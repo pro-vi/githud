@@ -19,7 +19,7 @@
 
 GitHub sends you everything. A repo you starred once, a bot commenting on CI, a thread
 you already replied to, someone else's review request. By Wednesday the inbox has 50
-unread items and you stop reading it — which is exactly when the one that mattered
+unread items and you stop reading it. That is exactly when the one that mattered
 arrives.
 
 githud does not mirror that inbox. It answers a smaller question, all day, in the corner
@@ -33,12 +33,12 @@ Click it and you get the whole picture. On a real account this is usually about 
 notifications down to a handful**.
 
 > **The moat is signal quality and trust, not the glass.** The one thing that kills a
-> tool like this is a **miss** — so githud is built to never silently hide something you
+> tool like this is a **miss**, so githud is built to never silently hide something you
 > needed, and to let you audit what it hid.
 
 ## Three lanes
 
-### Needs you — what you actually have to act on
+### Needs you: what you actually have to act on
 
 <img src="docs/images/needs-you.png" width="520" alt="The Needs you lane">
 
@@ -46,22 +46,21 @@ Review requests, mentions, assignments, and human replies on your own PRs. Bots,
 watch-the-repo noise, and threads where you already had the last word are suppressed.
 
 This lane has **two** sources, and the second one is the point. One is your
-notifications, filtered. The other is a standing search for reviews you owe — because a
+notifications, filtered. The other is a standing search for reviews you owe, because a
 review request stays owed after you read the notification, and a read notification is
-gone from the GitHub inbox forever. Without that search, those PRs are invisible. That
-is a miss, and misses are the thing that kills this tool.
+gone from the GitHub inbox forever. Without that search, those PRs are invisible.
 
-### Inbound — what is at your door
+### Inbound: what is at your door
 
 <img src="docs/images/inbound.png" width="520" alt="The Inbound lane, longest wait first">
 
 Every open issue and PR that someone **else** opened on repos you own, longest wait
 first. It is a triage queue, so the contributor who has been waiting since December
-leads, not the one who wrote yesterday. Bot and draft items hold back to a quiet count.
+leads. Bot and draft items hold back to a quiet count.
 
 One search per poll. No watch settings to configure.
 
-### Your PRs — how your own work is doing
+### Your PRs: how your own work is doing
 
 <img src="docs/images/your-prs.png" width="520" alt="The Your PRs lane grouped by org">
 
@@ -72,18 +71,19 @@ It never invents a state it cannot back: no checks is not passing, and "checking
 not ready.
 
 With work across several orgs the lane can wear titles, as above. Each org gets its own
-group ending in its own drafts and then its own gone-quiet PRs. Fold an org you are not
-working on today and it collapses to one line that **hides but still counts** —
-`acme · 4, 5 drafts, 2 gone quiet` — so nothing disappears silently. Drag orgs into the
-order you want. Both settings stay on that machine, because "which orgs matter" is a
-property of the desk, not the account.
+group, ending in its own drafts and then its own gone-quiet PRs.
+
+Fold an org you are not working on today and it collapses to a single line that **hides
+but still counts**: `acme · 4, 5 drafts, 2 gone quiet`. Nothing disappears silently. You
+can also drag orgs into the order you want. Both settings stay on that machine, because
+which orgs matter is a property of the desk, not the account.
 
 When your inbox is clear, the pill becomes a live gauge of your PRs instead of going
 blank.
 
 ## Install
 
-**Requires macOS 13 or newer.** Universal — Apple silicon and Intel.
+**Requires macOS 13 or newer.** Universal (Apple silicon and Intel).
 
 ### Download
 
@@ -91,8 +91,8 @@ Grab the latest `.zip` from [**Releases**](https://github.com/pro-vi/githud/rele
 unzip, and drag `githud.app` to `/Applications`.
 
 > [!IMPORTANT]
-> The build is **not signed yet** — there is no Apple Developer ID certificate on this
-> project. macOS Gatekeeper will refuse a plain double-click. Either **right-click the
+> The build is **not signed yet**. There is no Apple Developer ID certificate on this
+> project, so macOS Gatekeeper will refuse a plain double-click. Either **right-click the
 > app → Open** the first time, or:
 > ```sh
 > xattr -d com.apple.quarantine /Applications/githud.app
@@ -100,8 +100,7 @@ unzip, and drag `githud.app` to `/Applications`.
 
 ### Build it yourself
 
-You need a Swift 5.9+ toolchain. Command Line Tools is enough — full Xcode is not
-needed.
+You need a Swift 5.9+ toolchain. Command Line Tools is enough; full Xcode is not needed.
 
 ```sh
 git clone https://github.com/pro-vi/githud.git
@@ -174,20 +173,20 @@ Avoid `-w 'ghp_…'` with the token inline. That leaks it into shell history and
 | **Put it away** | <kbd>esc</kbd>, or click anywhere else |
 | **Settings** | right-click the menu-bar item → *Settings…* |
 
-The global hotkey uses no Accessibility permission — macOS never asks you to approve
+The global hotkey uses no Accessibility permission, so macOS never asks you to approve
 anything.
 
 Settings live on the glass, inside the island itself. There you pick the theme, choose
 which reasons reach "Needs you", turn on the default-off sections, set launch at login,
-and open two more cards: **Pill style** (how the collapsed pill holds the inbound queue
-— *Door first*, *Side by side — quiet mark*, or *Side by side — with the count*, each
-previewed with your own live data, never a fake queue) and **Lens** (which orgs lead,
-which are folded, and their order).
+and open two more cards. **Pill style** controls how the collapsed pill holds the inbound
+queue: *Door first*, *Side by side — quiet mark*, or *Side by side — with the count*, each
+previewed with your own live data rather than a mocked-up queue. **Lens** controls which
+orgs lead, which are folded, and their order.
 
 ## Themes
 
-Nine of them. The monochrome themes carry state by glyph **shape and weight**, not by
-hue — so they stay calm, and they stay readable if you do not see colour the way the
+Nine of them. The monochrome themes carry state by glyph **shape and weight** rather than
+by hue, so they stay calm, and they stay readable if you do not see colour the way the
 designer does.
 
 | Color *(default)* | Geist Mono | Tokyo Night |
@@ -208,7 +207,7 @@ read.
 
 **It will not claim an all-clear it did not earn.** If a source did not confirm on this
 tick, the pill says *"clear so far"*, not *"clear"*. A checkmark means all three lanes
-came back clean this session — not that a request failed quietly.
+came back clean this session, never that a request failed quietly.
 
 **It will not take your focus.** The island is a non-activating panel. It never steals
 keyboard focus from what you are doing, and it shows over full-screen Spaces.
@@ -218,8 +217,8 @@ inbox costs a `304 Not Modified` and nothing else. Around 0% CPU between polls.
 
 ## Audit what it hid
 
-Trust is earned, not assumed. The island footer links to your full GitHub inbox so you
-can check whether anything githud suppressed actually needed you.
+The island footer links to your full GitHub inbox, so you can check whether anything
+githud suppressed actually needed you.
 
 From the terminal, you can see the same decision with the hidden set spelled out:
 
@@ -232,15 +231,15 @@ file**](.github/ISSUE_TEMPLATE/missed-notification.md).
 
 ## How it is built
 
-- **`Sources/GithudCore`** — pure logic, no AppKit, testable without a window server.
+- **`Sources/GithudCore`**: pure logic, no AppKit, testable without a window server.
   `SignalClassifier` decides reason → action-required / fyi / noise, and knows about
   bots and about you. `RadarReading` holds all the state and policy of the "Needs you"
   lane. `PulsePresenter` does the same for your PRs, including the owner lens.
   `PlainWords` owns every user-facing string, so no two surfaces can word the same
   thing differently. Around thirty types; those four carry most of the decisions.
-- **`Sources/GithudApp`** — the AppKit shell: a non-activating `NSPanel` overlay with an
+- **`Sources/GithudApp`**: the AppKit shell. A non-activating `NSPanel` overlay with an
   `NSVisualEffectView` island, `PollScheduler` for live polling, and the status item.
-- **`Tests/`** — a zero-dependency runner. XCTest and swift-testing need full Xcode,
+- **`Tests/`**: a zero-dependency runner. XCTest and swift-testing need full Xcode,
   which this project does not use, so the tests are a plain executable that exits
   non-zero on failure. **1704 assertions**, no network, no PAT, no GitHub account.
 
@@ -251,17 +250,30 @@ scripts/screenshots.sh   # regenerate the images in this README from fixtures
 ```
 
 **[`docs/TOPOLOGY.md`](docs/TOPOLOGY.md) is the one document that describes what githud
-is now.** It holds the rules the interface is built from — the operators, the laws they
+is now.** It holds the rules the interface is built from: the operators, the laws they
 obey, and the exemptions. Read it before changing behaviour. This README lists
 features, which change every release; the topology holds the rules underneath, which do
 not.
 
-> `loop/` and `docs/plans/` are this project's AI-pairing dev log — a record of how each
-> change was decided, never updated afterwards, and not required reading.
+## How it was built
+
+githud was written by an autonomous AI build loop, from an empty directory to the app in
+these screenshots. That loop was composed by
+[**loopgen**](https://github.com/pro-vi/loopgen), a prompt compiler for `/goal` and ralph
+loops.
+
+[`loop/`](loop) is that loop's working state, kept as the record: the driving prompt, an
+append-only iteration log, the rubric it graded itself against, blind adversarial
+critiques from other models, and 59 machine-generated evidence manifests. It is a dev
+log, not documentation, and you cannot run it: the entry point is a slash command from a
+private toolchain. Nothing in it is needed to build or change githud.
+
+[`docs/plans/`](docs/plans) is the same kind of record at the work-package level. Both are
+append-only and correct only about the day they were written.
 
 ## Contributing
 
-Pull requests are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md).
+Pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 The most valuable contribution is not code. githud's whole premise is a trust bet, so
 the two issue templates — [**missed

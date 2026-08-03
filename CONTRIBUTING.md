@@ -26,10 +26,10 @@ without any code, is the single highest-leverage contribution to this project.
    ```
 4. Open a PR describing what changed and why.
 
-## `loop/` and `docs/plans/`
+## `loop/`
 
-`loop/` and `docs/plans/` are this project's AI-pairing dev log — generated
-working context for an iterative build process, not hand-authored
-documentation. Please don't edit them in your PR; if a PR needs to reference
+`loop/` is the working state of the autonomous build loop that wrote githud:
+generated context for an iterative build process, not hand-authored
+documentation. Please don't edit it in your PR; if a PR needs to reference
 something in there, quote it in the PR description instead. `README.md`,
 `Sources/`, and `Tests/` are the surfaces a contribution should touch.

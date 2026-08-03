@@ -243,10 +243,10 @@ final class StatusItemController: NSObject, NSMenuDelegate {
     @objc private func quitApp() { onQuit() }
 }
 
-/// Draws the 18×18pt TEMPLATE image for a `StatusGlyphDescriptor` — geometry verbatim from
-/// docs/plans/2026-07-22-001-g-takes-the-bar-wp.md ("the g takes the bar", render-verified
-/// against docs/design/2026-07-12-mark-settings-mocks.html top section), which RETIRES the
-/// arcs constant-mark (D-glyph) in favor of the Glyphling g with per-state eyes.
+/// Draws the 18×18pt TEMPLATE image for a `StatusGlyphDescriptor` — geometry render-verified
+/// against the top section of docs/design/2026-07-12-mark-settings-mocks.html ("the g takes
+/// the bar"), which RETIRES the arcs constant-mark (D-glyph) in favor of the Glyphling g
+/// with per-state eyes.
 ///
 /// Template = alpha-only ink: the system tints the mark black/white per bar appearance, so
 /// on this fourth surface the color doctrine's gray-swap law is not an audit — it is the

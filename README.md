@@ -268,8 +268,7 @@ critiques from other models, and 59 machine-generated evidence manifests. It is 
 log, not documentation, and you cannot run it: the entry point is a slash command from a
 private toolchain. Nothing in it is needed to build or change githud.
 
-[`docs/plans/`](docs/plans) is the same kind of record at the work-package level. Both are
-append-only and correct only about the day they were written.
+It is append-only, and correct only about the day each entry was written.
 
 ## Contributing
 

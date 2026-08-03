@@ -4,8 +4,8 @@
 interface is built from, and the laws they must obey. It describes *structure*, not features.
 
 **What this is not.** Not a feature list — that's the [README](../README.md). Not a history of
-decisions — that's `docs/plans/`, which is append-only and correct only about the day it was
-written. Not a component library; githud has ~5 primitives, not a catalogue.
+decisions — the build record lives in `loop/`, which is append-only and correct only about the
+day it was written. Not a component library; githud has ~5 primitives, not a catalogue.
 
 **Why it exists.** Features are the *output* of the system and change on every ship, so any
 document enumerating them is stale on landing. The rules underneath don't. This is also the
@@ -31,8 +31,7 @@ here, in the same pull request. Nothing else in this document is load-bearing ag
 
 ## Laws
 
-Numbering is stable. Reordering preserves numbers in place; a retired law leaves a gap. Same
-rule as `U-ID`s in `docs/plans/`.
+Numbering is stable. Reordering preserves numbers in place; a retired law leaves a gap.
 
 **L1 — conservation.** Every row **admitted to a lane** lands exactly once: as a visible row,
 inside a subordinate run, in a terminal region, or inside a count. Hiding is never dropping.

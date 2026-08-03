@@ -92,11 +92,18 @@ unzip, and drag `githud.app` to `/Applications`.
 
 > [!IMPORTANT]
 > The build is **not signed yet**. There is no Apple Developer ID certificate on this
-> project, so macOS Gatekeeper will refuse a plain double-click. Either **right-click the
-> app → Open** the first time, or:
-> ```sh
-> xattr -d com.apple.quarantine /Applications/githud.app
-> ```
+> project, so Gatekeeper blocks it on first launch. What you have to do depends on your
+> macOS version:
+>
+> - **macOS 15 Sequoia and newer** — double-click it once and let it be refused, then open
+>   **System Settings → Privacy & Security**, scroll to **Security**, and click **Open
+>   Anyway** next to githud. Sequoia removed the old right-click shortcut, so this is now
+>   the only route through the UI.
+> - **macOS 13 and 14** — **right-click the app → Open**, then confirm.
+> - **Any version, from the terminal** — `xattr -d com.apple.quarantine /Applications/githud.app`
+>
+> Building it yourself avoids all of this. Quarantine is attached by whatever downloads a
+> file, so an app you compiled locally does not carry the flag and simply runs.
 
 ### Build it yourself
 

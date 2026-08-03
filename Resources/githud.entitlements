@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- The ONE entitlement the app needs under the hardened runtime (release WP
+	     Phase 0, U3): URLSession to api.github.com. Keychain (Security.framework
+	     generic password), the Carbon summon hotkey, and SMAppService login-item
+	     registration all work without additional entitlements. Enumerated from
+	     behavior — add nothing speculative here. -->
+	<key>com.apple.security.network.client</key>
+	<true/>
+</dict>
+</plist>

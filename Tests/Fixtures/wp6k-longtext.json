@@ -1,0 +1,134 @@
+[
+  {
+    "expected": "actionRequired",
+    "note": "WP-6k proof fixture — long title + long excerpt so the row truncates and earns the chevron (the Space-peek witness)",
+    "thread": {
+      "id": "6001",
+      "unread": true,
+      "reason": "review_requested",
+      "updated_at": "2026-07-08T02:00:00Z",
+      "subject": {
+        "title": "Fix the race in PollScheduler when expand fires during an in-flight tick and the coalescer supersedes the pending render",
+        "type": "PullRequest",
+        "latest_comment_url": null
+      },
+      "repository": {
+        "full_name": "acme/api",
+        "private": true,
+        "owner": { "login": "acme", "type": "Organization" }
+      },
+      "latest_comment_author_login": "alice",
+      "latest_comment_excerpt": "I think the guard in setNeedsRender needs to also check isVisible before scheduling — otherwise the burst double-fires"
+    }
+  },
+  {
+    "expected": "actionRequired",
+    "note": "WP-6k proof fixture — long mention row (chevroned)",
+    "thread": {
+      "id": "6002",
+      "unread": true,
+      "reason": "mention",
+      "updated_at": "2026-07-08T01:00:00Z",
+      "subject": {
+        "title": "Design review: the collapsed pill gauge should lead with ready segments before blocked ones in every theme",
+        "type": "Issue",
+        "latest_comment_url": null
+      },
+      "repository": {
+        "full_name": "acme/web",
+        "private": true,
+        "owner": { "login": "acme", "type": "Organization" }
+      },
+      "latest_comment_author_login": "maria",
+      "latest_comment_excerpt": "@you the gauge ordering matters for the glance promise — can you confirm the worst-first ordering is deliberate here?"
+    }
+  },
+  {
+    "expected": "actionRequired",
+    "note": "WP-6k proof fixture — long assigned row (chevroned; the ↓↓-then-Space target)",
+    "thread": {
+      "id": "6003",
+      "unread": true,
+      "reason": "assign",
+      "updated_at": "2026-07-08T00:30:00Z",
+      "subject": {
+        "title": "Investigate the intermittent 304-swallowing behavior when URLCache revalidates the conditional notifications poll",
+        "type": "Issue",
+        "latest_comment_url": null
+      },
+      "repository": {
+        "full_name": "acme/platform",
+        "private": true,
+        "owner": { "login": "acme", "type": "Organization" }
+      },
+      "latest_comment_author_login": "deshawn",
+      "latest_comment_excerpt": "Repro: set NSURLCache shared capacity nonzero, poll twice, watch the second 200 arrive with no network traffic at all"
+    }
+  },
+  {
+    "expected": "actionRequired",
+    "note": "WP-6k proof fixture — long review row",
+    "thread": {
+      "id": "6004",
+      "unread": true,
+      "reason": "review_requested",
+      "updated_at": "2026-07-07T22:00:00Z",
+      "subject": {
+        "title": "Refactor the theme token bundle so Increase Contrast folds through one effectiveTheme call site everywhere",
+        "type": "PullRequest",
+        "latest_comment_url": null
+      },
+      "repository": {
+        "full_name": "acme/web",
+        "private": true,
+        "owner": { "login": "acme", "type": "Organization" }
+      },
+      "latest_comment_author_login": "priya",
+      "latest_comment_excerpt": "The border-opacity fold is the only place the a11y multiplier still lives outside the theme — worth pulling in too"
+    }
+  },
+  {
+    "expected": "actionRequired",
+    "note": "WP-6k proof fixture — long mention row (lane-cap filler)",
+    "thread": {
+      "id": "6005",
+      "unread": true,
+      "reason": "mention",
+      "updated_at": "2026-07-07T20:00:00Z",
+      "subject": {
+        "title": "Postmortem draft: the stale-freshness banner that sat over live data for a whole session needs your review notes",
+        "type": "Issue",
+        "latest_comment_url": null
+      },
+      "repository": {
+        "full_name": "acme/api",
+        "private": true,
+        "owner": { "login": "acme", "type": "Organization" }
+      },
+      "latest_comment_author_login": "sam",
+      "latest_comment_excerpt": "@you the seed-the-reducer fix section cites your Blocker B analysis — please check the timeline holds together"
+    }
+  },
+  {
+    "expected": "actionRequired",
+    "note": "WP-6k proof fixture — long assigned row (lane-cap filler)",
+    "thread": {
+      "id": "6006",
+      "unread": true,
+      "reason": "assign",
+      "updated_at": "2026-07-07T18:00:00Z",
+      "subject": {
+        "title": "Audit every CGColor bake site for the Light-Dark appearance change so no hairline sits stale after a system flip",
+        "type": "Issue",
+        "latest_comment_url": null
+      },
+      "repository": {
+        "full_name": "acme/platform",
+        "private": true,
+        "owner": { "login": "acme", "type": "Organization" }
+      },
+      "latest_comment_author_login": "kai",
+      "latest_comment_excerpt": "grep for cgColor assignments outside the factory — I count three that would miss viewDidChangeEffectiveAppearance"
+    }
+  }
+]

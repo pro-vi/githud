@@ -1,0 +1,682 @@
+<title>Gone quiet joins the tail — V3 architecture + program design</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --card: #ffffff; --ink: #1a2129; --ink2: #5a6572; --ink3: #8b95a3;
+    --line: #dde3ea; --accent: #2464c4; --accent-ink: #ffffff; --kill: #b4463c;
+    --add: #1f7a45; --add-bg: #e8f5ed; --del: #b4463c; --del-bg: #fbecea; --chg: #8a5a12; --chg-bg: #fdf3e2;
+    --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, monospace;
+    --sys: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) { :root {
+    --bg: #0b0e13; --card: #121722; --ink: #e7edf4; --ink2: #98a2b0; --ink3: #6b7683;
+    --line: #232b36; --accent: #4c94f8; --accent-ink: #0b0e13; --kill: #e07a6e;
+    --add: #6cc48d; --add-bg: #14251c; --del: #e07a6e; --del-bg: #2a1a19; --chg: #d8ab5c; --chg-bg: #2a2216;
+  } }
+  :root[data-theme="light"] {
+    --bg: #f6f7f9; --card: #ffffff; --ink: #1a2129; --ink2: #5a6572; --ink3: #8b95a3;
+    --line: #dde3ea; --accent: #2464c4; --accent-ink: #ffffff; --kill: #b4463c;
+    --add: #1f7a45; --add-bg: #e8f5ed; --del: #b4463c; --del-bg: #fbecea; --chg: #8a5a12; --chg-bg: #fdf3e2;
+  }
+  :root[data-theme="dark"] {
+    --bg: #0b0e13; --card: #121722; --ink: #e7edf4; --ink2: #98a2b0; --ink3: #6b7683;
+    --line: #232b36; --accent: #4c94f8; --accent-ink: #0b0e13; --kill: #e07a6e;
+    --add: #6cc48d; --add-bg: #14251c; --del: #e07a6e; --del-bg: #2a1a19; --chg: #d8ab5c; --chg-bg: #2a2216;
+  }
+  * { box-sizing: border-box; }
+  body { background: var(--bg); color: var(--ink); font: 15px/1.65 var(--sys); margin: 0; }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 0 24px 90px; }
+
+  header.lead { padding: 44px 0 6px; max-width: 74ch; }
+  header.lead .kicker { font: 600 11px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--accent); margin: 0 0 12px; }
+  header.lead h1 { font-size: 28px; font-weight: 750; letter-spacing: -0.022em; margin: 0 0 12px; text-wrap: balance; }
+  header.lead p { color: var(--ink2); margin: 0 0 10px; }
+  .ratified { font: 500 12px/1.6 var(--mono); color: var(--ink3); border-left: 2px solid #2f9e5f; padding: 3px 0 3px 12px; margin: 18px 0 0; }
+  .ratified strong { color: var(--ink); }
+
+  section { margin: 46px 0 0; }
+  .eyebrow { font: 600 11px/1 var(--mono); letter-spacing: .09em; text-transform: uppercase; color: var(--accent); margin: 0 0 10px; }
+  .eyebrow .n { color: var(--ink3); }
+  section h2 { font-size: 21px; font-weight: 700; letter-spacing: -0.015em; margin: 0 0 8px; max-width: 70ch; text-wrap: balance; }
+  section h3 { font-size: 15px; font-weight: 680; margin: 26px 0 8px; }
+  section p { color: var(--ink2); max-width: 76ch; margin: 0 0 12px; }
+  section p strong, li strong { color: var(--ink); font-weight: 640; }
+  code.tok { font: 500 11.5px var(--mono); background: color-mix(in srgb, var(--ink) 7%, transparent); border-radius: 4px; padding: 1px 5px; }
+
+  .panel { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 16px 20px; margin: 0 0 18px; }
+  .panel.key { border-left: 3px solid var(--accent); }
+  .panel.warn { border-left: 3px solid var(--kill); }
+  .panel h4 { margin: 0 0 8px; font-size: 13.5px; font-weight: 700; }
+  .panel p:last-child { margin-bottom: 0; }
+
+  pre { font: 500 12px/1.72 var(--mono); background: var(--card); border: 1px solid var(--line);
+    border-radius: 8px; padding: 13px 15px; overflow-x: auto; margin: 0 0 14px; }
+  pre .c { color: var(--ink3); }
+  pre .a { color: var(--add); background: var(--add-bg); display: block; margin: 0 -15px; padding: 0 15px; }
+  pre .d { color: var(--del); background: var(--del-bg); display: block; margin: 0 -15px; padding: 0 15px; text-decoration: line-through; text-decoration-color: color-mix(in srgb, var(--del) 45%, transparent); }
+  pre .m { color: var(--chg); background: var(--chg-bg); display: block; margin: 0 -15px; padding: 0 15px; }
+  pre .k { color: var(--accent); font-weight: 600; }
+  pre b { color: var(--ink); font-weight: 640; }
+  .filehead { font: 600 11px var(--mono); letter-spacing: .05em; text-transform: uppercase; color: var(--ink3); margin: 18px 0 6px; }
+
+  .tablewrap { overflow-x: auto; margin: 0 0 16px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; font: 600 10.5px var(--mono); letter-spacing: .06em; text-transform: uppercase;
+    color: var(--ink3); padding: 5px 14px 7px 0; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  td { padding: 8px 14px 8px 0; border-bottom: 1px solid color-mix(in srgb, var(--line) 55%, transparent);
+    color: var(--ink2); vertical-align: top; }
+  td:first-child { color: var(--ink); font-weight: 600; white-space: nowrap; }
+  tr:last-child td { border-bottom: none; }
+  td .mono, th .mono { font: 500 11.5px var(--mono); }
+  .verdict { font: 600 11px var(--mono); }
+  .ok { color: var(--add); } .no { color: var(--kill); } .neutral { color: var(--ink3); }
+
+  .uid { display: inline-block; font: 700 10px var(--mono); letter-spacing: .06em; color: var(--accent-ink);
+    background: var(--accent); border-radius: 4px; padding: 2px 6px; cursor: pointer; border: none; }
+  .uid.dim { background: var(--ink3); }
+  .uid.oblig { background: #6b46c1; }
+  tr.hot td { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+  .lede { font-size: 16px; color: var(--ink); max-width: 74ch; }
+
+  ol.units { margin: 0; padding-left: 0; list-style: none; }
+  ol.units > li { background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+    padding: 14px 18px; margin: 0 0 12px; }
+  ol.units > li > .uhead { display: flex; align-items: baseline; gap: 10px; margin: 0 0 8px; flex-wrap: wrap; }
+  ol.units > li > .uhead h3 { margin: 0; font-size: 15px; }
+  ol.units dl { margin: 0; font-size: 13px; }
+  ol.units dt { font: 600 10px var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--ink3); margin: 9px 0 2px; }
+  ol.units dd { margin: 0; color: var(--ink2); }
+  ol.units dd ul { margin: 3px 0 0; padding-left: 18px; }
+
+  footer.close { margin: 52px 0 0; padding: 18px 0 0; border-top: 1px solid var(--line); color: var(--ink3); font-size: 12.5px; }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+
+<header class="lead">
+  <div class="kicker">githud · WP V3 · architecture + program design</div>
+  <h1>Gone quiet joins the tail</h1>
+  <p class="lede">The owner lens governs live rows and drafts. It does not govern
+  <em>gone quiet</em> — so folding an org leaves its rotting PRs on screen. This closes the
+  last org-blind region and makes the fold mean what it says.</p>
+  <div class="ratified">
+    <strong>Ratified 2026-07-29 (dogfood):</strong> "in lens i disabled 'yours' … in gone quiet
+    and draft PRs, i see other orgs still" → <strong>tail it is</strong>; both regions tail the
+    org; order <strong>rows → drafts → quiet</strong> (descending relevance, not inherited region
+    order); copy stays <strong>"gone quiet"</strong> on glass and <code>stale</code> in code.
+  </div>
+</header>
+
+<!-- ══════════════════════════════ 0. BRIEF ══════════════════════════════ -->
+<section>
+  <div class="eyebrow"><span class="n">0 ·</span> Brief</div>
+  <h2>The claim, the decision, and what is still open</h2>
+
+  <p><strong>The claim.</strong> Folding an owner in the lens currently hides its live rows and
+  counts them on a ledger line, but its <em>gone quiet</em> rows keep rendering in a flat region
+  below — org-blind, unaffected by the fold. On the reporting lane every stale PR belonged to the
+  one folded owner, so folding "yours" emptied the live glance and left that section as the only
+  populated thing on screen. The mechanism: the lens's domain widens from two regions to three, so
+  each owner group ends with its own drafts and then its own quiet, and a folded owner's ledger
+  line admits all three counts.</p>
+
+  <p><strong>The decision, and what it beat.</strong> <code class="tok">LensEntry.group</code>
+  gains a third payload and <code class="tok">lensLayout</code> starts returning a
+  <code class="tok">LensLayout</code> value instead of a bare array. The rejected alternative was a
+  general <code class="tok">[Region: [PulseRow]]</code> map on the group — attractive because a
+  fourth region would then be free. It loses because the three regions are <em>not</em>
+  interchangeable at the view: drafts carry a count label and no control (the ratified no-caption
+  asymmetry), quiet carries a collapsed caption that <em>is</em> its affordance, and live rows carry
+  neither. A uniform map still needs a hand-written branch per region for its chrome, so it buys no
+  consumer collapse — and it invites summing regions uniformly, which is exactly the mistake the
+  live-only <code class="tok">fresh</code> rule was written to avoid.</p>
+
+  <p><strong>Non-goals and open questions.</strong> No per-owner reveal state — clicking any
+  group's <code class="tok">(show)</code> flips the one lane-wide
+  <code class="tok">showStale</code> pref, as the gear already does. No change to what counts as
+  stale (<code class="tok">staleAfter</code> stays 14 days). <span class="verdict neutral">Open:</span>
+  whether an org whose <em>only</em> rows are 16 weeks old deserves a title and a fold — this design
+  says yes for consistency with the draft-only precedent, and names it as the thing to watch.
+  <span class="verdict neutral">Open:</span> whether a four-clause ledger line still scans.
+  <span class="verdict neutral">Assumed:</span> that extending the dim treatment to quiet rows reads
+  as calm rather than as broken — it changes flat-shape appearance too, and only glass will settle it.</p>
+</section>
+
+<!-- ══════════════════════════ 1. THE ASYMMETRY ══════════════════════════ -->
+<section>
+  <div class="eyebrow"><span class="n">1 ·</span> The load-bearing decision</div>
+  <h2>The two prefs gate at different layers, and that is not an inconsistency</h2>
+
+  <div class="panel key">
+    <h4>Correction to the earlier plan</h4>
+    <p>The per-org-drafts plan said V3 would simply add <code class="tok">showStale:</code> beside
+    <code class="tok">showDrafts:</code> on <code class="tok">lensRegions</code>. That is wrong, and
+    the reason is doctrine, not convenience.</p>
+    <p><strong><code class="tok">showDrafts</code> gates the lens's INPUT.</strong> Drafts have no
+    collapsed caption — the ratified asymmetry is that hidden drafts stay <em>fully</em> invisible.
+    So "hidden" and "absent" mean the same thing, and passing <code class="tok">[]</code> is exactly
+    right: it also stops a folded ledger from claiming drafts the pref is hiding lane-wide.</p>
+    <p><strong><code class="tok">showStale</code> gates the group's RENDERING.</strong> Quiet's whole
+    grammar is that it <em>leaves a count behind</em> — "2 gone quiet (show)" is both the honesty and
+    the affordance. Gate its input and a stale-only owner disappears along with its count, which
+    breaks fold-not-filter. So stale enters the lens unconditionally and the view chooses caption
+    versus rows.</p>
+  </div>
+
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Pref</th><th>Gates</th><th>Because</th><th>Consequence</th></tr></thead>
+      <tbody>
+        <tr><td><span class="mono">showDrafts</span></td><td>lens input</td>
+            <td>no collapsed caption ⇒ hidden = absent</td>
+            <td>draft-only owner vanishes when off; ledger drops its draft clause</td></tr>
+        <tr><td><span class="mono">showStale</span></td><td>group rendering</td>
+            <td>caption ⇒ hidden = counted</td>
+            <td>stale-only owner always gets a group; ledger always carries its quiet clause</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Invariants</h3>
+  <ul>
+    <li><strong>Fold, not filter (three regions).</strong> Every input row — live, draft, or quiet —
+      appears exactly once: a visible row, a tail row, a flat terminal row, or inside a ledger count.
+      In both shapes, under every pref combination.</li>
+    <li><strong>The tails are positional.</strong> Within a group, <code class="tok">drafts</code>
+      then <code class="tok">quiet</code> render after <code class="tok">rows</code> and never join
+      their state sort. This is the 2026-06-18 inversion guard, now restated for two tails.</li>
+    <li><strong>Walk order == render order.</strong> Extended to the quiet tail, and to the flat
+      terminal reorder.</li>
+    <li><strong>Ledger honesty.</strong> A folded owner's line counts live, drafts, and quiet —
+      clause suppressed at zero, never <code class="tok">· 0</code>.</li>
+    <li><strong>Four surfaces, one truth.</strong> Lane groups, ledger lines, the Owners card, and
+      the lane eye agree on the owner set and its order — now over three regions.</li>
+  </ul>
+
+  <h3>Program obligations</h3>
+  <p>Discharged into declarations in section 2; each is marked at its landing site.</p>
+  <ul>
+    <li><span class="uid oblig">O1</span> &nbsp;The per-owner partition takes three regions, and
+      <code class="tok">OwnerBucket</code> is the one place their per-owner split is expressed.</li>
+    <li><span class="uid oblig">O2</span> &nbsp;<code class="tok">lensLayout</code> returns the whole
+      layout — entries plus <em>both</em> terminal sets plus the shape — so no consumer can compute
+      one and forget the other. The free functions that exist to rebuild that answer go private.</li>
+    <li><span class="uid oblig">O3</span> &nbsp;Row de-emphasis is derived from the row, never
+      passed: one predicate meaning "not in the live glance", covering both tails and both shapes.</li>
+  </ul>
+</section>
+
+<!-- ═══════════════════════ 2. TYPES & SIGNATURES ═══════════════════════ -->
+<section>
+  <div class="eyebrow"><span class="n">2 ·</span> Types &amp; signatures</div>
+  <h2>Declarations only — the thin review surface</h2>
+  <p>Diff-marked, grouped by file. <span class="verdict ok">+</span> added ·
+  <span class="verdict no">−</span> removed · <span class="verdict" style="color:var(--chg)">~</span>
+  changed. Contract comments assign every check to exactly one party.</p>
+
+  <div class="filehead">Sources/GithudCore/PulsePresenter.swift <span class="uid" data-u="U1">U1</span></div>
+<pre><span class="m">~ public struct <b>PulseSections</b></span>
+<span class="c">  // UNCHANGED signature — deliberately. `showStale` is NOT a parameter here:</span>
+<span class="c">  // quiet must reach the lens even when hidden, or its count dies with it.</span>
+    func lensRegions(showDrafts: Bool) -> (live: [PulseRow], drafts: [PulseRow])
+<span class="c">  // hides: that `stale` is passed separately by the caller — callers see three</span>
+<span class="c">  //        arguments at lensLayout, not a leaky two-plus-one convention.</span>
+
+<span class="m">~ public struct <b>OwnerBucket</b></span>              <span class="c">// discharges O1</span>
+    let key: String                        <span class="c">// lowercased identity</span>
+    let owner: String                      <span class="c">// first-seen display casing</span>
+    var live: [PulseRow]
+    var drafts: [PulseRow]
+<span class="a">+   var quiet: [PulseRow]</span>
+<span class="c">  // post: all three arrays preserve input order — this type partitions, never sorts.</span>
+<span class="c">  // hides: which region a row came from beyond these three names; no Region enum leaks.</span>
+
+<span class="m">~ static func <b>ownerBuckets</b>(live:, drafts:, quiet:) -> [OwnerBucket]</span>
+<span class="c">  // pre:  caller has already applied `showDrafts` to `drafts` (see lensRegions).</span>
+<span class="c">  // post: discovery order = live owners by lead-row rank, then draft-only, then</span>
+<span class="c">  //       quiet-only. Every returned bucket has ≥1 row in some region.</span>
+<span class="c">  // errors: none — a malformed repo string degrades to a whole-string owner, never throws.</span>
+<span class="c">  // hides: the dictionary it builds internally; callers get an ordered array.</span>
+
+<span class="a">+ public struct <b>LensLayout</b></span>                 <span class="c">// discharges O2</span>
+<span class="a">+   let entries: [LensEntry]</span>
+<span class="a">+   let terminalDrafts: [PulseRow]     // flat shape only; [] when grouped</span>
+<span class="a">+   let terminalQuiet: [PulseRow]      // flat shape only; [] when grouped</span>
+<span class="a">+   var isGrouped: Bool                // derived from the shape decision, not re-inferred</span>
+<span class="c">  // post: terminalDrafts and terminalQuiet are BOTH [] iff isGrouped — a row can</span>
+<span class="c">  //       never have two homes, and neither set can be forgotten independently.</span>
+<span class="c">  // hides: the guard arithmetic that chose the shape; consumers read isGrouped.</span>
+
+<span class="m">~ static func <b>lensLayout</b>(live:, drafts:, quiet:, prefs:, selfLogin:, lastOpened:)</span>
+<span class="m">~     -> <b>LensLayout</b></span>                        <span class="c">// was -> [LensEntry]</span>
+<span class="c">  // pre:  `drafts` already gated on showDrafts; `quiet` is NEVER gated (see above).</span>
+<span class="c">  // post: every input row is reachable exactly once across entries + both terminal</span>
+<span class="c">  //       sets + ledger counts. Tails follow rows positionally, never sorted in.</span>
+<span class="c">  // errors: none — total function over any row set, including all-empty.</span>
+
+<span class="d">- public static func isGrouped(_ entries: [LensEntry]) -> Bool</span>
+<span class="d">- public static func terminalDrafts(after:drafts:prefs:) -> [PulseRow]</span>
+<span class="c">  // Both existed to REBUILD an answer lensLayout already had. With two terminal</span>
+<span class="c">  // regions they would double the forget-hazard at the exact seam that has bitten</span>
+<span class="c">  // this WP twice (flat shape × the key walk). Folded into LensLayout.</span>
+
+<span class="m">~ static func <b>leadingRows</b>(_ rows:, prefs:) -> [PulseRow]   // now internal, not public</span>
+<span class="c">  // Still the one fold predicate for rows; only lensLayout calls it now.</span>
+</pre>
+
+  <div class="filehead">Sources/GithudCore/PulsePresenter.swift — LensEntry <span class="uid" data-u="U1">U1</span></div>
+<pre><span class="m">~ public enum <b>LensEntry</b></span>
+    case rows([PulseRow])
+<span class="m">~   case group(owner: String, title: String, rows: [PulseRow],</span>
+<span class="m">~              drafts: [PulseRow], <b>quiet: [PulseRow]</b>)</span>
+<span class="m">~   case ledger(owner: String?, title: String,</span>
+<span class="m">~              count: Int, draftCount: Int, <b>quietCount: Int</b>, fresh: Int)</span>
+<span class="c">  // post(group): drafts and quiet render AFTER rows, in that order — descending</span>
+<span class="c">  //              relevance (ratified). Payload order mirrors render order.</span>
+<span class="c">  // post(ledger): counts sum exactly the rows the fold hides in all three regions.</span>
+<span class="c">  //               `fresh` stays LIVE-only — a draft or a rotting PR is not arrival.</span>
+<span class="c">  // hides: the chrome each tail wears — that is the view's business, and it differs</span>
+<span class="c">  //        per region (label vs caption), which is why this is not a Region map.</span>
+</pre>
+
+  <div class="filehead">Sources/GithudCore/PlainWords.swift <span class="uid" data-u="U2">U2</span></div>
+<pre><span class="m">~ static func <b>lensLedger</b>(_ title:, count:, draftCount:, <b>quietCount:</b>, fresh:) -> String</span>
+<span class="c">  //   "acme · 4, 5 drafts, 2 gone quiet, 1 new"</span>
+<span class="c">  //   "facebook · 1 draft"              (zero live → the noun carries the line)</span>
+<span class="c">  //   "helios-oss · 3 gone quiet"       (zero live, zero drafts → same rule)</span>
+<span class="c">  // post: clause order is live · drafts · quiet · new; each suppressed at zero.</span>
+<span class="c">  //       Never renders "· 0". Pre-V3 call sites stay byte-identical.</span>
+<span class="m">~ static func <b>lensLedgerSpoken</b>(...) -> String     // mirrors, via spokenLedger</span>
+<span class="m">~ static func <b>lensCardRowSpoken</b>(...) -> String    // card row; no "open" verb</span>
+
+<span class="a">+ static func <b>quietTailLabel</b>(_ count: Int) -> String   // "2 gone quiet"</span>
+<span class="c">  // The REVEALED tail's label — sibling of draftTailLabel, no verb token.</span>
+<span class="c">  // hides: nothing about the 14-day threshold; that stayed in the gear tooltip in</span>
+<span class="c">  //        the 2026-07-12 plain-words round and does not come back.</span>
+<span class="c">  // NOTE: the COLLAPSED form reuses staleCaption(_:) unchanged — "2 gone quiet</span>
+<span class="c">  //       (show)". No new collapsed string; the ratified one is simply scoped per group.</span>
+</pre>
+
+  <div class="filehead">Sources/GithudCore/LensChooser.swift <span class="uid" data-u="U2">U2</span></div>
+<pre><span class="m">~ public struct <b>OwnerEntry</b></span>
+    let owner, title: String
+    let leads: Bool
+    let count: Int                <span class="c">// live</span>
+    let draftCount: Int
+<span class="a">+   let quietCount: Int</span>
+<span class="m">~ static func <b>make</b>(live:, drafts:, <b>quiet:</b>, prefs:, selfLogin:) -> LensChooser</span>
+<span class="c">  // pre:  same gating as the lane — drafts pre-gated, quiet never.</span>
+<span class="c">  // post: owner SET and ORDER equal the lane's, now across three regions; a folded</span>
+<span class="c">  //       owner with no rows anywhere still lists (the remnant rule) so it stays releasable.</span>
+<span class="c">  // hides: that the row label is built from the ledger grammar — the card and the</span>
+<span class="c">  //        ledger line it produces cannot read differently, but callers need not know.</span>
+</pre>
+
+  <div class="filehead">Sources/GithudApp/IslandContentView.swift <span class="uid" data-u="U3">U3</span></div>
+<pre><span class="a">+ private func <b>quietTailLabel</b>(count: Int) -> NSView</span>
+<span class="c">  // Sibling of draftTailLabel: 10pt medium, inkTertiary, indented under the group.</span>
+
+<span class="m">~ private func <b>lensLedgerLine</b>(owner:, title:, count:, draftCount:, <b>quietCount:</b>, fresh:)</span>
+
+<span class="m">~ PulseRowView.init(row:, theme:, peeked:, elideOwner:, emphasizeOwner:, onPeekToggle:)</span>
+<span class="c">  // discharges O3 — the de-emphasis stays DERIVED, and its rule widens:</span>
+<span class="c">  //     let subdued = row.isDraft || row.isStale     // "not in the live glance"</span>
+<span class="c">  // pre:  none — the row carries both facts already.</span>
+<span class="c">  // post: ink and weight only. The focus bar, hover band, click target and spoken</span>
+<span class="c">  //       form are untouched (an alphaValue on the row would composite the ⌃⌥G cursor).</span>
+<span class="c">  // VISIBLE CHANGE: flat-shape quiet rows dim too. Deliberate — one rule, both</span>
+<span class="c">  // shapes, both tails — and flagged in the brief as glass-settled, not argued.</span>
+</pre>
+
+  <div class="filehead">Composition root <span class="uid dim" data-u="U3">U3</span></div>
+<pre><span class="c">// There is no DI container. The object graph is assembled once per render pass in</span>
+<span class="c">// HUDPanelController.render(), from AppModel state, and the three-region call is</span>
+<span class="c">// the same expression at every one of its four sites:</span>
+
+    let sections = PulsePresenter.sections(for: model.pulseRows)
+    let regions  = sections.lensRegions(showDrafts: model.pulsePreferences.showDrafts)
+    let layout   = PulsePresenter.lensLayout(live: regions.live,
+                                             drafts: regions.drafts,
+<span class="a">+                                            quiet: sections.stale,       // never gated</span>
+                                             prefs: model.lensPreferences,
+                                             selfLogin: model.selfLogin,
+                                             lastOpened: model.lensLastOpened)
+<span class="c">// Bindings: prefs ← LensStore (UserDefaults, per machine) · rows ← the poll spine's</span>
+<span class="c">// last-good snapshot · showStale ← PulseStore, read by the VIEW, not by the lens.</span>
+</pre>
+</section>
+
+<!-- ═══════════════════════════ 3. CALL STACKS ═══════════════════════════ -->
+<section>
+  <div class="eyebrow"><span class="n">3 ·</span> Call stacks</div>
+  <h2>The two flows that change</h2>
+
+  <h3>Island render — grouped shape</h3>
+<pre>  IslandContentView.init
+    PulsePresenter.sections(for: pulse)
+    sections.lensRegions(showDrafts:)                  <span class="c">→ (live, drafts)</span>
+<span class="m">~   PulsePresenter.lensLayout(live:, drafts:, quiet: sections.stale, …) → LensLayout</span>
+      for entry in layout.entries
+        case .group(owner, title, rows, drafts, quiet)
+          ownerSubHeader(title)
+          rows.map(pulseRowView)                       <span class="c">// full emphasis</span>
+          if !drafts.isEmpty
+            draftTailLabel(drafts.count)               <span class="c">// "1 draft"</span>
+            drafts.map(pulseRowView)                   <span class="c">// dimmed, derived</span>
+<span class="a">+         if !quiet.isEmpty</span>
+<span class="a">+           if showStale   → quietTailLabel(quiet.count); quiet.map(pulseRowView)</span>
+<span class="a">+           else           → captionButton(staleCaption(quiet.count),</span>
+<span class="a">+                                          onClick: onToggleStale)</span>
+<span class="c">              // ONE lane-wide pref: any group's (show) reveals every group's quiet.</span>
+<span class="c">              // Named as a non-goal — per-owner reveal state would be a second</span>
+<span class="c">              // persisted set, and nobody asked for it.</span>
+<span class="m">~       case .ledger(owner, title, count, draftCount, quietCount, fresh)</span>
+<span class="m">~         lensLedgerLine(…, quietCount:, …)            // "pro-vi · 1, 1 draft, 2 gone quiet"</span>
+<span class="d">-   if showStale { stale region }                      // lane-level, retired in grouped shape</span>
+<span class="d">-   if showDrafts { terminal drafts region }           // ditto</span>
+<span class="a">+   // flat shape only — both empty when grouped, by LensLayout's post-condition:</span>
+<span class="a">+   if !layout.terminalDrafts.isEmpty  → revealedHeader(draftsHeader) + rows</span>
+<span class="a">+   if !layout.terminalQuiet.isEmpty   → showStale ? revealedHeader(staleHeader) + rows</span>
+<span class="a">+                                                   : captionButton(staleCaption(…))</span>
+<span class="c">    // ORDER FLIPPED in flat shape: drafts now precede quiet, matching the group</span>
+<span class="c">    // order the user ratified. Previously stale sat above drafts, inherited from</span>
+<span class="c">    // region order rather than chosen. Visible change; one mental model.</span>
+</pre>
+
+  <h3>Keyboard walk — must equal the render, id for id</h3>
+<pre>  KeySession.actionableIDs(radar:, pulse:, showDrafts:, showStale:, …)
+    sections = PulsePresenter.sections(for: pulse)
+    regions  = sections.lensRegions(showDrafts:)
+<span class="m">~   layout   = PulsePresenter.lensLayout(…, quiet: sections.stale, …)</span>
+      for entry in layout.entries
+        case .rows(rows)                    → ids += rows
+<span class="m">~       case .group(_, _, rows, drafts, quiet)</span>
+<span class="m">~         ids += rows + drafts + (showStale ? quiet : [])</span>
+<span class="c">          // A COLLAPSED quiet tail contributes NOTHING: its caption is structure,</span>
+<span class="c">          // not a row — same rule that keeps a ledger line out of the walk.</span>
+        case .ledger                        → break
+<span class="m">~     ids += layout.terminalDrafts                     // flat only, fold-filtered</span>
+<span class="a">+     ids += showStale ? layout.terminalQuiet : []</span>
+<span class="c">      // Both terminal sets come from LensLayout, so the walk cannot compute one</span>
+<span class="c">      // shape rule while the view computes another — that drift was a real finding</span>
+<span class="c">      // on the previous WP and this is its structural fix.</span>
+</pre>
+</section>
+
+<!-- ═══════════════════════ 4. FILE-TREE DIFF ═══════════════════════ -->
+<section>
+  <div class="eyebrow"><span class="n">4 ·</span> File-tree diff</div>
+  <h2>Everything the change touches</h2>
+<pre>Sources/GithudCore/
+<span class="m">~ PulsePresenter.swift        MODIFIED  three-region partition, LensLayout,     <span class="k">U1</span></span>
+                              &nbsp;         LensEntry payloads, retire 2 publics
+<span class="m">~ PlainWords.swift            MODIFIED  quiet clause + quietTailLabel           <span class="k">U2</span></span>
+<span class="m">~ LensChooser.swift           MODIFIED  quietCount on OwnerEntry, make(quiet:)  <span class="k">U2</span></span>
+<span class="m">~ KeySession.swift            MODIFIED  walk the quiet tail, flat reorder       <span class="k">U4</span></span>
+  LensPreferences.swift       (context — read, not modified) fold predicate home
+
+Sources/GithudApp/
+<span class="m">~ IslandContentView.swift     MODIFIED  quiet tail render, subdued rule,        <span class="k">U3</span></span>
+                              &nbsp;         flat terminal reorder, ledger line
+<span class="m">~ AppDelegate.swift           MODIFIED  makeLensChooser passes quiet            <span class="k">U3</span></span>
+<span class="m">~ HUDPanelController.swift    MODIFIED  render-pass chooser passes quiet        <span class="k">U3</span></span>
+<span class="m">~ LensChooserView.swift        MODIFIED  card row shows the quiet clause        <span class="k">U3</span></span>
+<span class="m">~ ProbeCommand.swift          MODIFIED  three-way split in line + JSON         <span class="k">U5</span></span>
+  PulseStore.swift            (context) showStale lives here, read by the view
+
+Tests/GithudCoreTests/
+<span class="m">~ main.swift                  MODIFIED  three-region fold-not-filter, tail   <span class="k">U1 U2 U4</span></span>
+                              &nbsp;         order, ledger clauses, walk equality
+
+docs/plans/
+<span class="a">+ 2026-07-29-001-feat-per-org-quiet-tail-plan.md   NEW   this blueprint, persisted</span>
+</pre>
+</section>
+
+<!-- ═══════════════════════ 5. SEAMS ═══════════════════════ -->
+<section>
+  <div class="eyebrow"><span class="n">5 ·</span> Seams &amp; enabling points</div>
+  <h2>What is provable in Core, and what is not provable at all</h2>
+  <p>This repo's test runner links <code class="tok">GithudCore</code> only — the App target has
+  <strong>no test seam by construction</strong>. That is why every rule worth pinning lives in Core,
+  and why the view units below say "live rehearsal" instead of inventing a double that cannot exist.</p>
+
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Seam</th><th>Enabling point</th><th>Double</th><th>Proves</th></tr></thead>
+      <tbody>
+        <tr><td><span class="mono">lensLayout</span></td>
+            <td>pure function — all state is arguments</td>
+            <td>fixture <span class="mono">[PulseRow]</span> + <span class="mono">LensPreferences</span></td>
+            <td>every <span class="mono">post:</span> on <span class="mono">LensLayout</span> and <span class="mono">LensEntry</span>; the fold-not-filter and positional-tail invariants</td></tr>
+        <tr><td><span class="mono">now</span> (age → isStale)</td>
+            <td>injected <span class="mono">now:</span> on <span class="mono">sections(for:now:)</span></td>
+            <td>frozen <span class="mono">Date</span></td>
+            <td>quiet membership is deterministic; a 14-day boundary row is testable</td></tr>
+        <tr><td><span class="mono">PlainWords</span></td>
+            <td>pure string functions</td>
+            <td>none needed</td>
+            <td>clause order, zero-suppression, the never-<span class="mono">· 0</span> rule, spoken parity</td></tr>
+        <tr><td><span class="mono">LensChooser.make</span></td>
+            <td>pure — rows + prefs in, descriptor out</td>
+            <td>fixture rows</td>
+            <td>card owner set/order == lane's, across three regions</td></tr>
+        <tr><td><span class="mono">actionableIDs</span></td>
+            <td><span class="mono">lens:</span> / <span class="mono">showStale:</span> parameters</td>
+            <td>fixture rows + prefs</td>
+            <td>walk order == render order; no id twice; collapsed quiet unreachable</td></tr>
+        <tr><td>island render</td>
+            <td>none — <span class="mono">--fixture-pulse</span> at the process boundary</td>
+            <td><span class="verdict no">none — live rehearsal</span></td>
+            <td>chrome per tail, the dim treatment, the caption's click; settled by capture, not assertion</td></tr>
+        <tr><td>probe split</td>
+            <td><span class="mono">githud probe</span> CLI</td>
+            <td><span class="verdict no">none — live rehearsal</span> (needs a classic PAT)</td>
+            <td>per-owner three-way counts equal <span class="mono">gh</span> truth</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ═══════════════════════ 6. UNITS & BUILD ORDER ═══════════════════════ -->
+<section>
+  <div class="eyebrow"><span class="n">6 ·</span> Implementation units</div>
+  <h2>Five units, ordered vertically — contract, then copy, then each surface</h2>
+
+  <ol class="units">
+    <li>
+      <div class="uhead"><span class="uid" data-u="U1">U1</span><h3>Core: the lens takes three regions</h3></div>
+      <dl>
+        <dt>Establishes</dt><dd>A group carries live rows, its drafts and its quiet; a folded owner's
+          ledger counts all three; and <code class="tok">lensLayout</code> hands back one value that
+          cannot be half-consumed. Discharges <span class="uid oblig">O1</span> <span class="uid oblig">O2</span>.</dd>
+        <dt>Dependencies</dt><dd>None</dd>
+        <dt>Files</dt><dd>Modify <code class="tok">PulsePresenter.swift</code>; mechanical updates to
+          <code class="tok">KeySession.swift</code>, <code class="tok">IslandContentView.swift</code>,
+          <code class="tok">LensChooser.swift</code> to compile; test <code class="tok">Tests/…/main.swift</code></dd>
+        <dt>Approach</dt><dd><code class="tok">OwnerBucket</code> gains <code class="tok">quiet</code>;
+          <code class="tok">ownerBuckets</code> takes a third array and appends quiet-only owners after
+          draft-only ones. The shape guard stays <code class="tok">leading.count &gt;= 2</code> — every
+          bucket has content by construction, so quiet-only owners count too.
+          <code class="tok">isGrouped</code> and <code class="tok">terminalDrafts</code> stop being
+          public and become fields.</dd>
+        <dt>Test scenarios</dt><dd><ul>
+          <li><em>Happy:</em> three owners × three regions → each group's tails hold only its own rows, in order rows → drafts → quiet.</li>
+          <li><em>Inversion guard ×2:</em> a group with a blocked draft AND a conflicted 16-week row → both render after the ready live row, drafts before quiet.</li>
+          <li><em>Edge:</em> quiet-only owner → group with empty rows and empty drafts, sunk below draft-only owners.</li>
+          <li><em>Edge:</em> <code class="tok">quiet: []</code> → entries byte-identical to the V2 layout.</li>
+          <li><em>Edge:</em> <code class="tok">isGrouped</code> true ⟹ both terminal sets empty (the post-condition, asserted directly).</li>
+          <li><em>Integration:</em> fold-not-filter over three regions × both shapes × folded/unfolded — visible ids unique, visible set == un-folded rows, ledger counts == exactly what folds hide.</li>
+        </ul></dd>
+        <dt>Verification</dt><dd>All five invariants hold; no public API exists to rebuild the shape decision.</dd>
+        <dt>Runtime evidence</dt><dd>Pure Core — the suite <em>is</em> the runtime evidence; no integration claim to execute.</dd>
+        <dt>Rollback</dt><dd>Revert the commit — no persisted shape changed, no stored pref added.</dd>
+      </dl>
+    </li>
+
+    <li>
+      <div class="uhead"><span class="uid" data-u="U2">U2</span><h3>Core: the ledger and the card admit the quiet</h3></div>
+      <dl>
+        <dt>Establishes</dt><dd>A folded owner's line says all three counts, and the Owners card row
+          reads identically to the ledger line it produces.</dd>
+        <dt>Dependencies</dt><dd>U1</dd>
+        <dt>Files</dt><dd>Modify <code class="tok">PlainWords.swift</code>,
+          <code class="tok">LensChooser.swift</code>; test <code class="tok">Tests/…/main.swift</code></dd>
+        <dt>Approach</dt><dd>Clause order live · drafts · quiet · new, each suppressed at zero, via the
+          existing <code class="tok">draftsNoun</code>-style single home. Zero-live keeps its rule and
+          extends: <code class="tok">"helios-oss · 3 gone quiet"</code> when live and drafts are both
+          zero. <code class="tok">quietTailLabel</code> joins as the revealed label; the collapsed form
+          reuses <code class="tok">staleCaption</code> untouched.</dd>
+        <dt>Test scenarios</dt><dd><ul>
+          <li><em>Happy:</em> all four clauses print in order; spoken form mirrors.</li>
+          <li><em>Edge:</em> zero live + drafts + quiet &gt; 0 → the quiet noun carries the line; never <code class="tok">· 0</code>.</li>
+          <li><em>Edge:</em> singular/plural on both nouns; <code class="tok">quietCount: 0</code> → V2 strings byte-identical.</li>
+          <li><em>Integration:</em> the <code class="tok">elsewhere</code> valve sums all three across every folded owner.</li>
+        </ul></dd>
+        <dt>Verification</dt><dd>No ledger or card string can print a zero count; every pre-V3 string is unchanged.</dd>
+      </dl>
+    </li>
+
+    <li>
+      <div class="uhead"><span class="uid" data-u="U4">U4</span><h3>Core: the walk follows the quiet tail</h3></div>
+      <dl>
+        <dt>Establishes</dt><dd>Keyboard order equals render order over three regions, and a collapsed
+          quiet tail is unreachable.</dd>
+        <dt>Dependencies</dt><dd>U1</dd>
+        <dt>Files</dt><dd>Modify <code class="tok">KeySession.swift</code>; test <code class="tok">Tests/…/main.swift</code></dd>
+        <dt>Approach</dt><dd>Per group: rows + drafts + quiet-when-shown. Flat: terminal drafts then
+          terminal quiet, both from <code class="tok">LensLayout</code>. Deliberately placed before the
+          view unit — it is the surface whose agreement is <em>provable</em>, so it defines the order the
+          view must match.</dd>
+        <dt>Test scenarios</dt><dd><ul>
+          <li><em>Happy:</em> id sequence == the documented render order, both shapes.</li>
+          <li><em>Edge:</em> <code class="tok">showStale</code> off → no quiet id reachable, in either shape.</li>
+          <li><em>Edge:</em> folded owner → neither its drafts nor its quiet enter the walk.</li>
+          <li><em>Invariant:</em> no id appears twice, under every pref × shape combination.</li>
+        </ul></dd>
+        <dt>Verification</dt><dd>Selection can never land on a row the lane does not draw.</dd>
+      </dl>
+    </li>
+
+    <li>
+      <div class="uhead"><span class="uid" data-u="U3">U3</span><h3>App: the island renders the quiet tail</h3></div>
+      <dl>
+        <dt>Establishes</dt><dd>Each group ends with its drafts then its quiet; quiet collapses to its
+          ratified caption and expands to a label plus dimmed rows; the flat shape reorders to match.
+          Discharges <span class="uid oblig">O3</span>.</dd>
+        <dt>Dependencies</dt><dd>U1, U2, U4</dd>
+        <dt>Files</dt><dd>Modify <code class="tok">IslandContentView.swift</code>,
+          <code class="tok">LensChooserView.swift</code>, <code class="tok">AppDelegate.swift</code>,
+          <code class="tok">HUDPanelController.swift</code></dd>
+        <dt>Approach</dt><dd>Mirror <code class="tok">draftTailLabel</code>'s indent and ink for the
+          revealed label; reuse <code class="tok">captionButton</code> for the collapsed form so the
+          click keeps flipping the one pref. Widen the derived predicate to
+          <code class="tok">isDraft || isStale</code>. The lane eye's owner set already derives from the
+          shared partition, so it picks up quiet-only owners with no edit.</dd>
+        <dt>Test expectation</dt><dd>None in Core — App has no test target. Proven by live rehearsal.</dd>
+        <dt>Runtime evidence</dt><dd><code class="tok">unverified until built</code> — settled by
+          <code class="tok">--fixture-pulse</code> with a three-region fixture, captured per-window by id,
+          under <code class="tok">showStale</code> both ways and a fold applied.</dd>
+      </dl>
+    </li>
+
+    <li>
+      <div class="uhead"><span class="uid" data-u="U5">U5</span><h3>Probe: the three-way split</h3></div>
+      <dl>
+        <dt>Establishes</dt><dd>The per-owner live/draft/quiet split is observable on live data without
+          opening the panel, and diffable against <code class="tok">gh</code>.</dd>
+        <dt>Dependencies</dt><dd>U1</dd>
+        <dt>Files</dt><dd>Modify <code class="tok">ProbeCommand.swift</code></dd>
+        <dt>Approach</dt><dd>Extend the existing <code class="tok">ownerBuckets</code> call to three
+          regions; human line stays shape-only by default (owner logins remain behind
+          <code class="tok">--show-items</code>, per the redaction contract), JSON gains a third field
+          on the anonymous-by-index split.</dd>
+        <dt>Test expectation</dt><dd>None — diagnostic surface.</dd>
+        <dt>Runtime evidence</dt><dd><code class="tok">unverified — needs GITHUD_PAT</code>; the V2
+          probe's kill condition is still unrun for the same reason.</dd>
+      </dl>
+    </li>
+  </ol>
+
+  <h3>Build order</h3>
+  <p><strong>U1</strong> → <strong>U2</strong> → <strong>U4</strong> → <strong>U3</strong> →
+  <strong>U5</strong>. Contract first, then the copy it needs, then the surface whose correctness is
+  <em>provable</em> (the walk), then the surface that can only be rehearsed (the view) against an order
+  already pinned, then the evidence instrument. Not stack order — the view deliberately lands fourth so
+  it is matching a fixed contract rather than defining one.</p>
+</section>
+
+<!-- ═══════════════════════ 7. RISK ═══════════════════════ -->
+<section>
+  <div class="eyebrow"><span class="n">7 ·</span> Scope, risk, disconfirming evidence</div>
+  <h2>What this does not do, and what would prove it wrong</h2>
+
+  <h3>Scope boundaries</h3>
+  <ul>
+    <li><strong>No per-owner reveal state.</strong> One lane-wide <code class="tok">showStale</code>;
+      any group's caption flips it for all. A second persisted set is not in scope.</li>
+    <li><strong>No change to the stale rule.</strong> <code class="tok">staleAfter</code> stays 14 days;
+      the threshold stays in the gear tooltip.</li>
+    <li><strong>The pill, the radar, the H1 queue, polling, persistence</strong> are untouched.</li>
+    <li><strong>Deferred:</strong> scroll-to-reveal on a pref flip — still open from 2026-07-26, and a
+      third tail makes the 240pt pane cap bite harder, not less.</li>
+    <li><strong>Deferred:</strong> whether tail rows keep GitHub's CI badge or take the ratified mock's
+      neutral WIP glyph — unanswered from V2, and now it would apply to two tails.</li>
+  </ul>
+
+  <h3>Disconfirming evidence</h3>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Claim</th><th>What would falsify it</th><th>Gate</th></tr></thead>
+      <tbody>
+        <tr><td>Tails never re-admit the inversion</td><td>a blocked draft or conflicted stale row rendering above a ready live row</td><td>U1 regression test, two tails</td></tr>
+        <tr><td>Fold-not-filter over three regions</td><td>any row appearing zero times or twice</td><td>U1 identity-multiset assertion</td></tr>
+        <tr><td>A row can never have two homes</td><td><code class="tok">isGrouped</code> true with a non-empty terminal set</td><td>U1 post-condition test</td></tr>
+        <tr><td>Walk == render</td><td>an id resolving to an unrendered row, or a collapsed quiet row reachable</td><td>U4</td></tr>
+        <tr><td>Pre-V3 output unchanged</td><td><code class="tok">quiet: []</code> producing different entries or strings</td><td>U1 + U2 byte-identity tests</td></tr>
+        <tr><td>The fold now means what it says</td><td>a folded owner's quiet row still on screen</td><td>live rehearsal, the reported case</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Risks</h3>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Risk</th><th>Mitigation</th></tr></thead>
+      <tbody>
+        <tr><td>Four-clause ledger stops scanning</td><td>Flagged Open in the brief; clause order is fixed and each suppresses at zero, so the common line stays two clauses. Copy-only revert.</td></tr>
+        <tr><td>Quiet-only orgs clutter the Owners card</td><td>Consistent with the draft-only precedent and foldable on arrival; watch in dogfood. Reversible by requiring live-or-draft content for discovery.</td></tr>
+        <tr><td>Dimming quiet rows reads as broken</td><td>One-line predicate; revert to <code class="tok">isDraft</code> alone without touching structure.</td></tr>
+        <tr><td>Flat-shape reorder surprises</td><td>Deliberate and stated; it buys one mental model across shapes.</td></tr>
+        <tr><td>Three tails × 240pt pane cap</td><td>Does not regress — collapsed quiet is one line per org. But it strengthens the case for the deferred scroll-to-reveal.</td></tr>
+        <tr><td>App layer stays untestable</td><td>Structural, pre-existing, named in section 5. Every rule that <em>can</em> live in Core does.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<footer class="close">
+  Architecture + program design · 5 units · 3 obligations · reopens the 2026-07-14 "open mic" for the
+  last org-blind region · companion to
+  <code class="tok">2026-07-26-per-org-drafts-mocks.html</code> and
+  <code class="tok">2026-07-12-org-grouping-mocks.html</code> · reviewer's thin surface is sections 0–2
+</footer>
+
+</div>
+
+<script>
+  // Click a U-ID chip to highlight every row that unit owns, across sections.
+  document.addEventListener('click', (e) => {
+    const chip = e.target.closest('.uid[data-u]');
+    if (!chip) return;
+    const u = chip.dataset.u;
+    const on = chip.getAttribute('aria-pressed') === 'true';
+    document.querySelectorAll('.uid[data-u]').forEach(c => c.setAttribute('aria-pressed', 'false'));
+    document.querySelectorAll('tr.hot').forEach(r => r.classList.remove('hot'));
+    if (on) return;
+    chip.setAttribute('aria-pressed', 'true');
+    document.querySelectorAll('ol.units > li').forEach(li => {
+      li.style.outline = li.querySelector(`.uid[data-u="${u}"]`) ? '2px solid var(--accent)' : '';
+    });
+  });
+</script>

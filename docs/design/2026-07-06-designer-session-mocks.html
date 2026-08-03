@@ -1,0 +1,1736 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>githud — design session mocks</title>
+<style>
+  /* ————— page tokens (chrome only; mock stages are committed-dark, they never theme-flip) ————— */
+  :root {
+    --bg: #f6f7f9; --card: #ffffff; --ink: #1a2129; --ink2: #5a6572; --ink3: #8b95a3;
+    --line: #dde3ea; --accent: #2464c4; --accent-ink: #ffffff;
+    --ok: #2da44e; --warn: #9a6700; --bad: #c93c37;
+    --chip-ok: #dcf2e3; --chip-warn: #f8ecd0; --chip-bad: #fadcda;
+    --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, monospace;
+    --sys: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) { :root {
+    --bg: #0b0e13; --card: #121722; --ink: #e7edf4; --ink2: #98a2b0; --ink3: #6b7683;
+    --line: #232b36; --accent: #4c94f8; --accent-ink: #0b0e13;
+    --ok: #4ac26b; --warn: #d29922; --bad: #f47067;
+    --chip-ok: #12351f; --chip-warn: #3a2d10; --chip-bad: #42201d;
+  }}
+  :root[data-theme="light"] {
+    --bg: #f6f7f9; --card: #ffffff; --ink: #1a2129; --ink2: #5a6572; --ink3: #8b95a3;
+    --line: #dde3ea; --accent: #2464c4; --accent-ink: #ffffff;
+    --ok: #2da44e; --warn: #9a6700; --bad: #c93c37;
+    --chip-ok: #dcf2e3; --chip-warn: #f8ecd0; --chip-bad: #fadcda;
+  }
+  :root[data-theme="dark"] {
+    --bg: #0b0e13; --card: #121722; --ink: #e7edf4; --ink2: #98a2b0; --ink3: #6b7683;
+    --line: #232b36; --accent: #4c94f8; --accent-ink: #0b0e13;
+    --ok: #4ac26b; --warn: #d29922; --bad: #f47067;
+    --chip-ok: #12351f; --chip-warn: #3a2d10; --chip-bad: #42201d;
+  }
+
+  html { scroll-behavior: smooth; }
+  body { background: var(--bg); color: var(--ink); font: 15px/1.6 var(--sys); margin: 0; }
+  * { box-sizing: border-box; }
+
+  /* ————— chrome ————— */
+  .topbar { position: sticky; top: 0; z-index: 50; background: color-mix(in srgb, var(--bg) 88%, transparent);
+    backdrop-filter: blur(10px); border-bottom: 1px solid var(--line); }
+  .topbar-in { max-width: 1200px; margin: 0 auto; padding: 10px 24px; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+  .brand { font-weight: 700; font-size: 14px; letter-spacing: -0.01em; }
+  .brand span { color: var(--ink3); font-weight: 400; }
+  nav { display: flex; gap: 6px; flex-wrap: wrap; }
+  nav a { font: 600 11px/1 var(--mono); letter-spacing: .04em; color: var(--ink2); text-decoration: none;
+    padding: 6px 10px; border: 1px solid var(--line); border-radius: 999px; background: var(--card); }
+  nav a:hover { color: var(--ink); border-color: var(--ink3); }
+  nav a:focus-visible, button:focus-visible, .vtab:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .wrap { max-width: 1200px; margin: 0 auto; padding: 0 24px 96px; }
+  header.lead { padding: 44px 0 8px; max-width: 78ch; }
+  header.lead h1 { font-size: 27px; font-weight: 750; letter-spacing: -0.022em; margin: 0 0 10px; text-wrap: balance; }
+  header.lead p { color: var(--ink2); margin: 0 0 8px; }
+  .doctrine-note { font: 500 12px/1.5 var(--mono); color: var(--ink3); border-left: 2px solid var(--accent);
+    padding: 2px 0 2px 12px; margin-top: 14px; }
+
+  /* ————— sections ————— */
+  section.record { border-top: 1px solid var(--line); margin-top: 48px; padding-top: 34px; }
+  .eyebrow { font: 600 11px/1 var(--mono); letter-spacing: .09em; text-transform: uppercase; color: var(--accent); margin: 0 0 10px; }
+  section.record h2 { font-size: 21px; font-weight: 700; letter-spacing: -0.015em; margin: 0 0 6px; max-width: 72ch; text-wrap: balance; }
+  .qsub { color: var(--ink2); max-width: 78ch; margin: 0 0 20px; }
+
+  .today { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px 18px; margin: 0 0 22px; }
+  .today h3 { margin: 0 0 6px; font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--ink3); }
+  .today p { margin: 0; color: var(--ink2); font-size: 13.5px; }
+  .today code, .spec code, .amendment code { font: 500 11.5px var(--mono); background: color-mix(in srgb, var(--ink) 7%, transparent);
+    border-radius: 4px; padding: 1px 4px; }
+
+  .variants { display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 20px; }
+  .vcard { background: var(--card); border: 1px solid var(--line); border-radius: 12px; overflow: hidden;
+    display: flex; flex-direction: column; }
+  .vcard.rec { border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent); }
+  .vbody { padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 10px; flex: 1; }
+  .vhead { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+  .vhead h3 { margin: 0; font-size: 15.5px; font-weight: 700; letter-spacing: -0.01em; }
+  .vid { font: 500 10.5px var(--mono); color: var(--ink3); }
+  .essence { margin: 0; color: var(--ink2); font-size: 13.5px; }
+  .vflags { display: flex; gap: 6px; flex-wrap: wrap; margin-left: auto; }
+  .chip { font: 700 10px/1 var(--mono); letter-spacing: .05em; text-transform: uppercase; padding: 4px 8px; border-radius: 999px; }
+  .chip.keep { background: var(--chip-ok); color: var(--ok); }
+  .chip.amend { background: var(--chip-warn); color: var(--warn); }
+  .chip.kill { background: var(--chip-bad); color: var(--bad); }
+  .chip.pick { background: var(--accent); color: var(--accent-ink); }
+
+  details { border-top: 1px solid var(--line); padding-top: 8px; }
+  details summary { cursor: pointer; font: 600 11px/1.6 var(--mono); letter-spacing: .05em; text-transform: uppercase; color: var(--ink3); list-style: none; }
+  details summary::before { content: "▸ "; }
+  details[open] summary::before { content: "▾ "; }
+  details > div { padding: 8px 0 2px; font-size: 13px; color: var(--ink2); }
+  details .spec { white-space: pre-wrap; }
+  .verdict { border-top: 1px solid var(--line); padding-top: 10px; font-size: 12.5px; color: var(--ink2); }
+  .verdict b { color: var(--ink); font-weight: 650; }
+  .amendment { margin-top: 4px; }
+  .amendment::before { content: "amend → "; font: 700 10px var(--mono); letter-spacing: .05em; color: var(--warn); text-transform: uppercase; }
+
+  .decide { margin-top: 22px; background: color-mix(in srgb, var(--accent) 7%, var(--card)); border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--line));
+    border-radius: 10px; padding: 14px 18px; font-size: 13.5px; }
+  .decide h3 { margin: 0 0 6px; font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--accent); }
+  .decide p { margin: 0 0 6px; color: var(--ink2); } .decide p:last-child { margin: 0; }
+  .decide b { color: var(--ink); font-weight: 650; }
+
+  /* ————— mock stage (committed dark — a desktop is a desktop in both page themes) ————— */
+  .stage { position: relative; background: linear-gradient(148deg, #232c4e 0%, #33234a 42%, #14263e 100%);
+    min-height: 220px; overflow: hidden; user-select: none; }
+  .stage.tall { min-height: 430px; }
+  .stage .menubar { position: absolute; top: 0; left: 0; right: 0; height: 24px;
+    background: rgba(16,18,24,.78); display: flex; align-items: center; gap: 10px;
+    padding: 0 12px; font: 500 11px var(--sys); color: rgba(235,240,246,.82); }
+  .stage .menubar.lightbar { background: rgba(246,246,248,.82); color: rgba(30,34,40,.85); }
+  .stage .menubar .mb-right { margin-left: auto; display: flex; align-items: center; gap: 12px; }
+  .stage .hint { position: absolute; left: 12px; bottom: 10px; font: 500 10.5px var(--mono); color: rgba(235,240,246,.5); }
+  .stage-ctl { display: flex; gap: 8px; align-items: center; padding: 10px 16px; border-top: 1px solid var(--line); background: var(--card); }
+  .stage-ctl button, .vtab { font: 600 12px var(--sys); color: var(--ink); background: var(--bg);
+    border: 1px solid var(--line); border-radius: 7px; padding: 5px 12px; cursor: pointer; }
+  .stage-ctl button:hover, .vtab:hover { border-color: var(--ink3); }
+  .stage-ctl .note { font: 500 10.5px var(--mono); color: var(--ink3); margin-left: auto; }
+  .vtab[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+
+  /* ————— island primitives (GitHub theme: the app's real tokens) ————— */
+  .island { position: absolute; top: 32px; left: 50%; transform: translateX(-50%);
+    background: #0d1117; border: 1px solid rgba(48,54,61,.85); border-radius: 14px;
+    box-shadow: 0 10px 30px rgba(0,0,0,.45), 0 2px 8px rgba(0,0,0,.35); overflow: hidden;
+    font-family: var(--sys); color: #e6edf3; }
+  .pill-ink { display: flex; align-items: center; justify-content: center; gap: 6px; height: 36px;
+    font: 600 13px var(--sys); color: #e6edf3; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .i-head { display: flex; align-items: center; gap: 8px; height: 22px; }
+  .i-lane { font: 600 11px var(--sys); color: #7d8590; letter-spacing: .02em; }
+  .i-badge { height: 16px; min-width: 16px; padding: 0 6px; border-radius: 8px; background: #2f81f7;
+    color: #fff; font: 700 11px/16px var(--sys); text-align: center; font-variant-numeric: tabular-nums; }
+  .i-sp { flex: 1; }
+  .i-icnbtn { width: 22px; height: 20px; display: grid; place-items: center; color: #7d8590; border-radius: 5px; }
+  .i-row { display: flex; gap: 8px; padding: 5px 6px; border-radius: 7px; align-items: flex-start; }
+  .i-row:hover { background: rgba(255,255,255,.06); }
+  .i-ric { width: 20px; display: grid; place-items: center; padding-top: 1px; color: #7d8590; flex: none; }
+  .i-rtx { min-width: 0; flex: 1; }
+  .i-rt { font: 500 13px/1.35 var(--sys); color: #e6edf3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .i-rs { font: 400 11px/1.5 var(--sys); color: #7d8590; font-variant-numeric: tabular-nums;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .i-rx { font: 400 11px/1.5 var(--sys); color: #484f58; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .i-cap { font: 400 11px var(--sys); color: #484f58; padding: 2px 6px; }
+  .i-foot { font: 400 11px var(--sys); color: #484f58; padding: 6px 6px 0; }
+  .i-sec { font: 600 11px var(--sys); color: #7d8590; padding: 8px 6px 2px; }
+  .glyph13 { font-size: 13px; line-height: 1; } .glyph12 { font-size: 12px; line-height: 1; }
+  .svg-ic { display: block; }
+
+  /* reduced motion: demos become instant (the app's own Reduce Motion contract) */
+  @media (prefers-reduced-motion: reduce) { .stage *, .stage { transition: none !important; animation: none !important; } }
+
+  .footer { margin-top: 56px; border-top: 1px solid var(--line); padding-top: 18px; color: var(--ink3); font-size: 12.5px; max-width: 78ch; }
+</style>
+
+<script>
+  function q(s, r) { return (r || document).querySelector(s); }
+  function qa(s, r) { return Array.from((r || document).querySelectorAll(s)); }
+</script>
+
+<div class="topbar"><div class="topbar-in">
+  <div class="brand">githud <span>/ design session — variants &amp; mocks · 2026-07-06</span></div>
+  <nav>
+    <a href="#d-morph">D-morph</a><a href="#d-card">D-card</a><a href="#d-glyph">D-glyph</a>
+    <a href="#d-reveal">D-reveal</a><a href="#d-copy">D-copy</a><a href="#gates">Gates ⛔</a>
+  </nav>
+</div></div>
+
+<div class="wrap">
+<header class="lead">
+  <h1>Six decisions, mocked live — pick a variant, or tear them apart</h1>
+  <p>Every variant below was specced from the real code (all <code style="font:500 12px var(--mono)">file:line</code> claims independently
+     verified), then passed through an adversarial doctrine review before reaching this page. Verdict chips show what survived:
+     <b>keep</b> = doctrine-clean as written, <b>amend</b> = clean after the noted amendment, <b>kill</b> = shown struck for the record.
+     A blue ring marks the runner's recommendation — a default, not a decision. The decisions are yours.</p>
+  <p class="doctrine-note">This page obeys the product's own doctrine: nothing on it moves until you click. Every demo is replayable.
+     Mock stages render the GitHub theme at real size (island 520px, pill 36px, radius 14).</p>
+</header>
+
+<section class="record" id="d-morph">
+<style>
+  .variants.stack { grid-template-columns: 1fr; }
+  #d-morph .m-island { width: 60px; height: 36px; }
+  #d-morph .m-island.expanded { width: 520px; height: 346px; }
+  #d-morph .m-pill { position: absolute; top: 0; left: 50%; transform: translateX(-50%); width: 60px; }
+  #d-morph .m-content { position: absolute; top: 0; left: 50%; transform: translateX(-50%); width: 520px; padding: 16px 18px 12px; }
+  #d-morph .m-lanewrap { position: relative; margin-top: 8px; }
+  #d-morph .m-lane { height: 226px; overflow-y: auto; scrollbar-width: none; }
+  #d-morph .m-lane::-webkit-scrollbar { display: none; }
+  #d-morph .m-fade { position: absolute; left: 0; right: 0; bottom: 0; height: 24px; pointer-events: none;
+    background: linear-gradient(to bottom, rgba(13,17,23,0), #0d1117); opacity: 1; transition: opacity 120ms ease-out; }
+  #d-morph .m-lanewrap.at-end .m-fade { opacity: 0; }
+
+  /* A — hand-off: one simultaneous curve; top band crossfades */
+  #mA { transition: width 180ms cubic-bezier(.2,0,0,1), height 180ms cubic-bezier(.2,0,0,1); }
+  #mA.expanded { transition: width 220ms cubic-bezier(.2,0,0,1), height 220ms cubic-bezier(.2,0,0,1); }
+  #mA .m-pill { opacity: 1; transition: opacity 80ms cubic-bezier(0,0,.2,1) 100ms; }
+  #mA.expanded .m-pill { opacity: 0; transition: opacity 100ms cubic-bezier(.4,0,1,1) 0ms; }
+  #mA .i-head { opacity: 0; transition: opacity 100ms cubic-bezier(.4,0,1,1) 0ms; }
+  #mA.expanded .i-head { opacity: 1; transition: opacity 120ms cubic-bezier(0,0,.2,1) 80ms; }
+  #mA .m-body { opacity: 0; transition: opacity 70ms cubic-bezier(.4,0,1,1) 0ms; }
+  #mA.expanded .m-body { opacity: 1; transition: opacity 100ms cubic-bezier(0,0,.2,1) 120ms; }
+  #mA.hid { opacity: 0; transform: translate(-50%, -8px); }
+  #mA { transition-property: width, height, opacity, transform; }
+  #mA.hid, #mA.showing { transition: opacity 140ms cubic-bezier(.4,0,1,1), transform 140ms cubic-bezier(.4,0,1,1); }
+
+  /* B — unfurl: width leads 120ms, edge unfurls 180ms (delay 60); body never fades */
+  #mB { transition: height 140ms cubic-bezier(.4,0,.6,1) 0ms, width 120ms cubic-bezier(.3,0,0,1) 80ms; }
+  #mB.expanded { transition: width 120ms cubic-bezier(.3,0,0,1) 0ms, height 180ms cubic-bezier(.32,.72,0,1) 60ms; }
+  #mB .m-pill { opacity: 1; transition: opacity 80ms cubic-bezier(0,0,.2,1) 120ms; }
+  #mB.expanded .m-pill { opacity: 0; transition: opacity 60ms cubic-bezier(.4,0,1,1) 0ms; }
+  #mB .i-head { opacity: 0; transition: opacity 60ms cubic-bezier(.4,0,1,1) 0ms; }
+  #mB.expanded .i-head { opacity: 1; transition: opacity 80ms cubic-bezier(0,0,.2,1) 60ms; }
+  #mB .m-edge { position: absolute; left: 0; right: 0; bottom: 0; height: 20px; pointer-events: none;
+    background: linear-gradient(to bottom, rgba(13,17,23,0), #0d1117); opacity: 0; transition: opacity 80ms; }
+  #mB.in-flight .m-edge { opacity: 1; }
+  #mB.hid { opacity: 0; transform: translateX(-50%) scaleY(.6); transform-origin: top center;
+    transition: opacity 120ms cubic-bezier(.4,0,1,1), transform 120ms cubic-bezier(.4,0,1,1); }
+
+  /* C — sequential print: ink off → glass moves → ink prints. --t = slow-mo multiplier */
+  #mC { --t: 1; transition: width calc(180ms*var(--t)) cubic-bezier(.2,0,0,1), height calc(180ms*var(--t)) cubic-bezier(.2,0,0,1); }
+  #mC.slowmo { --t: 4; }
+  #mC .m-pill { opacity: 1; transition: opacity calc(80ms*var(--t)) cubic-bezier(0,0,.2,1) calc(100ms*var(--t)); }
+  #mC.expanded .m-pill { opacity: 0; transition: opacity calc(60ms*var(--t)) cubic-bezier(.4,0,1,1) 0ms; }
+  #mC .m-content > * { opacity: 0; transition: opacity calc(50ms*var(--t)) cubic-bezier(.4,0,1,1) 0ms; }
+  #mC.expanded .m-content > * { opacity: 1; transition: opacity calc(100ms*var(--t)) cubic-bezier(0,0,.2,1) calc(120ms*var(--t)); }
+  #mC.hid { opacity: 0; transition: opacity 140ms cubic-bezier(.4,0,1,1); }
+</style>
+
+<p class="eyebrow">Record D-morph · feeds WP-3d / WP-3d′ · the signature move</p>
+<h2>When the pill becomes the island, what is the ink's contract mid-flight?</h2>
+<p class="qsub">Three honest answers: the pill's top band <b>hands off</b> into the header (overlap crossfade) · the advancing
+bottom edge <b>reveals</b> ink already laid out in place · the glass morphs <b>empty</b> and prints its ink after.
+All three run one ~220ms container morph, radius locked at 14, top edge pinned 8px under the menu bar. Click to judge.</p>
+
+<div class="today">
+  <h3>Today</h3>
+  <p>The morph does not exist — expand/collapse is a <b>hard cut</b>: <code>setExpanded → renderNow()</code> removes old content,
+  snaps the panel size, adds new content (<code>HUDPanelController.swift:326-338</code>). There is no NSAnimationContext anywhere in
+  Sources; the app's only animation is the 0.12s hover fade, which already models the Reduce Motion contract. Hide/show is also a hard
+  cut; while hidden, the static status-item glyph is the only handle back. All three variants degrade to exactly today's cut under
+  Reduce Motion, and all are interruptible mid-flight.</p>
+</div>
+
+<div class="variants stack">
+
+  <div class="vcard rec">
+    <div class="stage tall">
+      <div class="menubar"> <span style="font-weight:700"></span><span>githud</span>
+        <span class="mb-right"><span>⌃⌥G</span><span>Mon 21:42</span></span></div>
+      <div class="island m-island" id="mA">
+        <div class="m-pill pill-ink"><span class="glyph13">◉</span><span>7</span></div>
+        <div class="m-content">
+          <div class="i-head"><span class="i-lane">Needs you</span><span class="i-badge">7</span><span class="i-sp"></span>
+            <span class="i-icnbtn">⚙</span><span class="i-icnbtn">⌃</span></div>
+          <div class="m-body">
+            <div class="m-lanewrap"><div class="m-lane"><div class="m-rows"></div></div><div class="m-fade"></div></div>
+            <div class="i-sec">Your PRs</div>
+            <div class="i-row"><div class="i-ric glyph13" style="color:#3fb950">✓</div><div class="i-rtx">
+              <div class="i-rt">feat(island): reactive height with per-lane scroll cap</div>
+              <div class="i-rs">ready · approved · mergeable · 3h</div></div></div>
+            <div class="i-foot">3 stale hidden from the glance &nbsp;·&nbsp; GitHub inbox ↗</div>
+          </div>
+        </div>
+        <div class="m-edge"></div>
+      </div>
+      <div class="hint">expand 220ms · collapse 180ms · one curve</div>
+    </div>
+    <div class="stage-ctl">
+      <button data-toggle="#mA" data-labels="Expand|Collapse">Expand</button>
+      <button class="m-hide" data-target="#mA">Hide</button>
+      <span class="note">hide = collapse, then tuck up 8px under the bar</span>
+    </div>
+    <div class="vbody">
+      <div class="vhead"><h3>Hand-off — the pill grows into the header</h3><span class="vid">morph-hand-off-header</span>
+        <span class="vflags"><span class="chip pick">runner's pick</span><span class="chip amend">amend</span></span></div>
+      <p class="essence">One continuous surface morphs on a single curve while the pill's top band crossfades into the expanded
+      header in place — the pill is revealed to have been the island's header all along. No empty-glass beat.</p>
+      <details><summary>Build spec</summary><div class="spec">EXPAND 220ms, ONE NSAnimationContext.runAnimationGroup, cubic-bezier(0.2,0,0,1), width+height on the same curve simultaneously; radius constant 14. Expanded content built at final size immediately, added at opacity 0. Pill ink pinned in the top band, fades 1→0 over 0–100ms; header fades 0→1 over 80–200ms; body + footer fade 0→1 over 120–220ms. No per-row stagger, no text translation — the hand-off is the top BAND, not a traveling glyph. COLLAPSE 180ms mirrored (body out 0–70, header out 0–100, pill ink in 100–180). HIDE: collapse first, then pill fades out with 8px upward tuck (the menuBarGap), 140ms; status item stays a static handle — no glyph change, no flash. SHOW: fade in with 8px downward settle, 140ms. REDUCE MOTION: skip every group → today's hard cut. INTERRUPTION: single simultaneous curve retargets trivially from presentation values. Shadow: invalidateShadow() once, in the completion handler.</div></details>
+      <details><summary>Doctrine fit &amp; risks</summary><div><b>Fit:</b> motion maps 1:1 to the summon click; one continuous object — nothing appears from nowhere; opacity-only ink survives gray-swap; no stagger, no overshoot; the band hand-off crossfades real content at real positions — no fake traveling glyph.<br><br><b>Risks:</b> present() must keep the outgoing pill ink alive through flight (today it's removed synchronously — the main build delta). The 80–200ms overlap can read as brief double-exposure in the top band — judge at real size. Hide's collapse-then-fade is a 320ms two-beat; the pre-registered fallback is cutting straight to the fade.</div></details>
+      <div class="verdict"><b>Refuter — amend:</b> doctrine-clean on every hunted axis; the one violation was in the <i>mock</i>: a pill count of 3 beside 7 visible rows — a state the code can never produce (both bind to <code>rows.count</code>).
+      <div class="amendment">pill count, header badge, and row count must agree — <b>applied to all mocks on this page (7 everywhere)</b>.</div></div>
+    </div>
+  </div>
+
+  <div class="vcard">
+    <div class="stage tall">
+      <div class="menubar"><span style="font-weight:700"></span><span>githud</span>
+        <span class="mb-right"><span>⌃⌥G</span><span>Mon 21:42</span></span></div>
+      <div class="island m-island" id="mB">
+        <div class="m-pill pill-ink"><span class="glyph13">◉</span><span>7</span></div>
+        <div class="m-content">
+          <div class="i-head"><span class="i-lane">Needs you</span><span class="i-badge">7</span><span class="i-sp"></span>
+            <span class="i-icnbtn">⚙</span><span class="i-icnbtn">⌃</span></div>
+          <div class="m-body">
+            <div class="m-lanewrap"><div class="m-lane"><div class="m-rows"></div></div><div class="m-fade"></div></div>
+            <div class="i-sec">Your PRs</div>
+            <div class="i-row"><div class="i-ric glyph13" style="color:#3fb950">✓</div><div class="i-rtx">
+              <div class="i-rt">feat(island): reactive height with per-lane scroll cap</div>
+              <div class="i-rs">ready · approved · mergeable · 3h</div></div></div>
+            <div class="i-foot">3 stale hidden from the glance &nbsp;·&nbsp; GitHub inbox ↗</div>
+          </div>
+        </div>
+        <div class="m-edge"></div>
+      </div>
+      <div class="hint">width 120ms, then the edge unfurls 180ms · body never fades</div>
+    </div>
+    <div class="stage-ctl">
+      <button data-toggle="#mB" data-labels="Expand|Collapse">Expand</button>
+      <button class="m-hide" data-target="#mB">Hide</button>
+      <span class="note">hide = pill shrinks into its own top edge (scaleY .6 + fade)</span>
+    </div>
+    <div class="vbody">
+      <div class="vhead"><h3>Unfurl — width leads, the edge reveals</h3><span class="vid">morph-unfurl-edge-reveal</span>
+        <span class="vflags"><span class="chip amend">amend</span></span></div>
+      <p class="essence">Dynamic-Island-style two-axis choreography: the pill snaps wide first, then the bottom edge unfurls downward,
+      revealing rows already laid out in their final places — content never fades or moves; the real edge is the only performer.</p>
+      <details><summary>Build spec</summary><div class="spec">EXPAND 240ms, one transaction, two phases: width 60→520 over 0–120ms cubic-bezier(0.3,0,0,1); height 36→H over 60–240ms cubic-bezier(0.32,0.72,0,1) — spring-flavored decel, zero overshoot. Content built and framed at FINAL size at t=0, clipped by the growing container; zero opacity animation on the body. Only crossfade: pill ink out 0–60ms, header in 60–140ms. COLLAPSE 200ms reversed (height first, then width). A 16–24px soft gradient rides the advancing bottom edge mid-flight, then hands off to the persistent capped-lane fade — "more below this edge" is one continuous statement. HIDE: collapse, then scaleY 1→0.6 anchored top + fade, 120ms. SHOW: reverse, 160ms. REDUCE MOTION: hard cut. INTERRUPTION: retarget from presentation values; the height phase's 60ms delay is dropped on retarget.</div></details>
+      <details><summary>Doctrine fit &amp; risks</summary><div><b>Fit:</b> the purest never-fabricate content contract — rows exist at final positions from t=0 and a REAL edge reveals them; the bottom fade doubles as the overflow affordance, so mid-flight and at-rest meaning are identical.<br><br><b>Risks:</b> the most designed motion in the set — two overlapping phases at 240ms is the closest to "busy"; judge over a real desktop. Trickiest interruption bookkeeping. The footer trust link is the last thing to appear (~240ms).</div></details>
+      <div class="verdict"><b>Refuter — amend:</b> no kill-grade violation, but two honesty leaks: (a) with a center-anchored container the content would <i>slide horizontally</i> during the width phase unless pinned to the final rect — the essence's "revealed in place" breaks silently; (b) hide's scaleY squashes still-legible ink, contradicting the variant's own text-never-distorts stance.
+      <div class="amendment">(a) pin content to the container's center (<b>applied in this mock</b> — <code>left:50%; translateX(-50%)</code>; the build must counter-anchor the same way); (b) complete the pill-ink fade by ~60ms so scaleY never distorts legible ink; (c) counts agree (applied).</div></div>
+    </div>
+  </div>
+
+  <div class="vcard">
+    <div class="stage tall">
+      <div class="menubar"><span style="font-weight:700"></span><span>githud</span>
+        <span class="mb-right"><span>⌃⌥G</span><span>Mon 21:42</span></span></div>
+      <div class="island m-island" id="mC">
+        <div class="m-pill pill-ink"><span class="glyph13">◉</span><span>7</span></div>
+        <div class="m-content">
+          <div class="i-head"><span class="i-lane">Needs you</span><span class="i-badge">7</span><span class="i-sp"></span>
+            <span class="i-icnbtn">⚙</span><span class="i-icnbtn">⌃</span></div>
+          <div class="m-body">
+            <div class="m-lanewrap"><div class="m-lane"><div class="m-rows"></div></div><div class="m-fade"></div></div>
+            <div class="i-sec">Your PRs</div>
+            <div class="i-row"><div class="i-ric glyph13" style="color:#3fb950">✓</div><div class="i-rtx">
+              <div class="i-rt">feat(island): reactive height with per-lane scroll cap</div>
+              <div class="i-rs">ready · approved · mergeable · 3h</div></div></div>
+            <div class="i-foot">3 stale hidden from the glance &nbsp;·&nbsp; GitHub inbox ↗</div>
+          </div>
+        </div>
+      </div>
+      <div class="hint">ink off 60ms → glass 180ms → ink prints 120–220ms · deliberate empty-glass beat</div>
+    </div>
+    <div class="stage-ctl">
+      <button data-toggle="#mC" data-labels="Expand|Collapse">Expand</button>
+      <button class="m-hide" data-target="#mC">Hide</button>
+      <button class="vtab" id="mC-slow" aria-pressed="false">¼× slow-mo</button>
+      <span class="note">slow-mo exists to judge the empty-glass beat — the decision hinges on it</span>
+    </div>
+    <div class="vbody">
+      <div class="vhead"><h3>Sequential print — the glass moves empty, ink prints after</h3><span class="vid">morph-glass-then-ink</span>
+        <span class="vflags"><span class="chip keep">keep</span></span></div>
+      <p class="essence">A strict three-beat sequence: outgoing ink blinks off, the empty glass resizes as one clean object, incoming ink
+      prints on — text never stretches, clips, or coexists mid-flight. Closest to the existing teardown/rebuild render path.</p>
+      <details><summary>Build spec</summary><div class="spec">EXPAND 220ms, one runAnimationGroup: pill ink 1→0 over 0–60ms; frame over 0–180ms cubic-bezier(0.2,0,0,1); expanded content — built via the EXISTING present() flow, added at opacity 0 — fades in as one block over 120–220ms. Between 60–120ms the island is deliberately empty glass. COLLAPSE 180ms mirrored. Needs NO snapshots and NO shared elements: it is the current architecture with three opacity+frame animations laid over it — the cheapest faithful build. HIDE: the island fades in place, 140ms — it doesn't "go" anywhere because nothing physical persists; the status item is simply the handle, which is the literal truth of the architecture. SHOW: fade in at final position. REDUCE MOTION: hard cut. INTERRUPTION: simplest in the set — no text ever reverses direction.</div></details>
+      <details><summary>Doctrine fit &amp; risks</summary><div><b>Fit:</b> maximally honest to what the code actually does (content IS rebuilt, not moved — this variant refuses to theatricalize that); calm by subtraction; zero fabricated continuity.<br><br><b>Risks:</b> the 60ms empty-glass beat can read as a flicker on fast displays — the premium feel of a morph depends on ink continuity this variant deliberately gives up. The PLAN calls the morph "the signature move"; this is the anti-signature reading. In-place hide gives no spatial hint that the status item is the way back.</div></details>
+      <div class="verdict"><b>Refuter — keep:</b> the cleanest doctrine profile of the three; every code claim verified. Its weaknesses are product-taste calls this session exists to make, not violations. The empty-glass beat is a transitional non-state, not a fabricated claim.</div>
+    </div>
+  </div>
+</div>
+
+<div class="decide">
+  <h3>What you're deciding</h3>
+  <p><b>Runner's pick: hand-off.</b> It delivers the signature single-object morph the PLAN asks for, retargets trivially when
+  interrupted, and avoids the empty-glass flicker. The refuter notes it is <i>not</i> the doctrine-safest — that's sequential print —
+  and pre-cleared the fallback: <b>if the top-band double-exposure fails at real size, fall back to sequential print, not unfurl.</b></p>
+  <p><b>Scope bleed to decide on purpose:</b> every variant also specs the capped-lane bottom fade, which belongs to the separate
+  island-anatomy exploration. Ratifying a morph here also ratifies that fade behavior (static at rest, removed on scroll-to-end) —
+  decide it once, knowingly. Build burden either way: the scroll-fade listener must be event-driven and live only while expanded
+  (idle-footprint).</p>
+</div>
+
+<script>
+  (function () {
+    var MROWS = [
+      { i: '◉', t: 'Fix: pause-first debounce on wake polls', s: 'acme/api · sofia · review request · 2h', x: 'Could you sanity-check the lock ordering in the pause path…' },
+      { i: '@', t: 'Design tokens for the settings window', s: 'acme/hud · lin · mention · 3h', x: '' },
+      { i: '◉', t: 'v2 migration: keychain access groups', s: 'acme/api · devon · review request · 5h', x: '' },
+      { i: '↩', t: 'Crash on wake when the screen is locked', s: 'acme/hud · quinn · reply on your PR · 7h', x: 'Repro attached — happens only on the second wake…' },
+      { i: '@', t: 'CI: macos-14 runner queue times', s: 'acme/infra · mara · mention · 9h', x: '' },
+      { i: '✚', t: 'Docs: PAT scopes clarification', s: 'acme/site · theo · assignment · 1d', x: '' },
+      { i: '◉', t: 'Flaky test: freshness fold across DST', s: 'acme/api · ana · review request · 1d', x: '' }
+    ];
+    qa('#d-morph .m-rows').forEach(function (el) {
+      el.innerHTML = MROWS.map(function (r) {
+        return '<div class="i-row"><div class="i-ric glyph13">' + r.i + '</div><div class="i-rtx">' +
+          '<div class="i-rt">' + r.t + '</div><div class="i-rs">' + r.s + '</div>' +
+          (r.x ? '<div class="i-rx">' + r.x + '</div>' : '') + '</div></div>';
+      }).join('');
+    });
+    // capped-lane fade: off at scroll-end, back on scroll-up (scroll-mapped, like the build)
+    qa('#d-morph .m-lane').forEach(function (lane) {
+      lane.addEventListener('scroll', function () {
+        var end = lane.scrollTop + lane.clientHeight >= lane.scrollHeight - 2;
+        lane.parentElement.classList.toggle('at-end', end);
+      });
+    });
+    // unfurl: soft gradient rides the advancing edge only while in flight
+    var mB = q('#mB');
+    q('[data-toggle="#mB"]').addEventListener('click', function () {
+      mB.classList.add('in-flight');
+      setTimeout(function () { mB.classList.remove('in-flight'); }, 280);
+    });
+    // hide/show per variant (from collapsed state; A/B collapse first if needed)
+    qa('#d-morph .m-hide').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var t = q(b.getAttribute('data-target'));
+        var tog = q('[data-toggle="' + b.getAttribute('data-target') + '"]');
+        if (t.classList.contains('hid')) { t.classList.remove('hid'); b.textContent = 'Hide'; return; }
+        var delay = 0;
+        if (t.classList.contains('expanded')) { t.classList.remove('expanded'); tog.textContent = 'Expand'; delay = 220; }
+        setTimeout(function () { t.classList.add('hid'); }, delay);
+        b.textContent = 'Show';
+      });
+    });
+    var slowBtn = q('#mC-slow');
+    slowBtn.addEventListener('click', function () {
+      var on = q('#mC').classList.toggle('slowmo');
+      slowBtn.setAttribute('aria-pressed', String(on));
+    });
+  })();
+</script>
+</section>
+<!-- SECTION:D-morph-END -->
+<section class="record" id="d-card">
+<style>
+  #d-card .variants { grid-template-columns: repeat(auto-fit, minmax(480px, 1fr)); }
+  #d-card .stage { min-height: 348px; }
+  #d-card .card { position: absolute; top: 32px; left: 50%; transform: translateX(-50%); width: 420px;
+    background: #0d1117; border: 1px solid rgba(48,54,61,.85); border-radius: 14px;
+    box-shadow: 0 8px 24px rgba(0,0,0,.45); overflow: hidden; font-family: var(--sys); color: #e6edf3;
+    transition: width 320ms cubic-bezier(.32,.72,0,1), height 320ms cubic-bezier(.32,.72,0,1); }
+  #d-card .card-in { width: 420px; padding: 16px 18px 14px; display: flex; flex-direction: column; gap: 12px;
+    transition: opacity 150ms cubic-bezier(.25,.1,.25,1); }
+  #d-card .c-head { display: flex; gap: 8px; align-items: center; font: 600 13px var(--sys); color: #e6edf3; }
+  #d-card .c-head .ic { color: #7d8590; display: flex; }
+  #d-card .c-promise { font: 400 11px/1.5 var(--sys); color: #7d8590; }
+  #d-card .c-step { display: flex; gap: 8px; align-items: center; font: 400 12px var(--sys); }
+  #d-card .c-num { width: 16px; height: 16px; border-radius: 50%; border: 1px solid #30363d; color: #7d8590;
+    font: 600 10px/1 var(--sys); display: grid; place-items: center; flex: none; font-variant-numeric: tabular-nums; }
+  #d-card .c-link { color: #7d8590; font-size: 11px; text-decoration: none; cursor: pointer; }
+  #d-card .c-link:hover { text-decoration: underline; }
+  #d-card .c-well { display: flex; align-items: center; height: 32px; background: #161b22;
+    border: 1px solid #30363d; border-radius: 8px; padding: 0 4px 0 10px; gap: 8px;
+    transition: border-color 120ms cubic-bezier(0,0,.58,1), box-shadow 120ms cubic-bezier(0,0,.58,1); }
+  #d-card .c-well:focus-within { border-color: #2f81f7; box-shadow: 0 0 0 .5px #2f81f7; }
+  #d-card .c-well.err { border-color: #f85149 !important; box-shadow: none !important; }
+  #d-card .c-well .ic { color: #484f58; display: flex; flex: none; }
+  #d-card .c-well input { flex: 1; min-width: 0; background: none; border: none; outline: none;
+    color: #e6edf3; font: 12px var(--mono); caret-color: #2f81f7; }
+  #d-card .c-well input::placeholder { color: #484f58; }
+  #d-card .c-connect { display: flex; align-items: center; gap: 5px; font: 500 12px var(--sys); color: #484f58;
+    padding: 4px 9px; border-radius: 6px; transition: background 120ms ease-out, color 120ms; white-space: nowrap; }
+  #d-card .c-connect.ready { color: #e6edf3; cursor: pointer; }
+  #d-card .c-connect.ready:hover { background: rgba(255,255,255,.06); }
+  #d-card .c-connect .ok { display: none; color: #e6edf3; }
+  #d-card .c-connect.ready .ok { display: flex; }
+  #d-card .c-cap { font: 400 11px/1.5 var(--sys); color: #484f58; }
+  #d-card .c-err { display: none; gap: 6px; align-items: flex-start; font: 400 11px/1.45 var(--sys); color: #f85149; }
+  #d-card .c-err.on { display: flex; }
+  #d-card .c-err .ic { display: flex; flex: none; padding-top: 1px; }
+  #d-card .c-err u { cursor: pointer; }
+  #d-card .confirm { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    gap: 8px; font: 400 12px var(--sys); color: #e6edf3; opacity: 0; pointer-events: none; transition: opacity 150ms; }
+  #d-card .confirm.on { opacity: 1; }
+  #d-card .card.asPill { width: 52px; height: 36px; }
+  #d-card .card .dot { position: absolute; inset: 0; display: none; place-items: center; color: #484f58; }
+  #d-card .card.asPill .dot { display: grid; animation: none; opacity: 0; transition: opacity 120ms 200ms; }
+  #d-card .card.asPill .dot.on { opacity: 1; }
+  /* ledger */
+  #d-card .l-row { display: grid; grid-template-columns: 16px 76px 1fr; column-gap: 10px; height: 28px; align-items: center; }
+  #d-card .l-slot { width: 16px; height: 16px; border-radius: 50%; border: 1.5px solid #30363d; display: grid; place-items: center; }
+  #d-card .l-slot .ic { display: flex; opacity: 0; transition: opacity 120ms ease-out; color: #e6edf3; }
+  #d-card .l-row.done .l-slot .ic { opacity: 1; }
+  #d-card .l-row.fail .l-slot { border: none; }
+  #d-card .l-row.fail .l-slot .ic { opacity: 1; color: #f85149; }
+  #d-card .l-lab { font: 500 12px var(--sys); color: #e6edf3; }
+  #d-card .l-det { font: 400 11px var(--sys); color: #7d8590; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #d-card .l-det.dim { color: #484f58; } #d-card .l-det.mono { font-family: var(--mono); }
+  #d-card .l-remedy { display: none; margin: -4px 0 0 26px; font: 400 11px/1.45 var(--sys); color: #f85149; }
+  #d-card .l-remedy.on { display: block; }
+  /* chips (variant 3) */
+  #d-card .chiprow { display: flex; gap: 8px; }
+  #d-card .chipbtn { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px;
+    border: 1px solid #30363d; border-radius: 8px; color: #e6edf3; font: 500 12px var(--sys);
+    background: none; transition: background 120ms cubic-bezier(0,0,.58,1); cursor: pointer; }
+  #d-card .chipbtn:hover { background: rgba(255,255,255,.06); }
+  #d-card .chipbtn .red { font-family: var(--mono); font-size: 11px; color: #7d8590; }
+  /* OS pasteboard alert mock */
+  #d-card .osalert { position: absolute; inset: 0; display: none; place-items: center; background: rgba(0,0,0,.25); z-index: 5; }
+  #d-card .osalert.on { display: grid; }
+  #d-card .osalert .box { width: 260px; background: #ececec; color: #1d1d1f; border-radius: 10px; padding: 14px;
+    font: 400 11.5px/1.45 var(--sys); text-align: center; box-shadow: 0 18px 50px rgba(0,0,0,.5); }
+  #d-card .osalert .box b { display: block; font-size: 12.5px; margin-bottom: 4px; }
+  #d-card .osalert .btns { display: flex; gap: 8px; margin-top: 12px; }
+  #d-card .osalert .btns button { flex: 1; height: 26px; border-radius: 6px; border: 1px solid #c9c9cd;
+    background: #fff; font: 500 11.5px var(--sys); cursor: pointer; }
+  #d-card .osalert .btns .primary { background: #2f6fed; border-color: #2f6fed; color: #fff; }
+  /* variant 4 pill */
+  #d-card .p4 { width: 96px; height: 36px; }
+  #d-card .p4 .p4-pill { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    gap: 6px; font: 500 12px var(--sys); color: #e6edf3; cursor: pointer; opacity: 1; transition: opacity 100ms; }
+  #d-card .p4 .p4-pill .ic { color: #7d8590; display: flex; } #d-card .p4 .p4-pill.danger .ic { color: #f85149; }
+  #d-card .p4 .p4-row { position: absolute; top: 0; left: 50%; transform: translateX(-50%); width: 360px;
+    padding: 12px 14px; opacity: 0; pointer-events: none; transition: opacity 120ms 60ms; }
+  #d-card .p4 { transition: width 180ms cubic-bezier(.25,.1,.25,1), height 180ms cubic-bezier(.25,.1,.25,1); }
+  #d-card .p4.expanded { width: 360px; height: 64px; } #d-card .p4.expanded.tall { height: 82px; }
+  #d-card .p4.expanded .p4-pill { opacity: 0; pointer-events: none; }
+  #d-card .p4.expanded .p4-row { opacity: 1; pointer-events: auto; }
+  #d-card .p4.asPill { width: 52px; height: 36px; }
+  #d-card .p4.asPill .p4-row { opacity: 0; }
+</style>
+
+<p class="eyebrow">Record D-card · feeds WP-4d · the single highest-leverage trust surface</p>
+<h2>What must be true before the card claims success — a token stored, or a token GitHub answered for?</h2>
+<p class="qsub">Plus the fork underneath: may the non-key panel take keystrokes for <b>one deliberate click into a secure field</b>
+(variants 1, 2, 4 — a single scoped exception, decided once), or must intake stay <b>zero-focus, paste-only</b> (variant 3)?
+Walk each card's states with the buttons under its stage. Every string is a placeholder — <b>D-copy owns the words.</b></p>
+
+<div class="today">
+  <h3>Today</h3>
+  <p>No in-app entry exists — intake is the terminal (<code>security add-generic-password</code>), and the no-token state is a
+  <b>systemOrange warning triangle + a dense paragraph</b> (<code>AppDelegate.swift:113-116</code>, <code>IslandContentView.swift:351-392</code>),
+  the whole card clickable to github.com/settings/tokens. The plumbing is landed and reviewed: <code>submitToken</code> = trim →
+  classic-shape wall → Keychain store → hot start, no relaunch; auth failures already reason-routed (401 / SSO-403 / wrong-shape).
+  Load-bearing constraint: <code>HUDPanel.canBecomeKey == false</code> — today <i>nothing</i> in the island can receive keystrokes.</p>
+</div>
+
+<div class="variants">
+
+  <div class="vcard">
+    <div class="stage">
+      <div class="menubar"><span style="font-weight:700"></span><span>githud</span><span class="mb-right"><span>Mon 21:42</span></span></div>
+      <div class="card" id="c1">
+        <div class="card-in" id="c1-main">
+          <div class="c-head"><span class="ic" data-svg="key"></span><span id="c1-title">Connect GitHub</span></div>
+          <div class="c-promise">githud reads your notifications to find what needs you — it never writes anything back.</div>
+          <div class="c-step"><span class="c-num">1</span><span>Create a classic token with the notifications scope&nbsp;
+            <span class="c-link">GitHub ↗</span></span></div>
+          <div class="c-step"><span class="c-num">2</span><span>Paste it below — it lives in your Keychain, nowhere else</span></div>
+          <div class="c-well" id="c1-well"><span class="ic" data-svg="lock"></span>
+            <input id="c1-input" type="password" placeholder="ghp_…" spellcheck="false" autocomplete="off">
+            <span class="c-connect" id="c1-connect"><span class="ok" data-svg="check"></span>Connect ⏎</span></div>
+          <div class="c-err" id="c1-err"><span class="ic"></span><span class="msg"></span></div>
+          <div class="c-cap">Read-only · stored in the login Keychain, never on disk</div>
+        </div>
+        <div class="confirm" id="c1-confirm"><span data-svg="check"></span><span>Saved to Keychain — checking with GitHub…</span></div>
+        <div class="dot" id="c1-dot" data-svg="dot"></div>
+      </div>
+    </div>
+    <div class="stage-ctl">
+      <button class="vtab" data-c1="welcome" aria-pressed="true">no token</button>
+      <button class="vtab" data-c1="wrongShape" aria-pressed="false">wrong shape</button>
+      <button class="vtab" data-c1="401" aria-pressed="false">401</button>
+      <button class="vtab" data-c1="403" aria-pressed="false">403</button>
+      <button data-c1="success">▸ run success</button>
+      <span class="note">type ghp_ + 36 chars to unlock Connect</span>
+    </div>
+    <div class="vbody">
+      <div class="vhead"><h3>The Concierge — titled steps, in-island secure field</h3><span class="vid">welcome-steps-card</span>
+        <span class="vflags"><span class="chip amend">amend</span></span></div>
+      <p class="essence">A calm 420px card — title, one-line read-only promise, two numbered steps, a secure field with an inline
+      Connect — that crossfades to a confirmation and morphs into the claim-free loading pill on Keychain-store success.
+      Auth errors are this same card with one row lit — never a different species.</p>
+      <details><summary>Build spec</summary><div class="spec">420w, radius 14, hairline #30363D, padding 16/18/14, 12px block gap. Field well h32, bg #161B22, mono input, secure-masked; focus = accent border + 0.5→1.5px width over 120ms (width change survives gray-swap). Connect inert until the live shape gate (ghp_ + ≥40) passes. Error slot: per-reason glyph (triangle / key-slash / lock-shield — shape disambiguates on gray-swap) + sentence in #F85149, 120ms opacity fade, NO translation; field border goes danger while the error stands; first keystroke clears both. SUBMIT: Return/Connect → trim → shape gate → submitToken; on store success: content fades 150ms → confirmation row 150ms → hold 900ms → island morphs to the 52×36 loading pill over 320ms cubic-bezier(.32,.72,0,1), radius constant. KEYBOARD: the one sanctioned key moment — canBecomeKey true only while a field-bearing card shows AND the user clicked the field; Esc/click-away resigns instantly. Reduce Motion: all fades/morphs instant.</div></details>
+      <details><summary>Doctrine fit &amp; risks</summary><div><b>Fit:</b> ink-dominant; danger only on intervene lines; motion maps to keystroke/click/store-success; links visible without hover; gray-swap survives via glyph shapes + border-width cue.<br><br><b>Risks:</b> the panel-key exception owes the focus-non-theft screen-recording proof. Success fires on STORE success — a revoked-but-well-shaped token celebrates, then 401s (mitigated: the morph lands on the loading pill, which claims nothing).</div></details>
+      <div class="verdict"><b>Refuter — amend:</b> (1) "Connected — watching GitHub" on store success is a GitHub-backed claim the system can't back at that instant — the null→green class pulse-honesty forbids; copy can't fix a timing violation. (2) The green shape-check marked a validity <i>prediction</i>, not an unlock.
+      <div class="amendment">confirmation may only claim store-level truth ("Saved to Keychain — checking with GitHub…") and the shape-check renders in ink — <b>both applied in this mock</b>.</div></div>
+    </div>
+  </div>
+
+  <div class="vcard rec">
+    <div class="stage">
+      <div class="menubar"><span style="font-weight:700"></span><span>githud</span><span class="mb-right"><span>Mon 21:42</span></span></div>
+      <div class="card" id="c2" style="height:auto">
+        <div class="card-in" id="c2-main">
+          <div class="c-head"><span class="ic" data-svg="key"></span><span id="c2-title">Connect GitHub</span></div>
+          <div class="c-promise">githud reads your notifications to find what needs you — it never writes anything back.</div>
+          <div>
+            <div class="l-row" id="c2-r1"><span class="l-slot"><span class="ic" data-svg="check10"></span></span>
+              <span class="l-lab">Token</span><span class="l-det dim" id="c2-d1">paste below</span></div>
+            <div class="l-remedy" id="c2-m1"></div>
+            <div class="l-row" id="c2-r2"><span class="l-slot"><span class="ic" data-svg="check10"></span></span>
+              <span class="l-lab">Keychain</span><span class="l-det dim" id="c2-d2">—</span></div>
+            <div class="l-remedy" id="c2-m2"></div>
+            <div class="l-row" id="c2-r3"><span class="l-slot"><span class="ic" data-svg="check10"></span></span>
+              <span class="l-lab">GitHub</span><span class="l-det dim" id="c2-d3">—</span></div>
+            <div class="l-remedy" id="c2-m3"></div>
+          </div>
+          <div class="c-well" id="c2-well"><span class="ic" data-svg="lock"></span>
+            <input id="c2-input" type="password" placeholder="ghp_…" spellcheck="false" autocomplete="off">
+            <span class="c-connect" id="c2-connect"><span class="ok" data-svg="check"></span>Connect ⏎</span></div>
+          <div class="c-cap">Read-only · stored in the login Keychain, never on disk</div>
+        </div>
+        <div class="dot" id="c2-dot" data-svg="dot"></div>
+      </div>
+    </div>
+    <div class="stage-ctl">
+      <button class="vtab" data-c2="welcome" aria-pressed="true">no token</button>
+      <button class="vtab" data-c2="wrongShape" aria-pressed="false">wrong shape</button>
+      <button class="vtab" data-c2="401" aria-pressed="false">401</button>
+      <button class="vtab" data-c2="403" aria-pressed="false">403</button>
+      <button data-c2="success">▸ run success</button>
+      <span class="note">"verifying…" is deliberately still — feel that beat before ratifying</span>
+    </div>
+    <div class="vbody">
+      <div class="vhead"><h3>The Handshake Ledger — steps that are live receipts</h3><span class="vid">handshake-ledger</span>
+        <span class="vflags"><span class="chip pick">runner's pick</span><span class="chip keep">keep</span></span></div>
+      <p class="essence">The numbered steps ARE a ledger of real system events — Token / Keychain / GitHub — each row checked only
+      when its underlying call actually returned, errors landing on the exact row that failed, and the morph firing only after
+      GitHub genuinely answered. A runtime 401 is this card with rows 1–2 honestly pre-checked.</p>
+      <details><summary>Build spec</summary><div class="spec">Same 420px shell. Ledger rows h28: 16px state slot (pending = empty circle / done = ink check, 120ms fade ONLY on the real callback / failed = per-reason glyph in danger) + label + detail. Row 1 done-detail shows the REAL redacted form ghp_•(40) — the only form of the secret that ever renders. Row 3: "verifying…" is STATIC text — no spinner, no ambient motion; checks on the first poll's rows callback; fails via onAuthFailure (401 = key-slash, 403 = lock-shield); wrongShape fails row 1 and rows 2–3 stay pending — progress is never fabricated. Re-submit resets rows instantly, no animation (a reset is not progress). SUCCESS: all 3 checked → 700ms hold → morph 320ms cubic-bezier(.32,.72,0,1) to whatever the pill currently measures. Needs ONE seam beyond landed plumbing: a first-poll-outcome observer. Session must also specify the first-poll NETWORK-failure exit (caution/degraded treatment — never a spinner) so "verifying…" is bounded.</div></details>
+      <details><summary>Doctrine fit &amp; risks</summary><div><b>Fit:</b> the moat's own contract on its own setup card — it can never claim a state the system can't back; every check is motion mapped 1:1 to a real event; the whole error family collapses into "the row that failed".<br><br><b>Risks:</b> 2–6s of honest stillness on "verifying…" during the first fetch may read as hung — the temptation to add a spinner must be resisted forever. Three receipts for one paste may be judged ceremonious. Shares the panel-key exception.</div></details>
+      <div class="verdict"><b>Refuter — keep:</b> survived every axis; the only variant whose positive claim <i>structurally</i> cannot outrun the truth. All event bindings verified to exist except the honestly-declared first-success seam.</div>
+    </div>
+  </div>
+
+  <div class="vcard">
+    <div class="stage">
+      <div class="menubar"><span style="font-weight:700"></span><span>githud</span><span class="mb-right"><span>Mon 21:42</span></span></div>
+      <div class="card" id="c3" style="width:360px">
+        <div class="card-in" id="c3-main" style="width:360px">
+          <div class="c-head"><span class="ic" data-svg="key"></span><span>Connect GitHub</span></div>
+          <div class="c-promise">Create a classic token, copy it, then click Paste — githud reads the clipboard only at that click.</div>
+          <div class="chiprow">
+            <span class="chipbtn">Create token ↗</span>
+            <span class="chipbtn" id="c3-paste">Paste token</span>
+          </div>
+          <div class="c-err" id="c3-err"><span class="ic"></span><span class="msg"></span></div>
+          <div class="c-cap">Read-only · Keychain only · the clipboard is never read on its own</div>
+        </div>
+        <div class="dot" id="c3-dot" data-svg="dot"></div>
+      </div>
+      <div class="osalert" id="c3-alert"><div class="box">
+        <b>"githud" would like to paste from the clipboard</b>
+        This is the macOS pasteboard-privacy prompt — it can interpose exactly here, on the app's highest-leverage trust surface.
+        <div class="btns"><button id="c3-deny">Don't Allow</button><button class="primary" id="c3-allow">Allow Paste</button></div>
+      </div></div>
+    </div>
+    <div class="stage-ctl">
+      <button class="vtab" data-c3clip="valid" aria-pressed="true">ghp_… on clipboard</button>
+      <button class="vtab" data-c3clip="finegrained" aria-pressed="false">github_pat_…</button>
+      <button class="vtab" data-c3clip="empty" aria-pressed="false">empty</button>
+      <button class="vtab" data-c3clip="storefail" aria-pressed="false">Keychain write fails</button>
+      <span class="note">then click "Paste token" in the card — first click shows the OS prompt</span>
+    </div>
+    <div class="vbody">
+      <div class="vhead"><h3>The Zero-Focus Paste — no field, no keyboard, ever</h3><span class="vid">paste-chip-zero-focus</span>
+        <span class="vflags"><span class="chip amend">amend</span></span></div>
+      <p class="essence">Intake is one deliberate click — a Paste chip reads the clipboard, shows only the redacted shape
+      <span style="font:11px var(--mono)">ghp_•(40)</span>, and submits — so the panel never becomes key and focus-non-theft
+      survives absolutely untouched. The secret itself never renders anywhere.</p>
+      <details><summary>Build spec</summary><div class="spec">360w card (today's MessageView width). Two chips h32, radius 8: "Create token ↗" (opens settings/tokens — the action ceiling) and "Paste token" (reads NSPasteboard ONLY on click → trim → shape wall). PASS → chip crossfades 120ms to ink-check + redacted ghp_•(40), holds 600ms, submitToken; morph to the 52×36 loading pill GATED on store success (amendment). FAIL → per-reason error line fades in (triangle = wrong shape, dashed circle = clipboard empty, plus Keychain-write with its own copy); chip untouched, immediately retryable. ARCHITECTURE: zero panel changes — canBecomeKey stays false; no first responder exists anywhere. Reduce Motion: instant swaps.</div></details>
+      <details><summary>Doctrine fit &amp; risks</summary><div><b>Fit:</b> the purest burden position — the non-key architecture is untouched, so no new focus proof is owed at all; clipboard read maps 1:1 to a deliberate click; redacted-only is stronger than a masked field.<br><br><b>Risks:</b> hard dependency on the token being on the clipboard; the macOS pasteboard-privacy alert can interpose (mocked above — feel it); some users read "reads your clipboard" as MORE invasive; githud can't clear the clipboard afterward without acting on the user's behalf.</div></details>
+      <div class="verdict"><b>Refuter — amend:</b> the morph was unconditional on calling submitToken, not on its Result — a Keychain-write failure would morph anyway: fabricated progress on a failed store.
+      <div class="amendment">gate the morph on <code>submitToken == .success</code>; route .keychainWrite to the error slot, retryable — <b>applied in this mock</b> (try the "Keychain write fails" state).</div></div>
+    </div>
+  </div>
+
+  <div class="vcard">
+    <div class="stage">
+      <div class="menubar"><span style="font-weight:700"></span><span>githud</span><span class="mb-right"><span>Mon 21:42</span></span></div>
+      <div class="card p4" id="c4">
+        <div class="p4-pill" id="c4-pill"><span class="ic" data-svg="key"></span><span id="c4-pilltext">Set up</span></div>
+        <div class="p4-row">
+          <div class="c-well" style="margin-bottom:6px" id="c4-well"><span class="ic" data-svg="key"></span>
+            <input id="c4-input" type="password" placeholder="ghp_…" spellcheck="false" autocomplete="off">
+            <span class="c-link" style="white-space:nowrap">token ↗</span></div>
+          <div class="c-cap" id="c4-cap">classic token · notifications scope · lives in your Keychain</div>
+        </div>
+        <div class="dot" id="c4-dot" data-svg="dot"></div>
+      </div>
+    </div>
+    <div class="stage-ctl">
+      <button class="vtab" data-c4="firstRun" aria-pressed="true">first-run</button>
+      <button class="vtab" data-c4="wrongShape" aria-pressed="false">wrong shape</button>
+      <button class="vtab" data-c4="401" aria-pressed="false">401</button>
+      <button class="vtab" data-c4="403" aria-pressed="false">403</button>
+      <span class="note">click the pill to expand · ⏎ in the field runs success</span>
+    </div>
+    <div class="vbody">
+      <div class="vhead"><h3>The Pill-Native Setup — welcome by subtraction</h3><span class="vid">pill-first-minimal</span>
+        <span class="vflags"><span class="chip amend">amend</span></span></div>
+      <p class="essence">First-run is a 96px "Set up" pill that expands on click into a single-row island holding only the secure
+      field and one caption line. No interstitial at all — the morph to the loading pill IS the success moment. Auth errors are a
+      collapsed danger-glyph pill (shape differs per reason) that expands to the row with the remedy pre-filled.</p>
+      <details><summary>Build spec</summary><div class="spec">Collapsed 96×36 (key glyph + "Set up"); click → 360×64 over 180ms cubic-bezier(.25,.1,.25,1). Field well identical to the Concierge; trailing "token ↗" link visible without hover. Shape-gate fail → caption swaps to the danger sentence with per-reason glyph, field border danger, 120ms fades; typing reverts. Success on ⏎ → morph straight to 52×36 over 280ms, gated on store success. 403's two-clause SSO remedy grows the row to ~78px — the tooltip escape hatch is named and forbidden (no-hover-as-primary). AMENDMENT: auth errors inherit today's force-visible rule — a 401/403/wrongShape orders the island front even if hidden, via the same must-see-now path the message state uses today.</div></details>
+      <details><summary>Doctrine fit &amp; risks</summary><div><b>Fit:</b> setup speaks the product's own pill vocabulary — no new chrome class, the smallest possible first-run footprint.<br><br><b>Risks:</b> deliberately under-serves the trust job — no read-only promise visible before the user commits; a bare "Set up" pill may not explain itself; the 403 remedy barely fits. Shares the panel-key exception.</div></details>
+      <div class="verdict"><b>Refuter — amend:</b> recasting auth errors as a pill state silently dropped today's force-show rule (<code>HUDPanelController.swift:89-94</code>) — a runtime 401 while hidden would be an invisible dead radar, exactly the never-miss break the moat forbids.
+      <div class="amendment">auth errors force the island visible (collapsed danger pill at minimum) — <b>added to the spec above</b>.</div></div>
+    </div>
+  </div>
+</div>
+
+<div class="decide">
+  <h3>What you're deciding</h3>
+  <p><b>Runner's pick: the Handshake Ledger.</b> The refuter endorsed it as doctrine-safest with one nuance: the others don't
+  fabricate either (their morphs land on the claim-free loading pill) — the ledger wins because it <i>affirmatively verifies</i>
+  before any positive claim and absorbs the whole error family structurally (the failing row). Its cost: one first-poll-outcome
+  observer seam, and 2–6 seconds of honest stillness the mock lets you feel.</p>
+  <p><b>The real fork is the keyboard exception:</b> variants 1, 2 and 4 all hang on the same single sanctioned key-moment
+  (field-click → key; Esc/click-away resigns) — decide it once and the focus-non-theft recording proof is paid once. Variant 3 is
+  the only design that owes nothing there. Note this fork is <i>adjacent to</i> but separate from ⛔ G-keyboard below (list
+  navigation); ratifying a field key-moment here does not ratify list keys.</p>
+</div>
+
+<script>
+  (function () {
+    var SVG = {
+      key: '<svg class="svg-ic" width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="5" cy="8" r="2.6"/><path d="M7.6 8h6.4M11.4 8v2.4M13.6 8v1.7"/></svg>',
+      lock: '<svg class="svg-ic" width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="7" width="10" height="6.5" rx="1.5"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2"/></svg>',
+      check: '<svg class="svg-ic" width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 8.5l3.2 3L13 4.5"/></svg>',
+      check10: '<svg class="svg-ic" width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 8.5l3.2 3L13 4.5"/></svg>',
+      tri: '<svg class="svg-ic" width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2.2L15 13.6H1z" stroke-linejoin="round"/><path d="M8 6.5v3.4M8 11.8v.1"/></svg>',
+      keyslash: '<svg class="svg-ic" width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="5" cy="8" r="2.6"/><path d="M7.6 8h6.4M11.4 8v2.4"/><path d="M2 14L14 2" stroke-width="1.2"/></svg>',
+      shield: '<svg class="svg-ic" width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 1.8l5.2 2v4.4c0 3.4-2.3 5.6-5.2 6.6-2.9-1-5.2-3.2-5.2-6.6V3.8z" stroke-linejoin="round"/><circle cx="8" cy="7.4" r="1.4"/><path d="M8 8.8v2"/></svg>',
+      dashcirc: '<svg class="svg-ic" width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6" stroke-dasharray="3 2.6"/></svg>',
+      dot: '<svg class="svg-ic" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="8" cy="8" r="1.2" fill="currentColor" stroke="none"/><path d="M4.5 5.5a4.6 4.6 0 0 0 0 5M11.5 5.5a4.6 4.6 0 0 1 0 5" opacity=".55"/><path d="M2.6 3.8a7.3 7.3 0 0 0 0 8.4M13.4 3.8a7.3 7.3 0 0 1 0 8.4" opacity=".3"/></svg>'
+    };
+    qa('#d-card [data-svg]').forEach(function (el) { el.innerHTML = SVG[el.getAttribute('data-svg')] || ''; });
+
+    var ERR = {
+      wrongShape: { ic: 'tri', msg: "That's not a classic token — githud needs ghp_… (fine-grained tokens can't read notifications). " },
+      401: { ic: 'keyslash', msg: 'GitHub rejected the token — it may be expired or revoked. Create a fresh one. ' },
+      403: { ic: 'shield', msg: 'The token needs SSO authorization for your org — authorize it on GitHub, then retry. ' },
+      empty: { ic: 'dashcirc', msg: 'Nothing on the clipboard — copy the token, then click Paste. ' },
+      storefail: { ic: 'lock', msg: "Couldn't save to the Keychain — nothing was stored. Click Paste to retry. " }
+    };
+    function setErr(slot, kind) {
+      if (!kind) { slot.classList.remove('on'); return; }
+      slot.querySelector('.ic').innerHTML = SVG[ERR[kind].ic];
+      slot.querySelector('.msg').innerHTML = ERR[kind].msg + '<u>GitHub settings ↗</u>';
+      slot.classList.add('on');
+    }
+    function pressGroup(btn) {
+      qa('.vtab', btn.parentElement).forEach(function (b) { b.setAttribute('aria-pressed', String(b === btn)); });
+    }
+
+    /* — V1 Concierge — */
+    var c1 = q('#c1'), c1t = { welcome: 'Connect GitHub', wrongShape: "That's not a classic token", 401: 'Token expired or revoked', 403: 'Token needs SSO authorization' };
+    function setC1(state) {
+      c1.classList.remove('asPill'); q('#c1-confirm').classList.remove('on'); q('#c1-dot').classList.remove('on');
+      q('#c1-main').style.opacity = 1; c1.style.height = 'auto'; c1.style.width = '420px';
+      q('#c1-title').textContent = c1t[state] || c1t.welcome;
+      setErr(q('#c1-err'), state === 'welcome' ? null : state);
+      q('#c1-well').classList.toggle('err', state !== 'welcome');
+    }
+    q('#c1-input').addEventListener('input', function () {
+      var ok = /^ghp_.{36,}$/.test(this.value.trim());
+      q('#c1-connect').classList.toggle('ready', ok);
+      q('#c1-well').classList.remove('err'); setErr(q('#c1-err'), null);
+    });
+    qa('[data-c1]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var s = b.getAttribute('data-c1');
+        if (s !== 'success') { pressGroup(b); setC1(s); return; }
+        var h = c1.offsetHeight; c1.style.height = h + 'px'; c1.style.width = '420px';
+        q('#c1-main').style.opacity = 0;
+        setTimeout(function () { q('#c1-confirm').classList.add('on'); }, 160);
+        setTimeout(function () {
+          q('#c1-confirm').classList.remove('on');
+          c1.classList.add('asPill'); c1.style.width = ''; c1.style.height = '';
+          setTimeout(function () { q('#c1-dot').classList.add('on'); }, 220);
+        }, 1200);
+      });
+    });
+
+    /* — V2 Ledger — */
+    var c2 = q('#c2'), c2timers = [];
+    function lrow(n, st, det, mono) {
+      var r = q('#c2-r' + n); r.classList.remove('done', 'fail');
+      if (st === 'done') r.classList.add('done');
+      if (st) if (st !== 'done' && st !== 'pending') { r.classList.add('fail'); r.querySelector('.l-slot .ic').innerHTML = SVG[st]; }
+      if (st === 'done') r.querySelector('.l-slot .ic').innerHTML = SVG.check10;
+      var d = q('#c2-d' + n); d.textContent = det; d.className = 'l-det' + (mono ? ' mono' : '') + (det === '—' || det === 'paste below' ? ' dim' : '');
+      q('#c2-m' + n).classList.remove('on');
+    }
+    function setC2(state) {
+      c2timers.forEach(clearTimeout); c2timers = [];
+      c2.classList.remove('asPill'); q('#c2-dot').classList.remove('on');
+      q('#c2-main').style.opacity = 1; c2.style.width = '420px'; c2.style.height = 'auto';
+      lrow(1, 'pending', 'paste below'); lrow(2, 'pending', '—'); lrow(3, 'pending', '—');
+      if (state === 'wrongShape') { lrow(1, 'tri', 'not a classic token');
+        var m = q('#c2-m1'); m.innerHTML = ERR.wrongShape.msg + '<u>GitHub settings ↗</u>'; m.classList.add('on'); }
+      if (state === '401') { lrow(1, 'done', 'ghp_•(40)', true); lrow(2, 'done', 'stored'); lrow(3, 'keyslash', 'rejected — 401');
+        var m1 = q('#c2-m3'); m1.innerHTML = ERR[401].msg + '<u>GitHub settings ↗</u>'; m1.classList.add('on'); }
+      if (state === '403') { lrow(1, 'done', 'ghp_•(40)', true); lrow(2, 'done', 'stored'); lrow(3, 'shield', 'blocked — SSO');
+        var m2 = q('#c2-m3'); m2.innerHTML = ERR[403].msg + '<u>GitHub settings ↗</u>'; m2.classList.add('on'); }
+    }
+    qa('[data-c2]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var s = b.getAttribute('data-c2');
+        if (s !== 'success') { pressGroup(b); setC2(s); return; }
+        setC2('welcome');
+        c2timers.push(setTimeout(function () { lrow(1, 'done', 'ghp_•(40)', true); }, 100));
+        c2timers.push(setTimeout(function () { lrow(2, 'done', 'stored'); }, 250));
+        c2timers.push(setTimeout(function () { lrow(3, 'pending', 'verifying…'); }, 260));
+        c2timers.push(setTimeout(function () { lrow(3, 'done', 'connected'); }, 2500));
+        c2timers.push(setTimeout(function () {
+          var h = c2.offsetHeight; c2.style.height = h + 'px';
+          q('#c2-main').style.opacity = 0;
+          setTimeout(function () { c2.classList.add('asPill'); c2.style.width = ''; c2.style.height = '';
+            setTimeout(function () { q('#c2-dot').classList.add('on'); }, 220); }, 60);
+        }, 3200));
+      });
+    });
+
+    /* — V3 Paste chip — */
+    var c3clip = 'valid', c3asked = false;
+    qa('[data-c3clip]').forEach(function (b) {
+      b.addEventListener('click', function () { pressGroup(b); c3clip = b.getAttribute('data-c3clip');
+        q('#c3-main').style.opacity = 1; q('#c3').classList.remove('asPill'); q('#c3').style.width = '360px'; q('#c3').style.height = 'auto';
+        q('#c3-dot').classList.remove('on'); setErr(q('#c3-err'), null);
+        q('#c3-paste').innerHTML = 'Paste token'; });
+    });
+    function c3paste() {
+      setErr(q('#c3-err'), null);
+      if (c3clip === 'empty') { setErr(q('#c3-err'), 'empty'); return; }
+      if (c3clip === 'finegrained') { setErr(q('#c3-err'), 'wrongShape'); return; }
+      q('#c3-paste').innerHTML = '<span style="display:flex;color:#e6edf3">' + SVG.check + '</span><span class="red">ghp_•(40)</span>';
+      setTimeout(function () {
+        if (c3clip === 'storefail') { setErr(q('#c3-err'), 'storefail'); q('#c3-paste').innerHTML = 'Paste token'; return; }
+        var c3 = q('#c3'), h = c3.offsetHeight; c3.style.height = h + 'px';
+        q('#c3-main').style.opacity = 0;
+        setTimeout(function () { c3.classList.add('asPill'); c3.style.width = ''; c3.style.height = '';
+          setTimeout(function () { q('#c3-dot').classList.add('on'); }, 220); }, 60);
+      }, 700);
+    }
+    q('#c3-paste').addEventListener('click', function () {
+      if (!c3asked) { q('#c3-alert').classList.add('on'); return; }
+      c3paste();
+    });
+    q('#c3-allow').addEventListener('click', function () { c3asked = true; q('#c3-alert').classList.remove('on'); c3paste(); });
+    q('#c3-deny').addEventListener('click', function () { c3asked = true; q('#c3-alert').classList.remove('on'); });
+
+    /* — V4 Pill-native — */
+    var c4 = q('#c4');
+    var C4CAP = { firstRun: ['classic token · notifications scope · lives in your Keychain', '#484f58'],
+      wrongShape: ["That's not a classic token — githud needs ghp_…", '#f85149'],
+      401: ['GitHub rejected the token — create a fresh one. GitHub ↗', '#f85149'],
+      403: ['The token needs SSO authorization for your org.<br>Authorize it on GitHub, then retry. GitHub ↗', '#f85149'] };
+    function setC4(state) {
+      c4.classList.remove('expanded', 'asPill', 'tall'); q('#c4-dot').classList.remove('on');
+      q('#c4-well').classList.toggle('err', state !== 'firstRun');
+      var cap = q('#c4-cap'); cap.innerHTML = C4CAP[state][0]; cap.style.color = C4CAP[state][1];
+      var pill = q('#c4-pill');
+      if (state === 'firstRun') { pill.classList.remove('danger'); pill.querySelector('.ic').innerHTML = SVG.key; q('#c4-pilltext').textContent = 'Set up'; }
+      else { pill.classList.add('danger');
+        pill.querySelector('.ic').innerHTML = SVG[state === 'wrongShape' ? 'tri' : state === '401' ? 'keyslash' : 'shield'];
+        q('#c4-pilltext').textContent = 'Token'; }
+      c4.dataset.state = state;
+    }
+    q('#c4-pill').addEventListener('click', function () {
+      c4.classList.add('expanded'); if (c4.dataset.state === '403') c4.classList.add('tall');
+    });
+    qa('[data-c4]').forEach(function (b) { b.addEventListener('click', function () { pressGroup(b); setC4(b.getAttribute('data-c4')); }); });
+    q('#c4-input').addEventListener('keydown', function (e) {
+      if (e.key !== 'Enter' || !/^ghp_.{36,}$/.test(this.value.trim())) return;
+      c4.classList.remove('expanded', 'tall'); c4.classList.add('asPill');
+      setTimeout(function () { q('#c4-dot').classList.add('on'); }, 200);
+    });
+    setC4('firstRun');
+  })();
+</script>
+</section>
+<!-- SECTION:D-card-END -->
+<section class="record" id="d-glyph">
+<style>
+  #d-glyph .variants { grid-template-columns: repeat(auto-fit, minmax(520px, 1fr)); }
+  #d-glyph .gwrap { padding: 14px 16px 6px; }
+  #d-glyph .gbar { display: flex; align-items: center; height: 26px; padding: 0 8px; border-radius: 6px; margin-bottom: 6px; }
+  #d-glyph .gbar.dark { background: #1d1e23; color: rgba(255,255,255,.85); }
+  #d-glyph .gbar.light { background: #f2f2f4; color: rgba(0,0,0,.85); border: 1px solid var(--line); }
+  #d-glyph .gcell { width: 72px; display: flex; align-items: center; justify-content: center; gap: 3px; }
+  #d-glyph .gcount { font: 600 12px var(--sys); font-variant-numeric: tabular-nums; }
+  #d-glyph .glabels { display: flex; padding: 2px 8px 10px; }
+  #d-glyph .glabels span { width: 72px; text-align: center; font: 500 9.5px var(--mono); color: var(--ink3); }
+  #d-glyph .gzoom { display: flex; padding: 4px 8px 12px; color: var(--ink2); }
+  #d-glyph .gzoom .gcell { width: 72px; }
+  #d-glyph .gnote { font: 500 10.5px var(--mono); color: var(--ink3); padding: 0 8px 12px; }
+  #d-glyph .reflow { display: flex; gap: 14px; align-items: center; padding: 0 8px 12px; }
+  #d-glyph .reflow .gbar { margin: 0; padding: 0 8px; }
+  #d-glyph .tip { display: inline-block; background: #2a2a2a; border: 1px solid rgba(255,255,255,.15); border-radius: 4px;
+    font: 400 11px var(--sys); color: rgba(255,255,255,.85); padding: 3px 7px; margin: 0 8px 12px; }
+</style>
+
+<p class="eyebrow">Record D-glyph · feeds WP-5g · the fourth surface of the color doctrine</p>
+<h2>When the island is hidden, how much signal should the 18pt template glyph carry — and where does the count live?</h2>
+<p class="qsub">Knocked out inside the glyph · adjacent real text · mirrored per-kind like the pill · or withheld to
+tooltip/VoiceOver. A template image is alpha-only — here the gray-swap law isn't an audit, <b>it's the physics</b>.
+Each set below: real menu-bar size on dark and light bars, then 2× zoom. All amendments applied.</p>
+
+<div class="today">
+  <h3>Today</h3>
+  <p>The status item is a <b>static identity mark</b> — one SF Symbol (<code>dot.radiowaves.left.and.right</code>), template, set once
+  and never mutated by any state (<code>StatusItemController.swift:64-67</code>). Consequence: with the island hidden the user has
+  <b>zero ambient signal</b>; every cue lives on the pill. Critical is one categorical reason (security_alert) and sorts first,
+  so "top row = shield" is an invariant the glyph can inherit for free.</p>
+</div>
+
+<div class="variants">
+
+  <div class="vcard">
+    <div class="gwrap" id="g1"></div>
+    <div class="vbody">
+      <div class="vhead"><h3>Miniature Island — self-similar pill</h3><span class="vid">mini-island-pill</span>
+        <span class="vflags"><span class="chip amend">amend</span></span></div>
+      <p class="essence">The glyph IS the island in miniature — a hollow pill outline when clear, filling solid with a knocked-out
+      count when GitHub needs you. Teaches "the island lives here" by pure self-similarity. Critical = knocked-out <b>!N</b>;
+      degraded = a stale ring on the pill's shoulder.</p>
+      <details><summary>Build spec</summary><div class="spec">squareLength, 18×18pt template. CLEAR: hollow pill rx3.25 stroke 1.5. ACTION: filled pill, count knocked out (destination-out), 6.75px semibold tabular; 9+ beyond nine. CRITICAL: knockout "!N". DEGRADED composes: stale ring r2 at the top-right shoulder, 0ms hard swap (amended). LOADING (amended): pill outline + interior dot at α.40 — never the bare clear pill dimmed. Transitions: 180ms one-shot crossfade on class change only; digit changes 0ms. No timers — model mutation on poll tick.</div></details>
+      <details><summary>Doctrine fit &amp; risks</summary><div><b>Fit:</b> "filled/badged only when action is required" verbatim; ink-by-default made literal by template physics.<br><br><b>Risks:</b> knockout digits are ~4.6px cap-height at 1× — the weakest legibility of any variant on a non-Retina display (look at the 1× rows above); "!3" is dense in a 14.5px pill.</div></details>
+      <div class="verdict"><b>Refuter — amend:</b> its loading state was a dimmed CLEAR pill justified by a false code claim — the code deliberately uses a <i>distinct</i> glyph so loading never resembles all-clear (the "trust lie" comment at <code>CollapsedPillView.swift:75-82</code>); and it animated the degraded-ring toggle.
+      <div class="amendment">loading = pill + interior dot at α.40; degraded ring toggles at 0ms — <b>both applied above</b>.</div></div>
+    </div>
+  </div>
+
+  <div class="vcard rec">
+    <div class="gwrap" id="g2"></div>
+    <div class="vbody">
+      <div class="vhead"><h3>Constant Beacon + count-as-text</h3><span class="vid">constant-mark-count-text</span>
+        <span class="vflags"><span class="chip pick">runner's pick</span><span class="chip amend">amend</span></span></div>
+      <p class="essence">The identity mark never moves — a radar beacon whose hollow center dot fills when you're needed, the count
+      as <b>real 12pt text</b> beside it (the only 1×-guaranteed-legible count), dashed arcs when the reading degrades, and a shield
+      swap reserved for the one categorical emergency.</p>
+      <details><summary>Build spec</summary><div class="spec">variableLength: 18×18 template + button title. Mark = center dot + arc pair, stroke 1.5 round caps. CLEAR: hollow dot r2. ACTION: dot fills r2.75; title = count, monospacedDigitSystemFont(12, semibold), 3px gap. CRITICAL: mark swaps to filled shield with knocked-out "!" — identity yields ONLY for the drop-everything case. DEGRADED (amended): dashed arcs (2.25/1.6, round caps) compose over EVERY state including critical — the arcs return as pure freshness chrome flanking the shield. LOADING (amended): arcs only, no dot, α.40 — a dimmed clear-cue never shows pre-first-poll. Motion: 180ms crossfade for class changes; count text and dash toggles 0ms — freshness degradation is never celebrated with motion.</div></details>
+      <details><summary>Doctrine fit &amp; risks</summary><div><b>Fit:</b> constant silhouette = menu-bar findability; dashed-arcs = degraded maps the one sanctioned caution meaning onto the mark's own semantics, hue-free.<br><br><b>Risks:</b> variable width — neighbors shift ~10–18px when a count appears (see the reflow demo above; macOS Mail's badge does the same). The shield swap abandons the identity mark at critical — deliberate, but learned.</div></details>
+      <div class="verdict"><b>Refuter — amend:</b> the degraded-at-critical clause was garbled and on its plainest reading hid a stale reading exactly where trust matters most — a crisp shield backed by a 20-minutes-dead reading, contradicting the code's unconditional caution-composition; loading also dimmed the clear-cue.
+      <div class="amendment">degraded composes over critical (dashed arcs flank the shield); loading = arcs-only α.40 — <b>both applied above</b>.</div></div>
+    </div>
+  </div>
+
+  <div class="vcard">
+    <div class="gwrap" id="g3"></div>
+    <div class="vbody">
+      <div class="vhead"><h3>Kind Promotion — the pill crosses the bar</h3><span class="vid">kind-promoted-glyph</span>
+        <span class="vflags"><span class="chip amend">amend</span></span></div>
+      <p class="essence">The glyph mirrors the collapsed pill one-for-one: the top-urgency row's reason SHAPE plus a text count —
+      the bar tells you not just <i>that</i> GitHub needs you, but <i>what kind</i> of need it is. Shield-at-critical comes free:
+      critical sorts first, so the top row IS the shield.</p>
+      <details><summary>Build spec</summary><div class="spec">variableLength: top row's RadarPresenter.symbolName rendered 13pt semibold template (review → pull-fork, mention → @, author-reply → bubble, …) + count as 12pt text. CLEAR (amended): the check-ring only when the pill itself would show the bare check (inbox clear AND gauge nil); with open PRs, a neutral hollow ring — no positive claim the data can't back. DEGRADED: under-dash (dasharray 2/1.75) beneath any glyph including critical, 0ms. LOADING: dot.radiowaves at α.40 — the only variant that matched the code's actual never-fake-clear treatment unamended. Within-action glyph swaps (top row changes kind): 0ms — legal motion deliberately not spent.</div></details>
+      <details><summary>Doctrine fit &amp; risks</summary><div><b>Fit:</b> "shape says what" promoted to the fourth surface with zero new vocabulary — the glyphs ARE the row glyphs, the sort IS the classifier's.<br><br><b>Risks:</b> findability is the honest casualty — the silhouette changes with the top row; it never steals attention but invites more of it per glance. If the island is usually visible, this surface is redundant chrome.</div></details>
+      <div class="verdict"><b>Refuter — amend:</b> its CLEAR was a hollow check-ring shown whenever the inbox is empty — but with blocked PRs open, VoiceOver would speak "N blocked" while the glyph asserts a checkmark: the glyph contradicting its own spoken value.
+      <div class="amendment">check-ring only when the pill's own bare-check condition holds; neutral ring otherwise — <b>applied above</b> (see the two clear cells).</div></div>
+    </div>
+  </div>
+
+  <div class="vcard">
+    <div class="gwrap" id="g4"></div>
+    <div class="vbody">
+      <div class="vhead"><h3>Binary Presence — the count-free ring</h3><span class="vid">binary-presence</span>
+        <span class="vflags"><span class="chip amend">amend</span></span></div>
+      <p class="essence">The bar answers exactly three questions and nothing else — <b>am I needed</b> (hollow vs filled),
+      <b>is it an emergency</b> (knocked-out !), <b>can I trust the reading</b> (dashed halo). The count is deliberately withheld
+      to the tooltip, VoiceOver, and the click. Constant width: the item never reflows its neighbors.</p>
+      <details><summary>Build spec</summary><div class="spec">squareLength, no title ever. CLEAR: hollow circle r5.75. ACTION: filled r6.5 — identical outer silhouette, pure weight change. CRITICAL: filled + knocked-out exclamation. DEGRADED: outer dashed halo r8 composes over every state by construction — the only variant where that's structural. LOADING (amended): a lone small centered dot at α.40 — never the dimmed clear circle. Halo toggles 0ms (amended); class changes 180ms. Count lives in toolTip + accessibilityValue = the real PillAccessibilityPresenter string — VoiceOver hears exactly what the pill would say; the island, one click away, stays the count's first-class home.</div></details>
+      <details><summary>Doctrine fit &amp; risks</summary><div><b>Fit:</b> the calm ceiling — quietest possible "you're needed", zero layout churn, silhouette-constant, three shapes mapping exactly to the classifier's three interruption tiers.<br><br><b>Risks:</b> "1 needs you" and "7 need you" render identically — a philosophical bet that the ruthlessly-suppressed radar makes counts low-value. If dogfooding falsifies that, this variant can't grow a count without becoming the Miniature Island.</div></details>
+      <div class="verdict"><b>Refuter — amend:</b> doctrinally the safest architecture of the four; two shared-class breaches — loading as dimmed clear-circle, and an animated halo toggle.
+      <div class="amendment">loading = lone dot α.40; halo hard-swaps at 0ms — <b>both applied above</b>.</div></div>
+    </div>
+  </div>
+</div>
+
+<div class="decide">
+  <h3>What you're deciding</h3>
+  <p><b>The live pair, per the refuter: amended Constant Beacon vs amended Binary Presence.</b> The beacon wins findability +
+  1×-legible counts; the ring is the doctrine-safest and quietest. The count-at-a-glance question is explicitly deferrable to
+  dogfooding — pick the ring now and you cannot add a count later without becoming the Miniature Island; pick the beacon and the
+  cost is ~10–18px of honest neighbor reflow.</p>
+  <p><b>Three record-wide rules to ratify once</b> (all pre-applied above): loading is never a dimmed clear-mark; freshness
+  changes never animate (0ms — crossfade is reserved for clear↔action↔critical); and note that <b>all four sets scope the glyph
+  to H1 only</b> — a hidden island shows no blocked-PR signal. That omission is defensible (the axes stay orthogonal) but make
+  the call consciously.</p>
+</div>
+
+<script>
+  (function () {
+    var uid = 0;
+    function svg(inner, opts) {
+      opts = opts || {};
+      var s = opts.size || 18, op = opts.op ? ' opacity="' + opts.op + '"' : '';
+      return '<svg width="' + s + '" height="' + s + '" viewBox="0 0 18 18" fill="none"' + op +
+        ' xmlns="http://www.w3.org/2000/svg">' + inner + '</svg>';
+    }
+    function knockPill(txt, fs) {
+      var id = 'k' + (++uid);
+      return '<defs><mask id="' + id + '"><rect width="18" height="18" fill="black"/>' +
+        '<rect x="1" y="5" width="16" height="8" rx="4" fill="white"/>' +
+        '<text x="9" y="9.3" text-anchor="middle" dominant-baseline="central" font-family="-apple-system,system-ui,sans-serif" font-weight="600" font-size="' + fs + '" fill="black">' + txt + '</text></mask></defs>' +
+        '<rect x="1" y="5" width="16" height="8" rx="4" fill="currentColor" mask="url(#' + id + ')"/>';
+    }
+    var hollowPill = '<rect x="1.75" y="5.75" width="14.5" height="6.5" rx="3.25" stroke="currentColor" stroke-width="1.5"/>';
+    var staleRing = '<circle cx="14.75" cy="3.25" r="2" stroke="currentColor" stroke-width="1.25"/>';
+    var arcs = function (dash) {
+      var d = dash ? ' stroke-dasharray="2.25 1.6"' : '';
+      return '<path d="M 5.9,12.1 A 4.4,4.4 0 0 1 5.9,5.9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"' + d + '/>' +
+             '<path d="M 12.1,5.9 A 4.4,4.4 0 0 1 12.1,12.1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"' + d + '/>';
+    };
+    function shield(scale) {
+      var id = 'k' + (++uid);
+      var g = scale ? '<g transform="translate(9,9) scale(' + scale + ') translate(-9,-9)">' : '<g>';
+      return '<defs><mask id="' + id + '"><rect width="18" height="18" fill="black"/>' +
+        '<path d="M9,1.9 L14.6,4.1 C14.6,4.1 14.9,9.4 13.3,12.2 C11.9,14.6 9,16.1 9,16.1 C9,16.1 6.1,14.6 4.7,12.2 C3.1,9.4 3.4,4.1 3.4,4.1 Z" fill="white"/>' +
+        '<rect x="8.2" y="5.3" width="1.6" height="4.4" rx="0.8" fill="black"/><circle cx="9" cy="12" r="1" fill="black"/></mask></defs>' +
+        g + '<path d="M9,1.9 L14.6,4.1 C14.6,4.1 14.9,9.4 13.3,12.2 C11.9,14.6 9,16.1 9,16.1 C9,16.1 6.1,14.6 4.7,12.2 C3.1,9.4 3.4,4.1 3.4,4.1 Z" fill="currentColor" mask="url(#' + id + ')"/></g>';
+    }
+    var radiowaves = '<circle cx="9" cy="9" r="1.2" fill="currentColor"/>' +
+      '<path d="M5.5 6.5a4.6 4.6 0 0 0 0 5M12.5 6.5a4.6 4.6 0 0 1 0 5" stroke="currentColor" stroke-width="1.4" opacity=".6"/>' +
+      '<path d="M3.4 4.8a7.3 7.3 0 0 0 0 8.4M14.6 4.8a7.3 7.3 0 0 1 0 8.4" stroke="currentColor" stroke-width="1.4" opacity=".32"/>';
+    var checkRing = '<circle cx="9" cy="9" r="6.25" stroke="currentColor" stroke-width="1.5"/>' +
+      '<path d="M 6.2,9.2 L 8.2,11.2 L 12,6.9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>';
+    var neutralRing = '<circle cx="9" cy="9" r="6.25" stroke="currentColor" stroke-width="1.5"/>';
+    var pullFork = '<circle cx="5" cy="4.4" r="1.7" stroke="currentColor" stroke-width="1.4"/><circle cx="5" cy="13.6" r="1.7" stroke="currentColor" stroke-width="1.4"/>' +
+      '<path d="M5 6.1v5.8" stroke="currentColor" stroke-width="1.4"/><circle cx="12.8" cy="13.6" r="1.7" stroke="currentColor" stroke-width="1.4"/>' +
+      '<path d="M12.8 11.9V8.2M10.9 9.9l1.9-1.9 1.9 1.9" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>';
+    var atSign = '<text x="9" y="9.6" text-anchor="middle" dominant-baseline="central" font-family="-apple-system,system-ui,sans-serif" font-weight="600" font-size="13" fill="currentColor">@</text>';
+    var underDash = '<line x1="4.5" y1="16.75" x2="13.5" y2="16.75" stroke="currentColor" stroke-width="1.5" stroke-dasharray="2 1.75" stroke-linecap="round"/>';
+    function knockCircle() {
+      var id = 'k' + (++uid);
+      return '<defs><mask id="' + id + '"><rect width="18" height="18" fill="black"/><circle cx="9" cy="9" r="6.5" fill="white"/>' +
+        '<rect x="8.15" y="4.9" width="1.7" height="5.45" rx="0.85" fill="black"/><circle cx="9" cy="12.35" r="1.05" fill="black"/></mask></defs>' +
+        '<circle cx="9" cy="9" r="6.5" fill="currentColor" mask="url(#' + id + ')"/>';
+    }
+    var halo = '<circle cx="9" cy="9" r="8" stroke="currentColor" stroke-width="1" stroke-dasharray="2.1 2.1" opacity=".9"/>';
+    var wifiN = '<path d="M9 12.6l-2.6-2.9a3.9 3.9 0 0 1 5.2 0z" fill="currentColor"/><path d="M4.6 8a6.6 6.6 0 0 1 8.8 0M2.8 5.9a9.4 9.4 0 0 1 12.4 0" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linecap="round"/>';
+    var battN = '<rect x="1.5" y="5.5" width="12" height="7" rx="2" stroke="currentColor" stroke-width="1.2"/><rect x="3" y="7" width="7.5" height="4" rx="1" fill="currentColor"/><path d="M14.5 7.8v2.4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>';
+
+    var SETS = {
+      g1: [
+        { l: 'clear', g: function (o) { return svg(hollowPill, o); } },
+        { l: 'action · 3', g: function (o) { return svg(knockPill('3', 6.75), o); } },
+        { l: 'critical · !3', g: function (o) { return svg(knockPill('!3', 6.25), o); } },
+        { l: '+ degraded', g: function (o) { return svg(knockPill('3', 6.75) + staleRing, o); } },
+        { l: 'loading α.4', g: function (o) { o = Object.assign({}, o, { op: .4 }); return svg(hollowPill + '<circle cx="9" cy="9" r="1" fill="currentColor"/>', o); } }
+      ],
+      g2: [
+        { l: 'clear', g: function (o) { return svg(arcs() + '<circle cx="9" cy="9" r="2" stroke="currentColor" stroke-width="1.5"/>', o); } },
+        { l: 'action', g: function (o) { return svg(arcs() + '<circle cx="9" cy="9" r="2.75" fill="currentColor"/>', o); }, t: '3' },
+        { l: '+ degraded', g: function (o) { return svg(arcs(true) + '<circle cx="9" cy="9" r="2.75" fill="currentColor"/>', o); }, t: '3' },
+        { l: 'critical', g: function (o) { return svg(shield(), o); }, t: '3' },
+        { l: 'crit + degr', g: function (o) { return svg(arcs(true) + shield(.72), o); }, t: '3' },
+        { l: 'loading α.4', g: function (o) { o = Object.assign({}, o, { op: .4 }); return svg(arcs(), o); } }
+      ],
+      g3: [
+        { l: 'clear (true)', g: function (o) { return svg(checkRing, o); } },
+        { l: 'clear · PRs', g: function (o) { return svg(neutralRing, o); } },
+        { l: 'review · 2', g: function (o) { return svg(pullFork, o); }, t: '2' },
+        { l: 'mention · 1', g: function (o) { return svg(atSign, o); }, t: '1' },
+        { l: 'critical · 1', g: function (o) { return svg(shield(), o); }, t: '1' },
+        { l: '+ degraded', g: function (o) { return svg(pullFork + underDash, o); }, t: '2' },
+        { l: 'loading α.4', g: function (o) { o = Object.assign({}, o, { op: .4 }); return svg(radiowaves, o); } }
+      ],
+      g4: [
+        { l: 'clear', g: function (o) { return svg('<circle cx="9" cy="9" r="5.75" stroke="currentColor" stroke-width="1.5"/>', o); } },
+        { l: 'action', g: function (o) { return svg('<circle cx="9" cy="9" r="6.5" fill="currentColor"/>', o); } },
+        { l: 'critical', g: function (o) { return svg(knockCircle(), o); } },
+        { l: 'clear + degr', g: function (o) { return svg('<circle cx="9" cy="9" r="5.75" stroke="currentColor" stroke-width="1.5"/>' + halo, o); } },
+        { l: 'action + degr', g: function (o) { return svg('<circle cx="9" cy="9" r="6.5" fill="currentColor"/>' + halo, o); } },
+        { l: 'loading α.4', g: function (o) { o = Object.assign({}, o, { op: .4 }); return svg('<circle cx="9" cy="9" r="1.5" fill="currentColor"/>', o); } }
+      ]
+    };
+    function cells(set, opts, withText) {
+      return set.map(function (st) {
+        return '<span class="gcell">' + st.g(Object.assign({}, opts)) +
+          (withText && st.t ? '<span class="gcount">' + st.t + '</span>' : '') + '</span>';
+      }).join('');
+    }
+    Object.keys(SETS).forEach(function (id) {
+      var set = SETS[id], el = q('#' + id);
+      var html = '<div class="gbar dark">' + cells(set, { size: 18 }, true) + '</div>' +
+        '<div class="gbar light">' + cells(set, { size: 18 }, true) + '</div>' +
+        '<div class="glabels">' + set.map(function (s) { return '<span>' + s.l + '</span>'; }).join('') + '</div>' +
+        '<div class="gzoom">' + cells(set, { size: 36 }, true) + '</div>';
+      if (id === 'g2') {
+        html += '<div class="gnote">width reflow, honest but real — neighbors shift when the count appears:</div>' +
+          '<div class="reflow">' +
+          '<div class="gbar dark"><span class="gcell" style="width:40px">' + svg(wifiN, { size: 16 }) + '</span><span class="gcell" style="width:44px">' + SETS.g2[0].g({ size: 18 }) + '</span><span class="gcell" style="width:40px">' + svg(battN, { size: 16 }) + '</span></div>' +
+          '<div class="gbar dark"><span class="gcell" style="width:40px">' + svg(wifiN, { size: 16 }) + '</span><span class="gcell" style="width:58px">' + SETS.g2[1].g({ size: 18 }) + '<span class="gcount">3</span></span><span class="gcell" style="width:40px">' + svg(battN, { size: 16 }) + '</span></div></div>';
+      }
+      if (id === 'g4') {
+        html += '<div class="gnote">the count lives off-glass — hover/VoiceOver get the real presenter string:</div>' +
+          '<span class="tip">githud — 3 need you, including a critical alert. Click to expand.</span>';
+      }
+      el.innerHTML = html;
+    });
+  })();
+</script>
+</section>
+<!-- SECTION:D-glyph-END -->
+<section class="record" id="d-reveal">
+<style>
+  #d-reveal .variants { grid-template-columns: repeat(auto-fit, minmax(480px, 1fr)); }
+  #d-reveal .stage { min-height: 300px; }
+  #d-reveal .r-island { position: absolute; top: 32px; left: 50%; transform: translateX(-50%); width: 520px;
+    background: #0d1117; border: 1px solid rgba(48,54,61,.85); border-radius: 14px;
+    box-shadow: 0 10px 30px rgba(0,0,0,.5); padding: 16px 18px 12px; font-family: var(--sys); color: #e6edf3; }
+  #d-reveal .r-row { display: grid; grid-template-columns: 20px 1fr; column-gap: 8px; align-items: start;
+    padding: 5px 8px; border-radius: 6px; cursor: pointer;
+    transition: background-color 120ms cubic-bezier(0,0,.58,1); }
+  #d-reveal .r-row:hover { background: rgba(255,255,255,.06); }
+  #d-reveal .r-row.chev { grid-template-columns: 20px 1fr 22px; }
+  #d-reveal .r-ic { color: #7d8590; font-size: 13px; line-height: 1.35; text-align: center; }
+  #d-reveal .r-t { font: 500 13px/1.3 var(--sys); color: #e6edf3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #d-reveal .r-s { font: 400 11px/1.5 var(--sys); color: #7d8590; font-variant-numeric: tabular-nums;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #d-reveal .r-x { font: 400 11px/1.45 var(--sys); color: #484f58; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #d-reveal .r-body { max-height: 44px; overflow: hidden; transition: max-height 140ms cubic-bezier(.2,0,0,1); }
+  #d-reveal .r-row.hasx .r-body { max-height: 60px; }
+  #d-reveal .r-row.peek .r-body { max-height: 220px; }
+  #d-reveal .r-row.peek .r-t, #d-reveal .r-row.peek .r-s, #d-reveal .r-row.peek .r-x { white-space: normal; }
+  #d-reveal .r-cbtn { width: 22px; height: 18px; display: grid; place-items: center; border-radius: 5px;
+    color: #484f58; transition: background-color 120ms cubic-bezier(0,0,.58,1); }
+  #d-reveal .r-row:hover .r-cbtn { color: #7d8590; }
+  #d-reveal .r-cbtn:hover { background: rgba(255,255,255,.06); }
+  #d-reveal .r-cbtn svg { transition: transform 140ms cubic-bezier(.2,0,0,1); }
+  #d-reveal .r-row.peek .r-cbtn svg { transform: rotate(180deg); }
+  #d-reveal .r-tip { position: absolute; left: 46px; max-width: 440px; background: #161b22; border: 1px solid #30363d;
+    border-radius: 8px; padding: 10px 12px; box-shadow: 0 6px 18px rgba(0,0,0,.45); z-index: 10;
+    opacity: 0; transition: opacity 100ms cubic-bezier(0,0,.58,1); pointer-events: none; }
+  #d-reveal .r-tip.on { opacity: 1; }
+  #d-reveal .r-tip .tt { font: 500 12px/1.35 var(--sys); color: #e6edf3; }
+  #d-reveal .r-tip .ts { font: 400 11px/1.6 var(--sys); color: #7d8590; font-variant-numeric: tabular-nums; }
+  #d-reveal .r-tip .tx { font: 400 11px/1.4 var(--sys); color: #7d8590; margin-top: 4px; }
+  #d-reveal .vcard.killed { opacity: .78; }
+  #d-reveal .vcard.killed h3 { text-decoration: line-through; text-decoration-thickness: 1.5px; }
+  @media (prefers-reduced-motion: reduce) { #d-reveal .r-body, #d-reveal .r-cbtn svg, #d-reveal .r-tip { transition: none; } }
+</style>
+
+<p class="eyebrow">Record D-reveal · closes the WP-3e micro-polish box · the inspector's final form</p>
+<h2>When a row truncates at 520px, what gesture reveals the full text — and on what surface?</h2>
+<p class="qsub">The hard constraint: plain row click is irrevocably <b>Open-on-GitHub</b> and must stay unambiguous. Four answers
+were specced; one killed itself against that constraint. The refuter also found a shared defect — every variant's truncation
+predicate forgot the <b>subtitle</b> — fixed in all specs below.</p>
+
+<div class="today">
+  <h3>Today</h3>
+  <p>The only reveal is the <b>OS tooltip</b> — ~1.5s delayed, unstyled, visually foreign, and set unconditionally even on rows with
+  nothing hidden (<code>IslandContentView.swift:456</code>). The "inspector" of the original intent collapsed to a one-line excerpt
+  capped at 100 chars at enrichment time — the full body never reaches the row model. Two code facts the session must know:
+  <code>IslandClickableView.hitTest</code> <b>flattens each row to one hit target</b> (a child button can't receive its own click
+  without a carve-out), and <code>RadarRow</code> has <b>no stable identity</b> (peek state needs a model change to survive rebuilds).</p>
+</div>
+
+<div class="variants">
+
+  <div class="vcard">
+    <div class="stage">
+      <div class="menubar"><span style="font-weight:700"></span><span>githud</span><span class="mb-right"><span>Mon 21:42</span></span></div>
+      <div class="r-island" id="r1"></div>
+      <div class="hint">hover a row and wait ~1.5s — the browser tooltip is the honest analog of the OS one</div>
+    </div>
+    <div class="vbody">
+      <div class="vhead"><h3>Quiet Hand — status quo, hardened</h3><span class="vid">os-tooltip-hardened</span>
+        <span class="vflags"><span class="chip amend">amend</span></span></div>
+      <p class="essence">The one-line excerpt IS the final inspector; keep the OS tooltip as the only reveal and spend the record's
+      budget on the hover treatment: a uniform full-width fill slab (today it hugs each row's content, so widths jitter), 8/5px
+      internal padding, tooltip only when something actually truncates.</p>
+      <details><summary>Build spec</summary><div class="spec">Rows pin trailing to the lane edge — every hover fill is a uniform 484px slab, radius 6, rgba(255,255,255,.06), 120ms ease both ways; Reduce Motion → 0ms; Increase Contrast → α×2.2. Tooltip set ONLY when measured title OR subtitle OR excerpt exceeds available width (amended — subtitle included). Excerpt appended to the VoiceOver label so the spoken row equals the tooltip. NO new motion, surface, or gesture.</div></details>
+      <details><summary>Doctrine fit &amp; risks</summary><div><b>Fit:</b> zero new anything — the doctrine-safest answer on the table.<br><br><b>Risks:</b> the reveal stays effectively broken: 1.5s dwell per row to read a truncated title undermines the 2-second-glance promise; the OS tooltip reads as a different product. Picking this closes the inspector question as "the click is the reveal."</div></details>
+      <div class="verdict"><b>Refuter — amend:</b> the truncated-only rule as written omitted the subtitle — a subtitle-only-truncated row would <i>lose</i> the tooltip it has today: "never restate visible text" accidentally became "sometimes hide truncated text".
+      <div class="amendment">predicate = title OR subtitle OR excerpt — <b>applied</b>.</div></div>
+    </div>
+  </div>
+
+  <div class="vcard rec">
+    <div class="stage">
+      <div class="menubar"><span style="font-weight:700"></span><span>githud</span><span class="mb-right"><span>Mon 21:42</span></span></div>
+      <div class="r-island" id="r2"></div>
+      <div class="hint" id="r2-hint">click the chevron = peek · click the row = open on GitHub · ⌥-click row = peek</div>
+    </div>
+    <div class="vbody">
+      <div class="vhead"><h3>Inline Peek — click-to-expand in flow</h3><span class="vid">chevron-inline-peek</span>
+        <span class="vflags"><span class="chip pick">runner's pick</span><span class="chip amend">amend</span></span></div>
+      <p class="essence">Rows whose text truncates grow a quiet trailing disclosure chevron; clicking IT (never the row)
+      un-truncates the row in place — title wraps to 3 lines, excerpt to 4. The inspector's final form is the row itself, expanded.
+      Rows with nothing hidden get no chevron (see the short row above — the honesty rule).</p>
+      <details><summary>Build spec</summary><div class="spec">Chevron 11px semibold, #484F58 at rest / #7D8590 on row-hover, own 22×18 hit target + hover fill. AMENDED hit-target split: override the row's flattening hitTest to carve out the chevron frame (acceptsFirstMouse, never navigates — with an explicit test). Peek toggles per row; island height animates 140ms cubic-bezier(.2,0,0,1) via NSAnimationContext — flagged: the product's FIRST panel-frame animation. Peeks reset on island collapse; survive data rebuilds via a stash keyed on a NEW stable row id + change signature (AMENDED — RadarRow has no id today and url collides; this is a GithudCore model change, priced). Truncation predicate includes subtitle. OS tooltip removed on chevroned rows — one reveal channel. A11y: accessibilityCustomAction "Show full text"; the future keyboard scheme maps Space→peek, Return→open.</div></details>
+      <details><summary>Doctrine fit &amp; risks</summary><div><b>Fit:</b> the only reveal discoverable <i>without</i> hover; motion strictly click-mapped; ink-only chrome; ceiling untouched.<br><br><b>Risks:</b> standing chevron chrome on most long-title rows; a peek near the 240px lane cap converts growth into in-lane scroll; the peek can under-deliver while the excerpt stays capped at 100 chars (raising the cap is a separate enrichment decision).</div></details>
+      <div class="verdict"><b>Refuter — amend (blocking):</b> the central "two hit targets, zero ambiguity" claim was FALSE against the code — <code>hitTest</code> flattens rows, so an unamended chevron click would <i>navigate</i>: the worst failure of the record's own constraint. Plus the missing stable row id.
+      <div class="amendment">hitTest carve-out with a never-navigates test; stable id + change signature on the row models; subtitle in the predicate; the panel-height animation named as a deliberate first — <b>all folded into the spec above</b>.</div></div>
+    </div>
+  </div>
+
+  <div class="vcard">
+    <div class="stage">
+      <div class="menubar"><span style="font-weight:700"></span><span>githud</span><span class="mb-right"><span>Mon 21:42</span></span></div>
+      <div class="r-island" id="r4"></div>
+      <div class="hint">dwell on a truncated row ~600ms — no chaining: the next row needs its own full dwell</div>
+    </div>
+    <div class="vbody">
+      <div class="vhead"><h3>Styled Dwell Tooltip — the OS tooltip, made ours</h3><span class="vid">dwell-tooltip-styled</span>
+        <span class="vflags"><span class="chip amend">amend</span></span></div>
+      <p class="essence">Keep the exact trigger semantics the row already has (hover dwell) but replace the foreign OS tooltip with a
+      fast, themed, in-island one — 600ms, truncated rows only, one alive at a time, killed instantly by click or scroll.</p>
+      <details><summary>Build spec</summary><div class="spec">Trigger: 600ms dwell on a row where title OR subtitle OR excerpt truncates (amended). No chaining — sweeping the pointer never strobes tooltips. Surface #161B22, hairline #30363D, radius 8, max-width 440, placed below the row's text column (flips above near the bottom inset), clipped by the island mask — never a second window. Entrance: opacity-only ≤100ms (AMENDED — the translateY slide was pure decoration on a timer-fired appearance and is deleted). Dismiss: exit 80ms fade; click hides instantly and proceeds to GitHub untouched. Binding disclosure to the session: this surface is pointer-only by nature — that ceiling is stated, not implied.</div></details>
+      <details><summary>Doctrine fit &amp; risks</summary><div><b>Fit:</b> strictly dominates the status quo on native-feel and honesty; transient, no standing chrome, click untouched.<br><br><b>Risks:</b> deepens the hover channel exactly where iter-1 flagged the trap — reading full text becomes hover-only with no visible affordance, ever; clipping/flipping edge cases at the lane's scroll boundary are real presentation code.</div></details>
+      <div class="verdict"><b>Refuter — amend:</b> the entrance motion fired on <i>timer expiry</i>, not a pointer event — the fade is defensible, the 2px slide was decoration under the strict 1:1 law; and the shared subtitle gap.
+      <div class="amendment">opacity-only entrance; subtitle in the predicate; the pointer-only ceiling stated verbatim — <b>applied</b>.</div></div>
+    </div>
+  </div>
+
+  <div class="vcard killed">
+    <div class="vbody">
+      <div class="vhead"><h3>Hold to Peek — transient Quick-Look card</h3><span class="vid">hold-to-peek-card</span>
+        <span class="vflags"><span class="chip kill">killed</span></span></div>
+      <p class="essence">Press-and-hold a row 350ms to float a themed card with the full text; release dismisses. Zero standing
+      chrome — and shown here struck, for the record.</p>
+      <div class="verdict"><b>Refuter — kill:</b> a press ≥350ms followed by release <b>silently swallows the product's one action</b> —
+      the user meant "open", nothing happens, no feedback that the intent was reinterpreted. That violates the record's binding
+      constraint (its own risks section conceded it: self-refuting). No minimal amendment preserves the essence: navigate-on-release
+      double-fires; raising the threshold relocates the knife-edge; the temporal split IS the variant. Secondary: the mock needed an
+      instruction caption to be usable — demonstrating an affordance the shipped product could never convey — and the gesture plumbing
+      lands on exactly the non-key-panel terrain the codebase documents as unreliable.</div>
+    </div>
+  </div>
+</div>
+
+<div class="decide">
+  <h3>What you're deciding</h3>
+  <p><b>Runner's pick: Inline Peek</b> — the only variant that answers the design question without hover — but the refuter made its
+  hitTest amendment <b>blocking</b>: as originally written, its safety claim didn't survive contact with the code. If you want the
+  strictly doctrine-safest option instead, that's the hardened status quo, at the honest price of closing the inspector question as
+  "the click is the reveal." Also yours to price: Inline Peek needs a small GithudCore model change (stable row identity), and it
+  introduces the product's first panel-frame animation — a deliberate first, not a precedent smuggled in.</p>
+</div>
+
+<script>
+  (function () {
+    var chev = '<svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 6l4.5 4.5L12.5 6"/></svg>';
+    var ROWS = [
+      { i: '◉', t: 'Fix race in PollScheduler when expand fires during an in-flight tick and the coalescer supersedes the pending render', s: 'provi/githud · alice · review requested · 2h', x: 'I think the guard in setNeedsRender needs to also check isVisible before scheduling — otherwise…', trunc: true },
+      { i: '@', t: 'Bump CI to macos-15', s: 'acme/infra · mara · mention · 4h', x: '', trunc: false },
+      { i: '↩', t: 'Keychain access groups for the shared credential path in the v2 migration plan', s: 'acme/api · quinn · reply on your PR · 7h', x: 'The kSecAttrAccessible choice matters here because a locked-screen poll would…', trunc: true }
+    ];
+    function rowHTML(r, mode) {
+      var cls = 'r-row' + (r.x ? ' hasx' : '') + (mode === 'chev' && r.trunc ? ' chev' : '');
+      var tip = mode === 'os' && r.trunc ? ' title="' + r.t + '&#10;' + r.s + (r.x ? '&#10;' + r.x : '') + '"' : '';
+      return '<div class="' + cls + '"' + tip + ' data-trunc="' + r.trunc + '"><div class="r-ic">' + r.i + '</div>' +
+        '<div class="r-body"><div class="r-t">' + r.t + '</div><div class="r-s">' + r.s + '</div>' +
+        (r.x ? '<div class="r-x">' + r.x + '</div>' : '') + '</div>' +
+        (mode === 'chev' && r.trunc ? '<span class="r-cbtn">' + chev + '</span>' : '') + '</div>';
+    }
+    function fill(id, mode) {
+      var el = q('#' + id);
+      el.innerHTML = '<div class="i-head"><span class="i-lane">Needs you</span><span class="i-badge">3</span><span class="i-sp"></span>' +
+        '<span class="i-icnbtn">⚙</span><span class="i-icnbtn">⌃</span></div>' +
+        '<div style="margin-top:8px">' + ROWS.map(function (r) { return rowHTML(r, mode); }).join('') + '</div>' +
+        '<div class="i-foot">GitHub inbox ↗</div>';
+    }
+    fill('r1', 'os'); fill('r2', 'chev'); fill('r4', 'dwell');
+
+    function flashOpen(stage) {
+      var h = stage.querySelector('.hint'), old = h.textContent;
+      h.textContent = '↗ opened on GitHub (mock) — the primary action, untouched';
+      setTimeout(function () { h.textContent = old; }, 1400);
+    }
+    qa('#r1 .r-row, #r2 .r-row, #r4 .r-row').forEach(function (row) {
+      row.addEventListener('click', function (e) {
+        if (e.target.closest('.r-cbtn')) return;
+        if (e.altKey && row.closest('#r2')) { row.classList.toggle('peek'); return; }
+        flashOpen(row.closest('.stage'));
+      });
+    });
+    qa('#r2 .r-cbtn').forEach(function (b) {
+      b.addEventListener('click', function (e) { e.stopPropagation(); b.closest('.r-row').classList.toggle('peek'); });
+    });
+    /* dwell tooltip — 600ms, no chaining, opacity-only */
+    var tipEl = document.createElement('div'); tipEl.className = 'r-tip';
+    q('#r4').appendChild(tipEl);
+    var dwellTimer = null;
+    qa('#r4 .r-row').forEach(function (row) {
+      row.addEventListener('pointerenter', function () {
+        clearTimeout(dwellTimer); tipEl.classList.remove('on');
+        if (row.getAttribute('data-trunc') !== 'true') return;
+        dwellTimer = setTimeout(function () {
+          var t = row.querySelector('.r-t').textContent, s = row.querySelector('.r-s').textContent;
+          var x = row.querySelector('.r-x'); var isl = q('#r4');
+          tipEl.innerHTML = '<div class="tt">' + t + '</div><div class="ts">' + s + '</div>' + (x ? '<div class="tx">' + x.textContent + '</div>' : '');
+          var top = row.offsetTop + row.offsetHeight + 6;
+          tipEl.style.top = Math.min(top, isl.offsetHeight - 90) + 'px';
+          tipEl.classList.add('on');
+        }, 600);
+      });
+      row.addEventListener('pointerleave', function () { clearTimeout(dwellTimer); tipEl.classList.remove('on'); });
+      row.addEventListener('click', function () { clearTimeout(dwellTimer); tipEl.classList.remove('on'); });
+    });
+    q('#r4').parentElement.addEventListener('scroll', function () { tipEl.classList.remove('on'); }, true);
+  })();
+</script>
+</section>
+<!-- SECTION:D-reveal-END -->
+<section class="record" id="d-copy">
+<style>
+  #d-copy .variants { grid-template-columns: 1fr; }
+  #d-copy .copystage { display: flex; gap: 18px; flex-wrap: wrap; justify-content: center; align-items: flex-start;
+    padding: 22px 16px; background: linear-gradient(148deg, #232c4e 0%, #33234a 42%, #14263e 100%); }
+  #d-copy .ci { width: 520px; max-width: 100%; background: #0d1117; border: 1px solid rgba(48,54,61,.85);
+    border-radius: 14px; padding: 14px 18px 12px; font-family: var(--sys); color: #e6edf3;
+    box-shadow: 0 10px 30px rgba(0,0,0,.45); }
+  #d-copy .ci .tag { font: 600 9.5px var(--mono); letter-spacing: .07em; text-transform: uppercase; color: rgba(235,240,246,.45); margin-bottom: 8px; }
+  #d-copy .ci .banner { display: flex; gap: 6px; align-items: center; font: 500 11px var(--sys); color: #d29922; margin-bottom: 8px; }
+  #d-copy .aff { padding: 16px 0; }
+  #d-copy .aff.center { text-align: center; }
+  #d-copy .aff .l1 { font: 500 13px var(--sys); color: #e6edf3; }
+  #d-copy .aff .l2 { font: 400 11px var(--sys); color: #7d8590; margin-top: 3px; font-variant-numeric: tabular-nums; }
+  #d-copy table { border-collapse: collapse; width: 100%; font-size: 12px; }
+  #d-copy .twrap { overflow-x: auto; }
+  #d-copy th, #d-copy td { text-align: left; padding: 5px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  #d-copy th { font: 600 10px var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--ink3); }
+  #d-copy td:first-child { color: var(--ink3); font-size: 11.5px; white-space: nowrap; }
+  #d-copy td:last-child { font-family: var(--mono); font-size: 11.5px; color: var(--ink); }
+  #d-copy .gnote { font: 500 10.5px var(--mono); color: var(--ink3); padding: 8px 16px; }
+</style>
+
+<p class="eyebrow">Record D-copy · feeds WP-3d′ caught-up state, WP-4d strings, and every surface after</p>
+<h2>Which single voice speaks every githud string — and what exactly does a caught-up island say, fresh vs degraded?</h2>
+<p class="qsub">Three complete voices (a consistent string <i>system</i> each, not per-string alternatives). The binding constraint:
+copy may never soften a degraded reading into a reassurance. Each island pair below shows the voice's honesty device doing its
+job — the degraded state matters more than the fresh one. Amendments applied.</p>
+
+<div class="today">
+  <h3>Today</h3>
+  <p>There is <b>no caught-up affirmation</b> — when the radar is empty the header flips to the bare wordmark "githud", empty lanes
+  don't render, and the expanded island reads blank, not affirming (<code>IslandContentView.swift:258, :46-49</code>). The rest of the
+  product already speaks a de-facto plain second-person voice. Honesty mechanics that bind all copy: "caught up" can only render
+  after a confirmed first poll; degraded freshness composes with every state; degraded age is plumbed (<code>ageSeconds</code>), but a
+  fresh-state "checked Xs ago" and any "no open PRs" claim are NOT buildable today.</p>
+</div>
+
+<div class="variants">
+
+  <div class="vcard rec">
+    <div class="copystage">
+      <div class="ci"><div class="tag">caught up · fresh</div>
+        <div class="i-head"><span class="i-lane">githud</span><span class="i-sp"></span><span class="i-icnbtn">⚙</span><span class="i-icnbtn">⌃</span></div>
+        <div class="aff center"><div class="l1">You're all caught up</div><div class="l2">Nothing needs you right now</div></div>
+        <div class="i-foot">GitHub inbox ↗</div></div>
+      <div class="ci"><div class="tag">caught up · degraded (snapshot launch, reconnecting…)</div>
+        <div class="banner">◷ Reconnecting — last update 8m ago</div>
+        <div class="i-head"><span class="i-lane">githud</span><span class="i-sp"></span><span class="i-icnbtn">⚙</span><span class="i-icnbtn">⌃</span></div>
+        <div class="aff center"><div class="l1">All caught up as of 8m ago</div></div>
+        <div class="i-foot">GitHub inbox ↗</div></div>
+    </div>
+    <div class="vbody">
+      <div class="vhead"><h3>Plainspoken — second person, sentence case</h3><span class="vid">voice-plainspoken</span>
+        <span class="vflags"><span class="chip pick">runner's pick</span><span class="chip amend">amend</span></span></div>
+      <p class="essence">Calm plain English answering "what does this mean for me?" — the voice ~90% of shipped strings already
+      speak, completed into one system. Honesty device: present tense + "right now" are permitted <b>only under fresh</b>; any
+      degraded reading leaves the present tense entirely (amended — see the degraded island).</p>
+      <div class="twrap"><table>
+        <tr><th>surface</th><th>string</th></tr>
+        <tr><td>header, radar &gt; 0</td><td>Needs you</td></tr>
+        <tr><td>header, caught up + PRs open</td><td>All caught up &nbsp;·&nbsp; degraded → Caught up as of 8m ago</td></tr>
+        <tr><td>banner stale / failing</td><td>Updated 8m ago &nbsp;/&nbsp; Reconnecting — last update 8m ago</td></tr>
+        <tr><td>footer</td><td>GitHub inbox ↗</td></tr>
+        <tr><td>VO: loading / clear / degraded prefix</td><td>githud — checking GitHub &nbsp;/&nbsp; You're all caught up &nbsp;/&nbsp; Reading may be stale — updated 8m ago.</td></tr>
+        <tr><td>VO: critical suffix</td><td>, including a security alert &nbsp;<span style="font-family:var(--sys);color:var(--ink3)">(names the one reserved critical; add a test tripwire on the set's cardinality)</span></td></tr>
+        <tr><td>401</td><td>GitHub rejected the token (401) — it's invalid or expired. Create a fresh classic token (notifications scope) and paste it again.</td></tr>
+        <tr><td>wrong shape</td><td>That's not a classic token — it should start with ghp_. Fine-grained and App tokens can't read notifications.</td></tr>
+        <tr><td>welcome steps</td><td>1. Create a classic token (ghp_…) with the notifications scope · 2. Paste it here — it stays in your Keychain, nowhere else · 3. That's it — githud checks your inbox about once a minute</td></tr>
+      </table></div>
+      <div class="verdict"><b>Refuter — amend:</b> the spec kept present-tense "You're all caught up" under degraded — and the cold-launch
+      snapshot paint is <i>always</i> stale, so every launch would greet the user with a present-tense all-clear the data can't back
+      (a review request landed overnight → the headline is false at the moment it renders).
+      <div class="amendment">under any degraded freshness, line 1 leaves the present tense: "All caught up as of {age} ago" — <b>applied above</b>.</div></div>
+    </div>
+  </div>
+
+  <div class="vcard">
+    <div class="copystage">
+      <div class="ci"><div class="tag">caught up · fresh</div>
+        <div class="i-head"><span class="i-lane">githud</span><span class="i-sp"></span><span class="i-icnbtn">⚙</span><span class="i-icnbtn">⌃</span></div>
+        <div class="aff"><div class="l1">Inbox clear</div><div class="l2">0 need action</div></div>
+        <div class="i-foot">full inbox ↗</div></div>
+      <div class="ci"><div class="tag">caught up · degraded</div>
+        <div class="banner">◷ last update 8m ago</div>
+        <div class="i-head"><span class="i-lane">githud</span><span class="i-sp"></span><span class="i-icnbtn">⚙</span><span class="i-icnbtn">⌃</span></div>
+        <div class="aff"><div class="l1">Inbox clear</div><div class="l2">0 needed action · as of 8m ago</div></div>
+        <div class="i-foot">full inbox ↗</div></div>
+    </div>
+    <div class="gnote">the whole argument is adjacency — the rows already speak this grammar: &nbsp;
+      <span style="color:var(--ink2)">acme/api #142 · CI failing · conflicts · 2h</span> &nbsp;⟷&nbsp;
+      <span style="color:var(--ink2)">Inbox clear · 0 need action</span></div>
+    <div class="vbody">
+      <div class="vhead"><h3>Instrument readout — readings, not sentences</h3><span class="vid">voice-instrument</span>
+        <span class="vflags"><span class="chip keep">keep</span></span></div>
+      <p class="essence">githud is a gauge: every string is a reading in the rows' own "noun · count · age" grammar, so the copy is
+      <b>structurally incapable of sugarcoating</b> — there is no register for reassurance at all. VoiceOver keeps full phrases (raw
+      readouts are hostile speech) as a specced, deliberate exception.</p>
+      <div class="twrap"><table>
+        <tr><th>surface</th><th>string</th></tr>
+        <tr><td>header, radar &gt; 0</td><td>Action needed</td></tr>
+        <tr><td>lanes</td><td>Open PRs · Stale · Drafts</td></tr>
+        <tr><td>banner stale / failing</td><td>last update 8m ago &nbsp;/&nbsp; reconnecting · last update 8m ago</td></tr>
+        <tr><td>footer</td><td>full inbox ↗</td></tr>
+        <tr><td>VO: loading / clear</td><td>githud, first check running &nbsp;/&nbsp; inbox clear</td></tr>
+        <tr><td>401</td><td>Token rejected (401) — invalid or expired. Fix: fresh classic token, notifications scope.</td></tr>
+        <tr><td>wrong shape</td><td>Not a classic token (needs ghp_ prefix) — fine-grained and App tokens can't read notifications. Fix: classic token, notifications scope.</td></tr>
+        <tr><td>welcome steps</td><td>1 · Create classic token (ghp_…) — notifications scope · 2 · Paste — stored in Keychain only · 3 · First reading within a minute</td></tr>
+      </table></div>
+      <div class="verdict"><b>Refuter — keep:</b> the doctrine-cleanest of the three; every claim backed by existing plumbing; the
+      VoiceOver exception is a deliberate a11y accommodation, not a second voice. Its one real problem — honest but <i>cold</i>,
+      failing the PLAN's "affirming, not blank" ask, and "Open PRs" drops the ownership fact — is a design preference, yours to weigh,
+      not a doctrine clause.</div>
+    </div>
+  </div>
+
+  <div class="vcard">
+    <div class="copystage">
+      <div class="ci"><div class="tag">caught up · fresh</div>
+        <div class="i-head"><span class="i-lane">githud</span><span class="i-sp"></span><span class="i-icnbtn">⚙</span><span class="i-icnbtn">⌃</span></div>
+        <div class="aff"><div class="l1">Nothing needs you</div><div class="l2">Inbox clear</div></div>
+        <div class="i-foot">Check for yourself — GitHub inbox ↗</div></div>
+      <div class="ci"><div class="tag">caught up · degraded — the tense carries the doubt</div>
+        <div class="banner">◷ Showing a reading from 8m ago</div>
+        <div class="i-head"><span class="i-lane">githud</span><span class="i-sp"></span><span class="i-icnbtn">⚙</span><span class="i-icnbtn">⌃</span></div>
+        <div class="aff"><div class="l1">Nothing need<b>ed</b> you</div><div class="l2">Inbox clear</div></div>
+        <div class="i-foot">Check for yourself — GitHub inbox ↗</div></div>
+    </div>
+    <div class="vbody">
+      <div class="vhead"><h3>Question, answered — copy as the thesis</h3><span class="vid">voice-question-answered</span>
+        <span class="vflags"><span class="chip amend">amend</span></span></div>
+      <p class="essence">Every string is the answer to INTENT's one question — "does GitHub need me right now?" Honesty rides
+      <b>tense</b>: present only under fresh; degraded answers in the past ("Nothing need<b>ed</b> you"). The footer becomes the
+      explicit audit invitation. Auth errors are framed as "can't ask GitHub".</p>
+      <div class="twrap"><table>
+        <tr><th>surface</th><th>string</th></tr>
+        <tr><td>caught-up L2</td><td>Inbox clear &nbsp;<span style="font-family:var(--sys);color:var(--ink3)">(amended — "no open PRs" was unbackable: an empty pulse array is indistinguishable from a never-succeeded fetch)</span></td></tr>
+        <tr><td>banner stale / failing</td><td>Showing a reading from 8m ago &nbsp;/&nbsp; Reconnecting — showing a reading from 8m ago</td></tr>
+        <tr><td>footer</td><td>Check for yourself — GitHub inbox ↗</td></tr>
+        <tr><td>VO: loading / radar / clear</td><td>Not answered yet — first check running &nbsp;/&nbsp; GitHub needs you — 3 items &nbsp;/&nbsp; Nothing needs you</td></tr>
+        <tr><td>401</td><td>Can't ask GitHub — it rejected the token (401): invalid or expired. Create a fresh classic token (notifications scope).</td></tr>
+        <tr><td>welcome</td><td>githud answers one question: does GitHub need you right now? It needs a token to ask. · step 2: Paste it — it's stored only in your Keychain and sent only to GitHub</td></tr>
+      </table></div>
+      <div class="verdict"><b>Refuter — amend:</b> two fabrications: (1) "no open PRs" claimed PR-nonexistence the view can't back —
+      a user with 16 open PRs and a persistently failing pulse fetch would read a fresh, unhedged "no open PRs"; (2) "it lives in your
+      Keychain and never leaves this Mac" is false — the token goes to api.github.com on every poll; on a trust-moat product that
+      overclaim is exactly what the doctrine exists to catch.
+      <div class="amendment">L2 = "Inbox clear" only; step 2 = "stored only in your Keychain and sent only to GitHub" — <b>both applied above</b>.</div></div>
+    </div>
+  </div>
+</div>
+
+<div class="decide">
+  <h3>What you're deciding</h3>
+  <p><b>Runner's pick, per the refuter's exact framing: plainspoken-as-amended, else instrument.</b> Plainspoken ratifies the voice
+  the product already speaks with near-zero churn on trust-critical strings and is the only voice that delivers the PLAN's
+  "affirming, not blank" ask — but only the amended version is defensible. The clean compose: <b>borrow question-answered's footer</b>
+  ("Check for yourself — GitHub inbox ↗") into plainspoken — doctrine-clean, strengthens the audit loop.</p>
+  <p><b>Record-wide fixes to ratify with it</b> (all pre-applied above): 401 copy keeps "invalid" (a never-valid ghp_-shaped paste
+  also 401s — classify() only sees the status code); the string inventory adds "Launch at Login", and the gear tooltip
+  "Surface, Theme, Quit" currently lies by omission — it undersells a menu that also holds Launch-at-Login and Hide/Show.</p>
+</div>
+</section>
+<!-- SECTION:D-copy -->
+<section class="record" id="gates">
+<style>
+  #gates .variants { grid-template-columns: 1fr; }
+  #gates .xwrap { --gt: 1; display: flex; gap: 16px; flex-wrap: wrap; justify-content: center; padding: 26px 16px;
+    background: linear-gradient(148deg, #232c4e 0%, #33234a 42%, #14263e 100%); }
+  #gates .xcol { text-align: center; }
+  #gates .xcol .xlab { font: 600 10px var(--mono); letter-spacing: .07em; text-transform: uppercase;
+    color: rgba(235,240,246,.55); margin-bottom: 12px; }
+  #gates .xstage { height: 56px; display: flex; align-items: flex-start; justify-content: center; width: 220px; }
+  #gates .gp { height: 36px; border-radius: 14px; background: #0d1117; border: 1px solid rgba(48,54,61,.85);
+    box-shadow: 0 8px 24px rgba(0,0,0,.45); display: flex; align-items: center; justify-content: center;
+    gap: 6px; color: #e6edf3; font: 600 13px var(--sys); font-variant-numeric: tabular-nums;
+    position: relative; overflow: hidden; }
+  #gates .gp .cell { position: relative; display: flex; align-items: center; gap: 6px; }
+  #gates .gp .lyr { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+  #gates .gp .lyr.out { position: absolute; inset: 0; justify-content: center; }
+  #gates #xfade { transition: width calc(150ms * var(--gt)) cubic-bezier(.4,0,.2,1); }
+  #gates #xfade .lyr { transition: opacity calc(150ms * var(--gt)) cubic-bezier(.4,0,.2,1); }
+  #gates #xslot { transition: width calc(150ms * var(--gt)) cubic-bezier(.32,.72,0,1); }
+  #gates #xslot .lyr { transition: opacity calc(120ms * var(--gt)) cubic-bezier(.4,0,.2,1); }
+  #gates .badge { width: 16px; height: 16px; border-radius: 50%; display: inline-grid; place-items: center;
+    color: #fff; font: 700 9px/1 var(--sys); }
+  #gates .badge.ok { background: #3fb950; } #gates .badge.bad { background: #f85149; }
+  #gates .stale { color: #d29922; font-size: 12px; }
+  /* keyboard demo */
+  #gates .kstage { position: relative; min-height: 430px; }
+  #gates .editor { position: absolute; top: 56px; left: 26px; width: 340px; border-radius: 9px; overflow: hidden;
+    background: #14171c; border: 1px solid rgba(255,255,255,.09); box-shadow: 0 14px 34px rgba(0,0,0,.4); }
+  #gates .editor .tbar { height: 24px; background: #1d2026; display: flex; align-items: center; gap: 6px; padding: 0 10px; }
+  #gates .editor .tbar i { width: 10px; height: 10px; border-radius: 50%; background: rgba(255,255,255,.16); }
+  #gates .editor .tbar span { font: 500 10.5px var(--sys); color: rgba(235,240,246,.5); margin-left: 4px; }
+  #gates .editor pre { margin: 0; padding: 12px 14px 16px; font: 11.5px/1.7 var(--mono); color: #9aa5b1; }
+  #gates .caret { display: inline-block; width: 1.5px; height: 13px; background: #e6edf3; vertical-align: -2px;
+    animation: gblink 1s steps(1) infinite; }
+  #gates .kstage.session .caret { animation: none; opacity: .3; }
+  @keyframes gblink { 50% { opacity: 0; } }
+  #gates .k-island { position: absolute; top: 32px; left: 50%; transform: translateX(-50%); width: 400px;
+    background: #0d1117; border: 1px solid rgba(48,54,61,.85); border-radius: 14px; padding: 14px 16px 10px;
+    box-shadow: 0 10px 30px rgba(0,0,0,.5); font-family: var(--sys); color: #e6edf3; }
+  #gates .k-row { display: grid; grid-template-columns: 20px 1fr; column-gap: 8px; padding: 5px 8px;
+    border-radius: 6px; position: relative; }
+  #gates .k-row:hover { background: rgba(255,255,255,.06); }
+  #gates .k-island .kfoot { display: flex; justify-content: space-between; font: 400 11px var(--sys);
+    color: #484f58; padding: 6px 8px 0; }
+  #gates .k-island .khint { opacity: 0; transition: opacity 120ms; }
+  #gates .kstage.session .khint { opacity: 1; }
+  #gates .k-island.selring .k-row.sel { outline: 2px solid #2f81f7; outline-offset: 1px; }
+  #gates .k-island.selbar .k-row.sel { background: rgba(255,255,255,.06); }
+  #gates .k-island.selbar .k-row.sel::before { content: ""; position: absolute; left: 0; top: 4px; bottom: 4px;
+    width: 3px; border-radius: 1.5px; background: #e6edf3; }
+</style>
+
+<p class="eyebrow">Two ⛔ gates · G-crossfade feeds WP-3x · G-keyboard feeds WP-6k · yours alone</p>
+<h2>How far may githud step out of perfect stillness — on the pill, and under your hands?</h2>
+<p class="qsub">Both gates got the adversarial treatment. One mechanism was effectively killed: still-ledger's "never-key"
+keyboard half captured ⇧-free arrows/Return/Esc <b>system-wide</b> via Carbon — input theft wearing focus-non-theft's letter
+(press Return for a newline in your editor → githud opens a PR and the browser activates). Its amended form — instant pill +
+summon/dismiss only — survives as the legitimate zero pole.</p>
+
+<div class="today">
+  <h3>Today</h3>
+  <p>The pill is rebuilt and swapped in a <b>single frame</b> — no pill animation exists; tabular digits mean a same-digit tick
+  already moves zero pixels. ⌃⌥G summons via a permissionless Carbon hotkey, but <code>canBecomeKey == false</code> forever:
+  no key event ever reaches the island — ↑/↓/Return/Esc do nothing. focus-non-theft's proof line literally names that flag.</p>
+</div>
+
+<div class="variants">
+
+  <div class="vcard">
+    <div class="xwrap" id="xdemo">
+      <div class="xcol"><div class="xlab">A · instant (today, ratified)</div><div class="xstage"><div class="gp" id="xinst" style="width:60px"></div></div></div>
+      <div class="xcol"><div class="xlab">B · full 150ms crossfade</div><div class="xstage"><div class="gp" id="xfade" style="width:60px"></div></div></div>
+      <div class="xcol"><div class="xlab">C · slot morph — changed cell only</div><div class="xstage"><div class="gp" id="xslot" style="width:60px"></div></div></div>
+    </div>
+    <div class="stage-ctl">
+      <button id="xtick">▸ poll tick</button>
+      <button class="vtab" id="xslow" aria-pressed="false">¼× slow-mo</button>
+      <button class="vtab" id="xrm" aria-pressed="false">Reduce Motion</button>
+      <span class="note" id="xlabel">next: 3 → 4 (digit tick — watch B fade where C stays still)</span>
+    </div>
+    <div class="vbody">
+      <div class="vhead"><h3>⛔ G-crossfade — one button, all three answers</h3>
+        <span class="vflags"><span class="chip pick">pick: C</span></span></div>
+      <p class="essence">The scripted sequence walks the real state vocabulary: digit tick → critical arrives → inbox clears to the
+      gauge → reading degrades (+19px stale prefix) → bare check. <b>A</b> (still-ledger's pill half, <span class="vid">still-ledger-neverkey</span>)
+      never draws an interpolated frame — a purist's pill; an unwitnessed 3→4 tick is the knowing cost. <b>B</b>
+      (<span class="vid">witness-fade-keyring</span>, refuter: <b>keep</b>) fades the whole pill on every real change — the fade IS the
+      information, and the mid-fade ghost (a 3 over an incoming 4) plus 150ms of peripheral motion on every poll tick are the named
+      costs; use slow-mo to inspect the ghost frame — it's the decision. <b>C</b> (<span class="vid">slot-morph-inkfocus</span>, refuter:
+      <b>keep</b>) shares one chassis so nothing moves that didn't change: equal-digit ticks stay at today's zero motion, only the
+      changed cell fades 120ms, width settles 150ms, and the one animated color transition is the critical flip — exactly where the
+      doctrine spends danger.</p>
+      <div class="verdict"><b>Refuter on the field:</b> B and C are both doctrine-clean under the motion law (change-mapped, once per
+      burst, Reduce-Motion honored); A's pill half ratifies verified current behavior. C's written invariant — <i>"no motion where no
+      fact changed"</i> — is the guard against the two-grammar rule eroding into "animate whatever feels nice."</div>
+    </div>
+  </div>
+
+  <div class="vcard">
+    <div class="stage kstage" id="kstage">
+      <div class="menubar"><span style="font-weight:700"></span><span>TextMate</span><span style="opacity:.6">File · Edit · View</span>
+        <span class="mb-right"><span>⌃⌥G</span><span>Mon 21:42</span></span></div>
+      <div class="editor"><div class="tbar"><i></i><i></i><i></i><span>notes.md — your editor, frontmost</span></div>
+        <pre>## before the standup
+- ship the reducer fix
+- reply to sofia<span class="caret" id="kcaret"></span></pre></div>
+      <div class="k-island selbar" id="kisland">
+        <div class="i-head"><span class="i-lane">Needs you</span><span class="i-badge">3</span><span class="i-sp"></span>
+          <span class="i-icnbtn">⚙</span><span class="i-icnbtn">⌃</span></div>
+        <div style="margin-top:6px" id="krows"></div>
+        <div class="kfoot"><span>GitHub inbox ↗</span><span class="khint">↑↓ move · ⏎ open · esc dismiss</span></div>
+      </div>
+      <div class="hint" id="khintline">click Summon, then use real ↑ ↓ ⏎ esc — the editor's caret freezes honestly while the island holds key</div>
+    </div>
+    <div class="stage-ctl">
+      <button id="ksummon">⌃⌥G — Summon</button>
+      <button class="vtab" data-kf="selbar" aria-pressed="true">ink bar (C)</button>
+      <button class="vtab" data-kf="selring" aria-pressed="false">accent ring (B)</button>
+      <span class="note">mouse expand = no keys, no hint, no selection — the scoped boundary</span>
+    </div>
+    <div class="vbody">
+      <div class="vhead"><h3>⛔ G-keyboard — the scoped key session</h3>
+        <span class="vflags"><span class="chip pick">pick: ink bar</span></span></div>
+      <p class="essence">Both surviving variants share one mechanism: <code>canBecomeKey</code> becomes true <b>only</b> on the ⌃⌥G
+      path (Spotlight-style — the app never activates, key snaps back on resign), ↑/↓ walk the flattened actionable rows (headers
+      skipped, no wrap), ⏎ opens on GitHub and ends the session, esc/click-away/second-⌃⌥G end it too. Mouse paths never set the
+      flag. What differs is the focus mark: <b>accent ring</b> (system full-keyboard-access idiom, instantly legible) vs
+      <b>ink bar + fill</b> (no new hue; focus = "a persistent hover you steer" — one vocabulary with the existing hover). Toggle
+      both above and drive it with real keys. A11y gain is real either way: the first genuine first-responder for assistive tech.</p>
+      <div class="verdict"><b>Refuter — three binding notes:</b> (1) either choice re-words focus-non-theft's proof line
+      (<code>PRESSURE.md:28</code>) and re-cuts the proof recording (mouse path never-key; key snaps back) <b>before merge</b> —
+      choosing a variant is choosing that ratification. (2) Build directive: reset <code>keySessionActive</code> inside
+      <code>setExpanded(false)</code> — the one choke point all five end paths already funnel through — turning five leak-proof
+      obligations into one. (3) The zero pole (summon/dismiss only, no key session) remains fully legitimate — but the 0-modifier
+      system-wide Carbon capture must never be resurrected as a "lighter" compromise: it is dishonest by construction.</div>
+    </div>
+  </div>
+</div>
+
+<div class="decide">
+  <h3>What you're deciding</h3>
+  <p><b>G-crossfade → runner's pick: C (slot morph).</b> It answers the shared-geometry question affirmatively (one chassis, calm
+  width changes), keeps the common digit tick perfectly still, shrinks the ghost-frame objection to a 20px cell, and spends its one
+  color animation on the critical flip. B stays on the table if you want every real change witnessed; A if you want the purist pill.</p>
+  <p><b>G-keyboard → runner's pick: scoped key session with the ink bar.</b> Real keys, real a11y, one-flag revert, no new hue.
+  The ring is the more instantly legible mark if you'd rather borrow the system idiom. Or take the zero pole knowingly. Also note:
+  D-card's field key-moment is the same class of exception — if you ratify both, scope and prove them as <b>one</b> relaxation.</p>
+</div>
+
+<script>
+  (function () {
+    /* — crossfade tri-demo — */
+    var shieldR = '<svg width="13" height="13" viewBox="0 0 16 16" fill="#f85149" xmlns="http://www.w3.org/2000/svg"><path d="M8 1.6l5.4 2.1c0 0 .3 5.1-1.3 7.9C10.8 14 8 15.4 8 15.4S5.2 14 3.9 11.6C2.3 8.8 2.6 3.7 2.6 3.7z"/><rect x="7.3" y="4.6" width="1.4" height="4.2" rx=".7" fill="#0d1117"/><circle cx="8" cy="11" r=".9" fill="#0d1117"/></svg>';
+    function cellsFor(state) {
+      switch (state) {
+        case 'count3': return { p: '', a: '<span style="color:#e6edf3">◉</span>', b: '3', w: 60 };
+        case 'count4': return { p: '', a: '<span style="color:#e6edf3">◉</span>', b: '4', w: 60 };
+        case 'critical': return { p: '', a: shieldR, b: '4', w: 60 };
+        case 'gauge': return { p: '', a: '<span class="badge ok">✓</span><span>1</span>', b: '<span class="badge bad">✕</span><span>1</span>', w: 88 };
+        case 'staleGauge': return { p: '<span class="stale">◷</span>', a: '<span class="badge ok">✓</span><span>1</span>', b: '<span class="badge bad">✕</span><span>1</span>', w: 107 };
+        case 'check': return { p: '', a: '<span style="color:#484f58">✓</span>', b: '', w: 52 };
+      }
+    }
+    function whole(c) { return c.p + c.a + (c.b ? '<span style="margin-left:0">' + c.b + '</span>' : ''); }
+    var SEQ = ['count3', 'count4', 'critical', 'gauge', 'staleGauge', 'check'];
+    var LABELS = ['3 → 4 (digit tick — watch B fade where A/C stay still)', 'critical arrives (the sanctioned color moment)',
+      'inbox clears → gauge ✓1·✕1 (width 60→88)', 'reading degrades (+19px stale prefix — only C fades just the prefix)',
+      'back to the bare check (width →52)', '3 → 4 (digit tick — watch B fade where A/C stay still)'];
+    var xi = 0, prev = cellsFor(SEQ[0]);
+    q('#xinst').innerHTML = '<div class="lyr">' + whole(prev) + '</div>';
+    q('#xfade').innerHTML = '<div class="lyr">' + whole(prev) + '</div>';
+    q('#xslot').innerHTML = '<div class="cell cp"><div class="lyr">' + prev.p + '</div></div><div class="cell ca"><div class="lyr">' + prev.a + '</div></div><div class="cell cb"><div class="lyr">' + prev.b + '</div></div>';
+    function xfadeSwap(el, html) {
+      var old = el.querySelector('.lyr:not(.out)');
+      old.classList.add('out'); old.style.opacity = 1;
+      var nu = document.createElement('div'); nu.className = 'lyr'; nu.style.opacity = 0; nu.innerHTML = html;
+      el.appendChild(nu); void nu.offsetWidth;
+      old.style.opacity = 0; nu.style.opacity = 1;
+      setTimeout(function () { if (old.parentNode) old.parentNode.removeChild(old); }, 900);
+    }
+    q('#xtick').addEventListener('click', function () {
+      xi = (xi + 1) % SEQ.length;
+      var c = cellsFor(SEQ[xi]);
+      q('#xlabel').textContent = 'next: ' + LABELS[xi];
+      q('#xinst').style.width = c.w + 'px'; q('#xinst').querySelector('.lyr').innerHTML = whole(c);
+      q('#xfade').style.width = c.w + 'px'; xfadeSwap(q('#xfade'), whole(c));
+      var slot = q('#xslot'); slot.style.width = c.w + 'px';
+      [['cp', 'p'], ['ca', 'a'], ['cb', 'b']].forEach(function (m) {
+        if (prev[m[1]] !== c[m[1]]) {
+          var sameDigits = m[1] === 'b' && /^\d$/.test(prev.b) && /^\d$/.test(c.b);
+          var cellEl = slot.querySelector('.' + m[0]);
+          if (sameDigits) cellEl.querySelector('.lyr:not(.out)').innerHTML = c[m[1]];
+          else xfadeSwap(cellEl, c[m[1]]);
+        }
+      });
+      prev = c;
+    });
+    q('#xslow').addEventListener('click', function () {
+      var on = this.getAttribute('aria-pressed') !== 'true';
+      this.setAttribute('aria-pressed', String(on));
+      q('#xdemo').style.setProperty('--gt', on ? 4 : 1);
+    });
+    q('#xrm').addEventListener('click', function () {
+      var on = this.getAttribute('aria-pressed') !== 'true';
+      this.setAttribute('aria-pressed', String(on));
+      q('#xdemo').style.setProperty('--gt', on ? 0 : (q('#xslow').getAttribute('aria-pressed') === 'true' ? 4 : 1));
+    });
+
+    /* — keyboard session demo — */
+    var KROWS = [
+      { i: '◉', t: 'Fix: pause-first debounce on wake polls', s: 'acme/api · sofia · review request · 2h', sec: false },
+      { i: '@', t: 'Design tokens for the settings window', s: 'acme/hud · lin · mention · 3h', sec: false },
+      { i: '↩', t: 'Crash on wake when the screen is locked', s: 'acme/hud · quinn · reply on your PR · 7h', sec: false },
+      { i: 'HDR', t: 'Your PRs', s: '', sec: true },
+      { i: '✓', t: 'feat(island): reactive height with scroll cap', s: 'ready · approved · mergeable · 3h', sec: false, ok: true },
+      { i: '✕', t: 'fix(poll): scope-403 discrimination', s: 'blocked · CI failing · 5h', sec: false, bad: true }
+    ];
+    q('#krows').innerHTML = KROWS.map(function (r, ix) {
+      if (r.sec) return '<div class="i-sec">' + r.t + '</div>';
+      var col = r.ok ? '#3fb950' : r.bad ? '#f85149' : '#7d8590';
+      return '<div class="k-row" data-ix="' + ix + '"><div style="color:' + col + ';font-size:13px;text-align:center">' + r.i + '</div>' +
+        '<div><div class="i-rt">' + r.t + '</div><div class="i-rs">' + r.s + '</div></div></div>';
+    }).join('');
+    var actionable = qa('#krows .k-row');
+    var kOn = false, kSel = 0;
+    function ksel(n) {
+      kSel = Math.max(0, Math.min(actionable.length - 1, n));
+      actionable.forEach(function (r, i) { r.classList.toggle('sel', kOn && i === kSel); });
+    }
+    function kend(msg) {
+      kOn = false; q('#kstage').classList.remove('session'); ksel(0);
+      actionable.forEach(function (r) { r.classList.remove('sel'); });
+      if (msg) { var h = q('#khintline'), old = 'click Summon, then use real ↑ ↓ ⏎ esc — the editor\'s caret freezes honestly while the island holds key';
+        h.textContent = msg; setTimeout(function () { h.textContent = old; }, 1800); }
+    }
+    q('#ksummon').addEventListener('click', function () {
+      kOn = true; q('#kstage').classList.add('session'); ksel(0);
+    });
+    document.addEventListener('keydown', function (e) {
+      if (!kOn) return;
+      if (e.key === 'ArrowDown') { e.preventDefault(); ksel(kSel + 1); }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); ksel(kSel - 1); }
+      else if (e.key === 'Enter') { e.preventDefault(); kend('↗ opened on GitHub (mock) — session ended, key snapped back to the editor'); }
+      else if (e.key === 'Escape') { e.preventDefault(); kend('dismissed — key snapped back, the caret resumes'); }
+    });
+    qa('[data-kf]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        qa('[data-kf]').forEach(function (x) { x.setAttribute('aria-pressed', 'false'); });
+        b.setAttribute('aria-pressed', 'true');
+        q('#kisland').className = 'k-island ' + b.getAttribute('data-kf');
+      });
+    });
+  })();
+</script>
+</section>
+<!-- SECTION:Gates-END -->
+
+<div class="footer">
+  Prepared 2026-07-06 by the runner session (spec + doctrine-refute workflow, 12 agents) for the designer-loop sessions.
+  Source of record: <span style="font:500 11.5px var(--mono)">docs/design/2026-07-06-designer-session-agenda.md</span> —
+  ratified decisions land there, then build as WP-3d/3d′/3x/4d/5g/6k.
+</div>
+</div>
+
+<script>
+  // Motion maps 1:1 to your click — nothing autoplays.
+  // generic toggle: buttons with [data-toggle="#id"] flip .expanded on the target
+  qa('[data-toggle]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var t = q(b.getAttribute('data-toggle'));
+      if (t) t.classList.toggle('expanded');
+      var lbl = b.getAttribute('data-labels');
+      if (lbl) { var p = lbl.split('|'); b.textContent = t.classList.contains('expanded') ? p[1] : p[0]; }
+    });
+  });
+  // generic replay: buttons with [data-replay="#id"] remove+re-add .play (restarts CSS animation)
+  qa('[data-replay]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var t = q(b.getAttribute('data-replay'));
+      if (!t) return;
+      t.classList.remove('play'); void t.offsetWidth; t.classList.add('play');
+    });
+  });
+</script>

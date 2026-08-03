@@ -1,0 +1,30 @@
+{
+  "iter": 32,
+  "probe": "notifications",
+  "note": "WHOLE-PROJECT REVIEW ROUND 2 — verifies the GithudApp-layer fixes on the live spine (no GithudApp test target). Confirms: pagination still returns 272 threads after the round-2 changes; 304 conditional still fires; bounded enrichment ran clean (enriched=26, no stall); and the EVIDENCE_JSON emitter NO LONGER contains oauth_scopes (review #12 — has_repo_scope boolean retained). Redacted; counts/histogram only.",
+  "first": {
+    "status": 200,
+    "thread_count": 272,
+    "action_required_pre_enrich": 75,
+    "action_required_post_enrich": 50,
+    "radar_automation_policy_b": 0,
+    "suppressed": 222,
+    "enriched": 26,
+    "demoted_by_enrichment": 25,
+    "skipped_private_no_repo_scope": 0,
+    "has_repo_scope": true,
+    "reason_histogram": {"author": 61, "ci_activity": 177, "comment": 2, "mention": 5, "review_requested": 9, "state_change": 18},
+    "poll_interval": 60,
+    "rate_remaining": 4908
+  },
+  "second": {"status": 304, "not_modified": true},
+  "conditional_polling_proven": true,
+  "oauth_scopes_emitted": false,
+  "pulse": {"open_prs": 19, "drafts": 4, "state_histogram": {"blocked": 5, "draft": 2, "ready": 9, "waiting": 3}},
+  "verified": [
+    "pagination intact post-R2 (272 threads)",
+    "304 conditional still fires",
+    "bounded enrichment clean (enriched=26, no stall)",
+    "EVIDENCE_JSON no longer emits oauth_scopes (review #12); has_repo_scope kept"
+  ]
+}

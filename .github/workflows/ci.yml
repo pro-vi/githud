@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Cancel a superseded run on the same PR branch; never cancel on master.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/master' && github.ref != 'refs/heads/main' }}
+
+jobs:
+  # Fails the build if private data reaches a tracked file. githud is dogfooded on
+  # real work data and captured API responses land in Tests/Fixtures/, so this is the
+  # gate that keeps a public repo safe to work in. Runs first and costs seconds.
+  leak:
+    name: Leak gate (scripts/leak-check.sh)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Scan tracked files for private data
+        run: bash scripts/leak-check.sh
+
+  test:
+    name: Test (scripts/test.sh)
+    runs-on: macos-14
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Swift toolchain version
+        run: swift --version
+
+      - name: Run test suite
+        run: bash scripts/test.sh
+
+  build:
+    name: Build (scripts/build-app.sh)
+    runs-on: macos-14
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Swift toolchain version
+        run: swift --version
+
+      - name: Build app bundle
+        run: bash scripts/build-app.sh

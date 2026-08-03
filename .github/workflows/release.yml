@@ -1,0 +1,48 @@
+# Release (WP Phase 0, U4): tag push v* → universal build → package → DRAFT
+# GitHub release with the artifact attached. Runs today with zero credentials
+# (artifact labeled -unsigned); Phase 1 adds DEVELOPER_ID_IDENTITY /
+# NOTARY_KEYCHAIN_PROFILE as repo secrets and the same pipeline emits a
+# signed+notarized zip. Trigger is TAG PUSH only — never pull_request — so
+# fork PRs can never reach signing secrets (the Gitify split).
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # CFBundleVersion = commit count
+
+      - name: Test
+        run: ./scripts/test.sh
+
+      - name: Build (universal, stamped)
+        run: UNIVERSAL=1 VERSION="${GITHUB_REF_NAME}" ./scripts/build-app.sh
+
+      - name: Verify artifact
+        run: |
+          lipo -archs build/githud.app/Contents/MacOS/githud | grep -q "x86_64 arm64" \
+            || { echo "not universal"; exit 1; }
+          plutil -lint build/githud.app/Contents/Info.plist
+          /usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' build/githud.app/Contents/Info.plist
+
+      - name: Package
+        env:
+          DEVELOPER_ID_IDENTITY: ${{ secrets.DEVELOPER_ID_IDENTITY }}
+          NOTARY_KEYCHAIN_PROFILE: ${{ secrets.NOTARY_KEYCHAIN_PROFILE }}
+        run: ./scripts/package-release.sh
+
+      - name: Draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" build/githud-*.zip \
+            --draft --generate-notes --title "githud ${GITHUB_REF_NAME}"

@@ -1,0 +1,31 @@
+{
+  "record": "lane-row full-width fix — the first dogfood defect (user screenshot 2026-07-09): a leading-aligned lane doc stack let rows HUG their fitting width, so a peeked row's wrapped labels shrank it to their longest laid-out line — the trailing chevron slid to a per-row X (and out from under the toggling cursor), the hover/key fill and hit band stopped where the text ended. Fix: every lane child pinned row.width == doc.width; leading glyph re-anchored to the title's line (.top) so a peek no longer moves it.",
+  "captured_at": "2026-07-09T00:00:00Z",
+  "base_commit": "daabc69",
+  "fix_state_at_capture": "fix applied in working tree, committed together with this manifest",
+  "method": "external app-level AX queries (row AXFrame/AXDescription walk, WP-6k precedent) + CGEvent hidSystemState synthesized input: one ⌥-click on the row body (explicit ⌥ flagsChanged around the click, alternate flag on down+up — the peek toggle path, never navigate) + one plain pill click to re-expand after a REAL user click on the live desktop tripped click-away collapse mid-run (disclosed, not hidden); scripts/window-probe.swift bounds; screencapture region stills; lsappinfo frontmost before/after",
+  "fixtures": "Tests/Fixtures/wp6k-longtext.json (radar, chevroned long rows) + Tests/Fixtures/pulls.json --show-stale (pulse rows — baked fixture dates have aged past the 14d stale line, so the stale section is where PulseRowView instances render)",
+  "witnessed": [
+    "pre-peek: 15 rows across BOTH lanes (RadarRowView + PulseRowView) all AXFrame width 484.0 at x 622.0 — every row spans the full lane",
+    "⌥-click peek on row 6001 (PollScheduler title): row width 484.0 -> 484.0 UNCHANGED while height 46.0 -> 76.0 (title wrapped + excerpt un-truncated) — the reported defect (replica-probe before-fix: width 484 -> 439) is gone",
+    "post-peek: all row widths still exactly {484.0}",
+    "island frame 520x531 -> 520x561 (the eased peek reflow, matches the WP-6k witnessed values)",
+    "frontmost app unchanged across launch, clicks, and peek (ASN:0x0-0x390390: throughout) — focus-non-theft holds",
+    "after-peek still (eyeballed): peeked chevron flush at the lane edge level with sibling chevrons + the header collapse; hover fill spans the full band; leading glyphs (radar arrows/@, pulse ✓/✕/⚠/●) sit on their titles' first line on every row incl. the peeked one; capped-lane bottom fade intact"
+  ],
+  "not_witnessed": [
+    "the before-fix live geometry was NOT re-cut (fix was already applied) — the defect numbers 439/478-vs-484 come from the deterministic constraint-replica probe (scratchpad chevron-hug-probe.swift) + the user's own screenshot",
+    "hover-fill band extent eyeballed in the still, not pixel-diffed",
+    "the dead-zone-click-through (a click right of wrapped text falling through) witnessed only in the replica, not live",
+    "the width pin also lands on sectionHeader/captionLabel lane children — rendered in the still ('Your PRs', 'Stale') but their AX frames were not individually read (labels report no AXDescription)",
+    "the overlay scroller floating over the now-edge-flush chevron while a capped lane scrolls — not examined; transient-occlusion cost recorded as a dogfood watch (review finding, doctrine lens minor 3)",
+    "synthesized hands, not human hands (standing dogfood caveat)"
+  ],
+  "disclosure": "the .top glyph anchoring SUPERSEDES iter 041 (cc5123f, user: 'center the icon vertically' — .top read as 'sat high' pre-peek). That directive predates peeks, under which block-centering wanders; the title-line anchor was proposed to and approved by the user 2026-07-09 with the peek rationale stated. Recorded in the agenda amendments; flagged to the user as a one-line revert if the rest look reads high again.",
+  "stills": {
+    "before_peek": { "png": "loop/evidence/lanerow-before-peek.png", "sha256": "d780f1c1345333d6981e1f2de159117db2d37dd29bad14a506dc6056975c08b0" },
+    "after_peek": { "png": "loop/evidence/lanerow-after-peek.png", "sha256": "9e5b8227cdec9c4654f89ab23e6c23f2e247e196737d504f5419e86eda69c087" }
+  },
+  "checks": "swift build (githud app target) clean — the AX-probed binary IS the fixed build, which is the compile proof for this app-target-only diff; 927 Core checks green but they never compile GithudApp and exercise none of this change (review finding: not decorative evidence for this fix). Core's PeekReveal hitTest tests already pin the POST-fix geometry (rowBounds 484, chevron x=462) — this fix makes the live view match them",
+  "spec_lineage": "the width pin BUILDS the width half of D-reveal's hover-slab clause (os-tooltip-hardened 'uniform slab 484px wide'), whose deferral rationale ('no bearing on peek correctness') this very defect falsified — corrected in the agenda amendments; the padding 8/5 + inter-row-spacing respec remains deferred"
+}

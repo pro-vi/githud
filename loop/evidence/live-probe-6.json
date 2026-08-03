@@ -1,0 +1,31 @@
+{
+  "captured_at": "2026-06-16T19:21:56Z",
+  "commit": "c11a9ea",
+  "conditional_polling_proven": true,
+  "first": {
+    "action_required_post_enrich": 3,
+    "action_required_pre_enrich": 13,
+    "demoted_by_enrichment": 10,
+    "enriched": 10,
+    "has_repo_scope": true,
+    "poll_interval": 60,
+    "rate_remaining": 4780,
+    "reason_histogram": {
+      "author": 12,
+      "ci_activity": 24,
+      "review_requested": 1,
+      "state_change": 13
+    },
+    "skipped_private_no_repo_scope": 0,
+    "status": 200,
+    "thread_count": 50
+  },
+  "headline": "RADAR PRECISION ON REAL DATA: 50 raw notifications \u2192 13 naive action-required \u2192 3 genuinely action-required (enriched=10, demoted=10 = bot/automation + your own latest comments). ci_activity(24) + state_change(13) suppressed; review_requested(1) surfaced.",
+  "iter": 6,
+  "note": "Self-activity demotion live. REDACTED \u2014 counts/reasons/headers only; self-login NOT committed.",
+  "rubric_4_11": "Strong real-data evidence for #4 (signal relevance) + #11 (signal trust): aggressive, justified noise suppression (bot + self + firehose). NOT yet scored \u2014 the 3 remaining are not user-validated, and #11 top-range needs the multi-day trust experiment (false-alarm/miss logs). Recall: review_requested not missed.",
+  "second": {
+    "not_modified": true,
+    "status": 304
+  }
+}

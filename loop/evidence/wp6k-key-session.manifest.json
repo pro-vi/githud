@@ -1,0 +1,39 @@
+{
+ "record": "WP-6k — the ⌃⌥G scoped key session live proof (the ratified focus-non-theft merge condition, re-cut for the list-session relaxation)",
+ "captured_at": "2026-07-08T20:11:00Z",
+ "worktree_commit_base": "c1f39e1",
+ "method": "AX-trusted synthesized input (CGEvent, hidSystemState source; explicit flagsChanged around ⌃⌥G so no stuck modifiers), TextEdit as the foreground marker app, CGWindowList bounds probes, GITHUD_DEBUG stderr keylog as the in-process isKeyWindow/session probe, app-level AX kAXFocusedUIElement queries as the external VoiceOver-mirror probe, screencapture stills + full-run video. TWO runs: run1 on the committed classifier fixture (notifications.json + pulls.json, --collapsed --show-stale), run2 on Tests/Fixtures/wp6k-longtext.json (rows long enough to truncate → chevrons, so the Space-peek leg is exercisable). Markers only — no secret ever synthesized. Binary artifacts content-addressed here, kept on disk gitignored; the manifest is the proof.",
+ "witnessed": {
+  "summon_takes_key": "⌃⌥G expanded the island (w 520) AND took key — keylog 'session begin — isKeyWindow=true selected=1005/6001' (both runs); initial selection = first actionable row (run1: the critical security_alert row — critical-first sort visible in B1-run1 with fill + 3px ink bar + hint footer)",
+  "foreground_loses_keys_honestly": "mid-session typed 'm2ghost' is ABSENT from both TextEdit transcripts — the panel had key and the editor honestly lost input (the caret-freeze witness in input-routing form; caret behavior visible in the movs)",
+  "bar_moves_headers_skipped": "keylog move sequences walk radar ids then pulse ids CONSECUTIVELY (run1 1004→acme/api#412; run2 6006→acme/api#412) — the 'Your PRs' + 'Stale' headers are skipped by construction; clamped, no wrap",
+  "voiceover_mirror": "external app-level AX kAXFocusedUIElement queries answered with the focused ROW's full spoken label at indices 0/2/10, changing with each ↓ (run2: 'Fix the race in PollScheduler…' → 'Design review: the collapsed pill gauge…' → 'Introduce the billing reconciliation job…') — the panel's accessibilityFocusedUIElement override + .focusedUIElementChanged posts are externally queryable",
+  "lane_cap_scroll": "B1-run1 vs B3-run1: the capped radar lane scrolled whole-row as the bar walked past it (top row 'Vulnerability in transitive dep' scrolled out of view)",
+  "space_peeks_focused_row": "run2 keylog 'space — peek toggled=true' (open) + island height 531→561→531 via the peek reflow; B2-run2 shows the focused row un-truncated (title 2 lines, excerpt 2 lines), its chevron pointing up, bar + fill intact. Run1's 'toggled=false' was the honest no-op: no committed-fixture row truncates at 456px, so no chevron existed",
+  "return_opens_collapses_ends": "keylog 'return — opened=true' → browser frontmost (company.thebrowser.Browser) via the existing openInBrowser path; island collapsed to the 60px pill; 'session end — isKeyWindow=false'",
+  "esc_hands_key_back": "re-summon → esc → typed 'mark4' landed in TextEdit (AX-read transcripts: 'Mark1 mark3 mark4 mark5 SEED') — key snapped back through the order-out pulse (the recorded WP-4d spec amendment; never resignKey()); the app never activated, so the snap-back is structural",
+  "mouse_path_boundary_F8": "pill CLICK expanded the island (w 520) with NO 'session begin' line in either keylog, NO bar and NO hint in E-run1/E-run2 pixels, AX probe 'windows:1 no-focused-element', and typed 'mark5' landed in TEXTEDIT — the mouse path never takes key",
+  "app_never_activates": "TextEdit remained the active app across summon/moves/esc (markers land there the instant the session ends); acquisition was makeKey() only — no makeKeyAndOrderFront, no NSApp.activate anywhere (grep-clean)"
+ },
+ "not_witnessed": "real VoiceOver narration (the AX mirror is externally query-witnessed; driving actual VO speech is out of scope — WP-5i precedent); a human-hand non-synthesized recording remains for the runner/dogfood (WP-4d precedent). Driver false-negatives explained, not hidden: run1/run2 'A_textedit_seeded FAILED' is the driver's case-sensitive assert losing to TextEdit smart-caps ('Mark1') — retro-witnessed in both transcripts; run1 'C_space_peek no height change' is the no-chevron honest no-op above.",
+ "files_sha256": {
+  "wp6k-key-session-B1-session-begin-run1.png": "5ea3419a3bef4ef9797ddc14a31ae7997430cf7122cc8aeb62a9b3dacb0efb6f",
+  "wp6k-key-session-B1-session-begin-run2.png": "9eb4b2a1df85f914083cf9989ed03f0b01252aa7bfb53b827d3fcfd6f2f462a4",
+  "wp6k-key-session-B2-peeked-run1.png": "aa647b301feb2931d92dd41ce5e5038b1a6404288574e516da003a0fa15b3352",
+  "wp6k-key-session-B2-peeked-run2.png": "8bac5eb5ab8f707c785c66d28fe700540298729f3557f716b921274fa4c55513",
+  "wp6k-key-session-B3-bar-deep-run1.png": "d100b6b7ef048308d4e02d81f6e098033448dbc53740d092657f459feea739ce",
+  "wp6k-key-session-B3-bar-deep-run2.png": "85d1fdfac8db6bc321e56bcb1d7e0480a0eb248bc7ff04e8058a59993c3e9af4",
+  "wp6k-key-session-D-collapsed-after-return-run1.png": "d791e75d1223306637cf3a6ae910497da5655cf9bb44de53fb0963c5d4562305",
+  "wp6k-key-session-D-collapsed-after-return-run2.png": "0358c5c8444cca322d04e360f122713997ba2df73cdcd714f17a930c25b462e5",
+  "wp6k-key-session-E-mouse-expand-no-bar-run1.png": "1d4b3dd99fce011bb3b0cc9e3f2258437dd3f7f67c11b601f38b30c52eb84aae",
+  "wp6k-key-session-E-mouse-expand-no-bar-run2.png": "e22932f5024f1fdc82513f2aadc9b7c4916bde3c1cf5f6653af0e900da92f81f",
+  "wp6k-key-session-run1.mov": "60897f72372677b55b8fbe767ac5f7d82fcd672baaa473196e43cedc7b0a8b32",
+  "wp6k-key-session-run2.mov": "478818d6d214b20a257b589c56ffeea384185b861ff222a33c2b6188762c9d08",
+  "wp6k-key-session-keylog-run1.txt": "d4105d561507452d48938bc28c87de886a1f4df0bf78848d1f1bb514d17b2501",
+  "wp6k-key-session-keylog-run2.txt": "d59835fbcfc2567a9c1ef7a1ecdcc69ddffbed02c156a71a44aa0e77658845fc",
+  "wp6k-key-session-textedit-run1.txt": "afa987d86c8e145ae8ef90506a683c2b0efc8f4eabae07e542d6b99be6b38a83",
+  "wp6k-key-session-textedit-run2.txt": "ff4bb3c46206e9031cb1ec5645aef4c067788709c6cda34600e318fd22cd2b5f",
+  "wp6k-key-session-witnesses-run1.json": "3f5116f5e89523b5184c5721dea3f6db733392f0fa6e3b34ed9588586bbb9f0e",
+  "wp6k-key-session-witnesses-run2.json": "e79115630226bdf4c87e4561afe1c21297fafaae7ba9f2a699c78b5092823855"
+ }
+}

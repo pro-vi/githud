@@ -1,0 +1,11 @@
+{
+  "action_required": 3,
+  "captured_at": "2026-06-16T22:11:54Z",
+  "commit": "43a3da7",
+  "finding": "Launching githud reads the classic PAT, conditional-polls /notifications on X-Poll-Interval(60s)+jitter, enriches + self-demotes, refreshes the island ON CHANGE. Idle CPU ~0%% between polls. RUBRIC #8 + the live spine now run in the actual app.",
+  "idle_cpu_between_polls": 0.0,
+  "island_geometry": "520x159 expanded",
+  "iter": 11,
+  "live_log": "\u25b8 live: 3 action-required (changed) \u2014 next poll 60s",
+  "note": "LIVE polling end-to-end (githud, no args). REDACTED \u2014 counts/geometry only, no titles."
+}

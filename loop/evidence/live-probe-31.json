@@ -1,0 +1,32 @@
+{
+  "iter": 31,
+  "probe": "notifications",
+  "note": "REVIEW ROUND — verifies the pagination fix (review F1) on live data. THE moat finding: before this fix /notifications read page 1 ONLY (per_page/Link unhandled), so thread_count was capped at 50. Prior probes (live-probe-4..6) showed exactly 50 — the cap, not the true count. With pagination following Link rel=next, the SAME account now returns 272 threads: the old code was silently dropping 222 notifications (82%), including action-required items (review_requested/mention/author) on pages 2-6. The never-miss moat was broken; the user's iter-20 'it holds' audit only ever saw page 1. Redacted (counts/histogram only; no titles/repos/token).",
+  "first": {
+    "status": 200,
+    "thread_count": 272,
+    "thread_count_before_fix_was_capped_at": 50,
+    "action_required_pre_enrich": 75,
+    "action_required_post_enrich": 57,
+    "radar_automation_policy_b": 0,
+    "suppressed": 215,
+    "enriched": 19,
+    "demoted_by_enrichment": 18,
+    "skipped_private_no_repo_scope": 0,
+    "has_repo_scope": true,
+    "reason_histogram": {"author": 61, "ci_activity": 177, "comment": 2, "mention": 5, "review_requested": 9, "state_change": 18},
+    "poll_interval": 60,
+    "rate_remaining": 4943
+  },
+  "second": {"status": 304, "not_modified": true},
+  "conditional_polling_proven": true,
+  "pagination_proven": true,
+  "pulse": {"open_prs": 20, "drafts": 4, "state_histogram": {"blocked": 4, "draft": 3, "ready": 10, "waiting": 3}},
+  "verified": [
+    "F1 pagination: 272 threads across ~6 pages (was 50-capped)",
+    "304 conditional re-GET still fires after pagination (poll discipline intact, no rate cost)",
+    "F6 bounded enrichment: enriched=19 within budget, no hang",
+    "rate fine: 4943/5000 remaining after multi-page fetch",
+    "pulse classified 20 PRs (H2 unaffected)"
+  ]
+}

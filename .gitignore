@@ -1,0 +1,23 @@
+.build/
+*.app
+.DS_Store
+*.xcuserstate
+.swiftpm/
+
+# Forbidden loop scope — never tracked.
+.claude/
+logs/
+
+# Evidence frames: PNGs are BLACK until screen_recording_permission is granted —
+# the manifest (loop/evidence/*.manifest.json) is the proof, not the screenshot.
+# Revisit when the gate flips so real captured frames (with verifiable sha256)
+# can be committed.
+loop/evidence/*.png
+
+# WP-4d key-routing proof artifacts: content-addressed in wp4d-key-routing.manifest.json
+loop/evidence/*.mov
+loop/evidence/wp4d-key-routing-textedit-*.txt
+
+# WP-6k key-session proof artifacts: content-addressed in wp6k-key-session.manifest.json
+loop/evidence/wp6k-key-session-*.txt
+loop/evidence/wp6k-key-session-witnesses-*.json

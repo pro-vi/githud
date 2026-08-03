@@ -1,0 +1,32 @@
+{
+  "captured_at": "2026-06-16T20:52:09Z",
+  "commit": "c5b77b1",
+  "condition": "hover-expanded",
+  "frontmost_after": "ASN:0x0-0x1001:",
+  "frontmost_before": "ASN:0x0-0x1001:",
+  "frontmost_unchanged": true,
+  "idle_cpu": null,
+  "iter": 9,
+  "pixel_live": null,
+  "pixel_stats": null,
+  "png": "loop/evidence/hover-expanded-normal-desktop-9.png",
+  "png_sha256": null,
+  "reason": "screen_locked",
+  "scenario": "normal-desktop",
+  "screen": {
+    "h": 0,
+    "w": 0,
+    "x": 0,
+    "y": 0
+  },
+  "size_class": "expanded",
+  "status": "skipped",
+  "window_bounds": {
+    "h": 181,
+    "w": 520,
+    "x": 604,
+    "y": 46
+  },
+  "window_count": 1,
+  "within_screen": false
+}

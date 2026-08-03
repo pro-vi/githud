@@ -1,0 +1,24 @@
+{
+ "record": "WP-4d fix round \u2014 key-routing input proof (the ratified focus-non-theft merge condition)",
+ "captured_at": "2026-07-07T23:15:00Z",
+ "worktree_commit_base": "f6cecd7",
+ "method": "AX-trusted synthesized input (CGEvent, hidSystemState source; explicit flagsChanged around cmd-V so no stuck modifiers), TextEdit as the foreground marker app, window-probe for panel bounds, screencapture for frames + video. FAKE github_pat_ payload only \u2014 no real secret ever synthesized. Binary artifacts are content-addressed here and kept on disk (gitignored, like all evidence pixels); the manifest is the proof.",
+ "witnessed": {
+  "mouse_path_never_key": "card up, no field click -> typed marker landed in TextEdit (mark2, run1)",
+  "field_click_takes_key": "accent focus cue on (driven by the panel's real becomeKey); typed/pasted chars entered the SECURE field only",
+  "cmdV_pastes": "HUDPanel.performKeyEquivalent -> NSText.paste -> field filled (BLOCKER 1); Return then submitted: card grew 256->321, the wrong-shape remedy for the pasted github_pat_ fake (window-probe bounds in both runs)",
+  "esc_hands_key_back": "post-Esc marker landed in TextEdit (mark3, run1) \u2014 the order-out pulse returns key (recorded spec amendment vs Gates.json's prescribed resignKey())",
+  "click_away_returns_key": "mid-session click into TextEdit -> marker landed there (mark4, run2)",
+  "click_back_reacquires": "subsequent field click re-took key \u2014 typed chars (qq run1+run2, ww run1) never reached TextEdit; frame E2 shows the re-focused field holding the pasted dots (BLOCKER 2)",
+  "secret_never_leaked": "the fake payload appears in neither TextEdit transcript"
+ },
+ "not_witnessed": "a human-hand recording of real (non-synthesized) input remains for the runner/dogfood; wp4d-key-routing.mov captures the synthesized run end-to-end",
+ "files_sha256": {
+  "wp4d-key-routing-B-wrongshape.png": "886089efee05c3be8dc794bb958f5cf40bd9af5657f0a4a4ccc8406aba43478b",
+  "wp4d-key-routing-D-reacquire.png": "f2ecb76a9a21e2d306e6f671e9ccaa34ce3bc0d925afd77b36d45b087013678a",
+  "wp4d-key-routing-E2-clickback.png": "b0577961afe55c64ac070796585bf5ffedd471e86f5d75e867eb11334fc1bf81",
+  "wp4d-key-routing.mov": "dec7eb41bfbd47c71efda7b042eb5502550111e5970ebb5e3fc2b5711f1b7304",
+  "wp4d-key-routing-textedit-run1.txt": "650b4a10ff1cb8934336989bac86fbced85e22676c6df736771531c971c720d8",
+  "wp4d-key-routing-textedit-run2.txt": "b756ae8a712aa5f726aa02893f61bd397ff67e2f83070e4e7690add91ece6727"
+ }
+}

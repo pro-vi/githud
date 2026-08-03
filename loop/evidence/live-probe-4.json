@@ -1,0 +1,26 @@
+{
+  "captured_at": "2026-06-16T08:37:02Z",
+  "commit": "e6dfb58",
+  "conditional_polling_proven": true,
+  "first": {
+    "action_required": 14,
+    "poll_interval": 60,
+    "rate_remaining": 4995,
+    "reason_histogram": {
+      "author": 13,
+      "ci_activity": 23,
+      "review_requested": 1,
+      "state_change": 13
+    },
+    "status": 200,
+    "thread_count": 50
+  },
+  "iter": 4,
+  "note": "Live data spine end-to-end via `githud probe`. REDACTED \u2014 counts/reasons/headers only, no titles/repos/logins.",
+  "rubric_4_11_precision_caveat": "13 'author' threads ALL surfaced as action-required. The base /notifications response lacks the latest-comment author, so bot/CI activity on your own PRs cannot be demoted without enrichment (GET latest_comment_url). Likely contains false alarms \u2192 real-data precision (#11) is UNVERIFIED pending enrichment (next iter). Recall is good (review_requested not missed; ci_activity/state_change correctly suppressed).",
+  "rubric_8_polling_discipline": "PROVEN on live data: 200 then conditional 304 (ETag/Last-Modified), X-Poll-Interval=60 honored, 304 = no primary-rate cost.",
+  "second": {
+    "not_modified": true,
+    "status": 304
+  }
+}

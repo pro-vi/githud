@@ -1,0 +1,31 @@
+{
+  "captured_at": "2026-06-16T06:44:05Z",
+  "commit": "430f57f",
+  "condition": "idle",
+  "frontmost_after": "ASN:0x0-0x390390:",
+  "frontmost_before": "ASN:0x0-0x390390:",
+  "frontmost_unchanged": true,
+  "idle_cpu": 0.1,
+  "iter": 0,
+  "pixel_live": null,
+  "png": "loop/evidence/idle-normal-desktop-0.png",
+  "png_sha256": null,
+  "reason": "no_screen_recording",
+  "scenario": "normal-desktop",
+  "screen": {
+    "h": 1117,
+    "w": 1728,
+    "x": 0,
+    "y": 0
+  },
+  "size_class": "collapsed",
+  "status": "skipped",
+  "window_bounds": {
+    "h": 42,
+    "w": 280,
+    "x": 724,
+    "y": 46
+  },
+  "window_count": 1,
+  "within_screen": true
+}

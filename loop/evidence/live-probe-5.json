@@ -1,0 +1,32 @@
+{
+  "captured_at": "2026-06-16T08:52:27Z",
+  "commit": "ddd48da",
+  "conditional_polling_proven": true,
+  "finding": "Enrichment works for PUBLIC repos (enriched=3, 0 errors). PRIVATE-repo comment content 404s with a notifications-only PAT (skipped_private=7). demoted_by_enrichment=0 so far (the 3 accessible were human). RUBRIC #11 real-data precision on the user's PRIVATE work threads remains UNVERIFIED \u2014 gated on a `repo`-scoped PAT (user action).",
+  "first": {
+    "action_required_post_enrich": 14,
+    "action_required_pre_enrich": 14,
+    "demoted_by_enrichment": 0,
+    "enriched": 3,
+    "has_repo_scope": false,
+    "poll_interval": 60,
+    "rate_remaining": 4985,
+    "reason_histogram": {
+      "author": 13,
+      "ci_activity": 23,
+      "review_requested": 1,
+      "state_change": 13
+    },
+    "skipped_private_no_repo_scope": 7,
+    "status": 200,
+    "thread_count": 50
+  },
+  "iter": 5,
+  "next": "iter 6: self-activity demotion (GET /user \u2192 demote author threads whose latest commenter == you), island wiring.",
+  "note": "Live enrichment probe. REDACTED \u2014 counts/reasons/headers only.",
+  "second": {
+    "not_modified": true,
+    "status": 304
+  },
+  "user_action_recommended": "Re-issue the classic PAT with scope=notifications,repo (store same Keychain item githud.github.pat) to enable private-repo enrichment + precision verification."
+}

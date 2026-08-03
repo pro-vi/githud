@@ -1,0 +1,21 @@
+{
+ "record": "WP-3d′ fix round — chevron-routing input proof (D-reveal BLOCKING amendment 1: a chevron click NEVER navigates; plain row click stays Open-on-GitHub byte-for-byte)",
+ "captured_at": "2026-07-08T08:30:00Z",
+ "worktree_commit_base": "9f6e561 (+ fix-round working tree: radar-confirmation gate, age-0 guard, cursor/VO minors — committed immediately after this capture)",
+ "method": "AX-trusted synthesized input (CGEvent, cghidEventTap; move → leftMouseDown → leftMouseUp at global screen coords), long-title fixture (title+excerpt truncate → the row wears a chevron; a second short row proves the truncated-only rule), window-probe for panel bounds, screencapture for frames, lsappinfo front as the navigation witness (frontmost-app ASN before/after each click). Fixture URLs are real github.com links, so a navigation is observable as the browser (Arc) taking frontmost. PNGs are content-addressed here and kept on disk (gitignored, like all evidence pixels); the manifest is the proof.",
+ "witnessed": {
+  "chevron_renders_truncated_only": "frame A: the long-title row wears the 22×18 chevron; the short row has none (island 520×184 at 604,46)",
+  "chevron_click_opens_peek": "synthesized click at (1095,101) — inside the chevron's frame: island 184→230 (window-probe), title wraps to 3 lines, excerpt to 2, chevron points up (frame B)",
+  "chevron_click_never_navigates": "frontmost app ASN unchanged across the chevron click (WezTerm 0x390390 before AND after; no browser activation, no URL open) — the carve-out's AppKit half, witnessed at runtime on top of the Core hitTarget sweep",
+  "row_text_click_navigates": "synthesized click at (700,120) — the same row's title area: Arc (default browser) took frontmost (ASN 0x21cf1cd) with the fixture's github.com URL; island frame untouched at 520×230 (frame C) — Open-on-GitHub byte-for-byte",
+  "second_chevron_click_closes": "click at (1095,101) again: island 230→184, chevron back down (frame D); frontmost UNCHANGED across the click (Arc before and after) — the toggle never navigates in either direction",
+  "caught_up_block_still_renders": "post-fix re-witness: quiet-pulse fixture (draft+stale only) renders the fresh affirmation block ('You're all caught up' / 'Nothing needs you right now') — the new radar-confirmation gate does not eat the legitimate state (fixture setRadar is a confirmed read)"
+ },
+ "not_witnessed": "peek persistence across a REAL poll-driven rebuild (fixture mode has no poll ticks — Core signature-stability tests carry it; needs the runner's live-PAT run); Option-click and collapse-reset were witnessed in the pre-fix run of the same build lineage (window-probe heights 230→184→230, then collapse→re-expand at 184) but are not in this recorded frame set; a human-hand (non-synthesized) run remains for dogfood",
+ "files_sha256": {
+  "wp3dprime-chevron-routing-A-closed.png": "1e6ebf5a08280991064f5e14d6e33e4bb90bcd0239d4d0c4fe7ad825da8e917b",
+  "wp3dprime-chevron-routing-B-peek-open.png": "3b0bf37d4d1f5a71ddf0d6ef6467c0054f557c824ae6cc4f568000bfb49777fc",
+  "wp3dprime-chevron-routing-C-row-navigated.png": "70b33d1ced53ba3c2de3e5fb740ebc671823d45e664aa3a78efd9ecf8dd01553",
+  "wp3dprime-chevron-routing-D-peek-closed.png": "0117f5087ae226dc7ce2c75cc0b8eb1ca52e284fde72b399e77d3a6532d797a9"
+ }
+}

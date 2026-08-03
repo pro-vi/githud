@@ -1,0 +1,524 @@
+<title>Per-org drafts — island design session</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --card: #ffffff; --ink: #1a2129; --ink2: #5a6572; --ink3: #8b95a3;
+    --line: #dde3ea; --accent: #2464c4; --accent-ink: #ffffff; --kill: #b4463c;
+    --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, monospace;
+    --sys: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) { :root {
+    --bg: #0b0e13; --card: #121722; --ink: #e7edf4; --ink2: #98a2b0; --ink3: #6b7683;
+    --line: #232b36; --accent: #4c94f8; --accent-ink: #0b0e13; --kill: #e07a6e;
+  } }
+  :root[data-theme="light"] {
+    --bg: #f6f7f9; --card: #ffffff; --ink: #1a2129; --ink2: #5a6572; --ink3: #8b95a3;
+    --line: #dde3ea; --accent: #2464c4; --accent-ink: #ffffff; --kill: #b4463c;
+  }
+  :root[data-theme="dark"] {
+    --bg: #0b0e13; --card: #121722; --ink: #e7edf4; --ink2: #98a2b0; --ink3: #6b7683;
+    --line: #232b36; --accent: #4c94f8; --accent-ink: #0b0e13; --kill: #e07a6e;
+  }
+  * { box-sizing: border-box; }
+  body { background: var(--bg); color: var(--ink); font: 15px/1.6 var(--sys); margin: 0; }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 0 24px 80px; }
+
+  header.lead { padding: 44px 0 8px; max-width: 76ch; }
+  header.lead h1 { font-size: 27px; font-weight: 750; letter-spacing: -0.022em; margin: 0 0 10px; text-wrap: balance; }
+  header.lead p { color: var(--ink2); margin: 0 0 8px; }
+  .doctrine-note { font: 500 12px/1.5 var(--mono); color: var(--ink3); border-left: 2px solid var(--accent);
+    padding: 2px 0 2px 12px; margin: 16px 0 0; }
+  .doctrine-note em { color: var(--ink2); font-style: normal; }
+  .doctrine-note.reopen { border-left-color: var(--kill); }
+  .doctrine-note.ratified { border-left-color: #2f9e5f; }
+  .doctrine-note.ratified strong { color: var(--ink); }
+  .badge-pick.rat { background: #2f9e5f; color: #ffffff; }
+
+  section { margin: 44px 0 0; }
+  .eyebrow { font: 600 11px/1 var(--mono); letter-spacing: .09em; text-transform: uppercase; color: var(--accent); margin: 0 0 10px; }
+  section h2 { font-size: 21px; font-weight: 700; letter-spacing: -0.015em; margin: 0 0 6px; max-width: 72ch; text-wrap: balance; }
+  .qsub { color: var(--ink2); max-width: 78ch; margin: 0 0 20px; }
+  code.tok { font: 500 11.5px var(--mono); background: color-mix(in srgb, var(--ink) 7%, transparent); border-radius: 4px; padding: 1px 4px; }
+
+  .today { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px 18px; margin: 0 0 22px; }
+  .today h3 { margin: 0 0 6px; font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--ink3); }
+  .today p { margin: 0 0 4px; color: var(--ink2); font-size: 13.5px; }
+  .tablewrap { overflow-x: auto; }
+  .ledger { width: 100%; border-collapse: collapse; margin: 10px 0 6px; font-size: 13px; }
+  .ledger th { text-align: left; font: 600 10.5px var(--mono); letter-spacing: .06em; text-transform: uppercase;
+    color: var(--ink3); padding: 4px 14px 6px 0; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  .ledger td { padding: 7px 14px 7px 0; border-bottom: 1px solid color-mix(in srgb, var(--line) 55%, transparent);
+    color: var(--ink2); vertical-align: top; font-variant-numeric: tabular-nums; }
+  .ledger td:first-child { color: var(--ink); font-weight: 600; white-space: nowrap; }
+  .ledger tr:last-child td { border-bottom: none; }
+  .ledger .verdict { font: 600 11px var(--mono); }
+  .ledger .keep { color: var(--accent); }
+  .ledger .fold-v { color: var(--ink3); }
+  .ledger .reopen { color: var(--kill); }
+
+  /* ---- the inversion panel: what the record forbids ---- */
+  .warnpanel { background: var(--card); border: 1px solid var(--line); border-left: 3px solid var(--kill);
+    border-radius: 10px; padding: 16px 18px; margin: 0 0 22px; }
+  .warnpanel h3 { margin: 0 0 8px; font-size: 14px; font-weight: 700; }
+  .warnpanel p { margin: 0 0 10px; color: var(--ink2); font-size: 13.5px; max-width: 74ch; }
+  .warnpanel .cite { font: 500 12px/1.6 var(--mono); color: var(--ink3); margin: 10px 0 0; }
+  .sidebyside { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; margin: 12px 0 0; }
+  .minilane { background: linear-gradient(180deg, #171b22, #10141a); border-radius: 8px; padding: 12px 12px 10px; }
+  .minilane .mtitle { font: 600 10px var(--mono); letter-spacing: .07em; text-transform: uppercase;
+    color: rgba(255,255,255,0.4); margin: 0 0 9px; }
+  .minilane .mtitle.bad { color: #e0857a; }
+
+  /* ---- variant cards ---- */
+  .vgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: 18px; }
+  .vcard { background: var(--card); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; display: flex; flex-direction: column; }
+  .vcard.picked { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+  .vhead { padding: 13px 16px 11px; border-bottom: 1px solid var(--line); }
+  .vhead .vid { font: 700 10px var(--mono); letter-spacing: .07em; color: var(--accent); text-transform: uppercase; }
+  .vhead h3 { margin: 3px 0 3px; font-size: 15px; font-weight: 700; letter-spacing: -0.008em; }
+  .vhead p { margin: 0; font-size: 12.5px; color: var(--ink2); }
+  .badge-pick { font: 700 9px var(--mono); letter-spacing: .07em; text-transform: uppercase;
+    border-radius: 4px; padding: 2px 6px; margin-left: 8px; vertical-align: 1px;
+    color: var(--accent-ink); background: var(--accent); }
+  .vbody { padding: 16px; display: flex; flex-direction: column; gap: 12px; flex: 1; }
+  .vstrings { font: 500 12px/1.7 var(--mono); color: var(--ink2); border-top: 1px solid var(--line); padding: 11px 16px 13px; }
+  .vstrings b { color: var(--ink); font-weight: 600; }
+  .vstrings .lbl { color: var(--ink3); }
+  .vstrings .bad { color: var(--kill); }
+
+  /* ---- the island mock: deliberately single-theme (the app's dark glass) ---- */
+  .stage { background:
+      radial-gradient(1200px 500px at 70% -10%, #2a3242 0%, transparent 60%),
+      linear-gradient(180deg, #171b22, #10141a);
+    border-radius: 10px; padding: 20px 16px; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+  .machine { font: 600 10px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: rgba(255,255,255,0.4); }
+  .island { width: 100%; max-width: 400px; background: rgba(30, 34, 42, 0.96); border: 1px solid rgba(255,255,255,0.09);
+    border-radius: 14px; box-shadow: 0 18px 44px rgba(0,0,0,0.5); padding: 12px 14px 10px;
+    font-family: var(--sys); color: rgba(255,255,255,0.85); }
+  .island * { font-variant-numeric: tabular-nums; }
+  .isec { font-size: 11px; font-weight: 600; color: rgba(255,255,255,0.55); margin: 10px 0 7px; display: flex; align-items: center; gap: 6px; }
+  .isec:first-child { margin-top: 0; }
+  .isec .cnt { font-weight: 700; font-size: 10px; background: rgba(255,255,255,0.14); border-radius: 8px; padding: 1px 6px; }
+  .isub { font-size: 11px; font-weight: 600; color: rgba(255,255,255,0.42); letter-spacing: .02em; margin: 7px 0 4px;
+    display: flex; align-items: center; gap: 6px; }
+  .irow { display: flex; gap: 8px; align-items: flex-start; padding: 5px 6px; border-radius: 6px; margin: 0 -6px; }
+  .irow:hover { background: rgba(255,255,255,0.07); }
+  .irow .glyph { width: 16px; text-align: center; font-size: 11px; color: rgba(255,255,255,0.55); padding-top: 1px; flex: none; }
+  .irow .t { font-size: 13px; font-weight: 500; color: rgba(255,255,255,0.85); line-height: 1.35; }
+  .irow .s { font-size: 11px; color: rgba(255,255,255,0.55); margin-top: 1px; }
+  .irow .s .org { color: rgba(255,255,255,0.74); font-weight: 590; }
+  .gsb { width: 15px; height: 15px; border-radius: 50%; color: #fff; font-size: 9px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center; flex: none; margin-top: 2px; }
+  .gsb.ok { background: #3FB950; } .gsb.pend { background: #D29922; } .gsb.fail { background: #F85149; }
+  .gsb.wip { background: rgba(255,255,255,0.22); }
+
+  /* NEW for this session — the subordination treatment: a draft tail is INSIDE its
+     owner group but never a peer of the live rows. Indent + hairline + dimmed ink. */
+  .tailwrap { margin: 3px 0 2px 7px; padding-left: 9px; border-left: 1px solid rgba(255,255,255,0.10); }
+  .isub.tailsub { font-size: 10px; font-weight: 600; color: rgba(255,255,255,0.34);
+    letter-spacing: .04em; text-transform: lowercase; margin: 3px 0 3px; }
+  .tailwrap .irow .t { font-size: 12.5px; color: rgba(255,255,255,0.62); font-weight: 450; }
+  .tailwrap .irow .s { color: rgba(255,255,255,0.40); }
+  .tailwrap .irow .s .org { color: rgba(255,255,255,0.56); }
+  .more { font-size: 10.5px; color: rgba(255,255,255,0.30); font-style: normal; padding: 3px 6px 1px; margin: 0 -6px;
+    font-family: var(--mono); }
+
+  /* caption-button + reveal: the app's own (show)/(hide) grammar */
+  .icap { font-size: 11px; color: rgba(255,255,255,0.32); padding: 6px 6px; margin: 0 -6px; border-radius: 6px;
+    background: none; border: none; display: block; width: calc(100% + 12px); text-align: left; cursor: pointer;
+    font-family: var(--sys); }
+  .icap:hover { background: rgba(255,255,255,0.07); color: rgba(255,255,255,0.55); }
+  .icap .fresh { color: rgba(255,255,255,0.55); font-weight: 600; }
+  .icap:focus-visible, .hidelink:focus-visible { outline: 2px solid #4c94f8; outline-offset: 1px; }
+  .icap .verb, .hidelink { text-decoration: underline; text-underline-offset: 2px;
+    text-decoration-color: rgba(255,255,255,0.28); }
+  .icap:hover .verb { text-decoration-color: rgba(255,255,255,0.6); }
+  .hidelink { font-size: 11px; font-weight: 400; color: rgba(255,255,255,0.32); background: none; border: none;
+    cursor: pointer; font-family: var(--sys); padding: 2px 4px; border-radius: 4px; }
+  .hidelink:hover { color: rgba(255,255,255,0.55); background: rgba(255,255,255,0.07); }
+  .isub .hidelink { margin-left: auto; }
+  .reveal { display: grid; grid-template-rows: 0fr; transition: grid-template-rows 150ms ease; }
+  .reveal > div { overflow: hidden; opacity: 0; transition: opacity 120ms ease; }
+  .reveal.open { grid-template-rows: 1fr; }
+  .reveal.open > div { opacity: 1; }
+  @media (prefers-reduced-motion: reduce) { .reveal, .reveal > div { transition: none; } }
+
+  .qgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; }
+  .qcard { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; }
+  .qcard h4 { margin: 0 0 6px; font-size: 13.5px; font-weight: 700; }
+  .qcard p { margin: 0 0 8px; font-size: 13px; color: var(--ink2); }
+  .qcard .ask { font: 600 11.5px/1.5 var(--mono); color: var(--accent); margin: 0; }
+  .qcard.resolved { border-left: 3px solid #2f9e5f; }
+  .qcard .ans { font-size: 12.5px; line-height: 1.55; color: var(--ink2); margin: 0;
+    border-top: 1px solid var(--line); padding-top: 9px; }
+  .qcard .ans b { color: var(--ink); font-weight: 650; }
+
+  .spec { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 16px 20px; }
+  .spec ol { margin: 0; padding-left: 20px; }
+  .spec li { margin: 0 0 10px; color: var(--ink2); font-size: 14px; max-width: 80ch; }
+  .spec li b { color: var(--ink); font-weight: 650; }
+  .spec li:last-child { margin-bottom: 0; }
+
+  footer.close { margin: 48px 0 0; padding: 18px 0 0; border-top: 1px solid var(--line); color: var(--ink3); font-size: 12.5px; }
+</style>
+
+<div class="wrap">
+
+<header class="lead">
+  <h1>Per-org drafts — reopening the open mic</h1>
+  <p>The org lens governs the live glance only. Stale and drafts sit below it as flat,
+  org-blind regions. That was ratified on 2026-07-14 — and ratified <em>with an exit</em>.</p>
+  <div class="doctrine-note">
+    <em>2026-07-12-org-grouping-mocks.html, spec line 4 of six:</em><br>
+    "Two grammars coexist by scope: the eye is org-grouping's control; the stale / bots &amp;
+    drafts / drafts families keep their ratified word-captions.
+    <strong>Open mic: converge them later if dogfood wants one grammar.</strong>"
+  </div>
+  <div class="doctrine-note reopen">
+    <em>2026-07-26, dogfood:</em> "i realize draft PR is a separate section from orgs.. while I
+    was expecting them to show at the bottom of each org section." → <strong>reopen</strong>.
+  </div>
+  <div class="doctrine-note ratified">
+    <em>2026-07-26, ratified:</em> <strong>V1 — draft tail inside each group.</strong> And
+    "facebook should be there as an org" — a draft-only owner is a first-class lens owner:
+    listed in the Owners card, foldable, draggable. The two-grammars-by-scope rule is retired
+    for drafts; stale keeps its flat caption until V3 is taken up.
+  </div>
+</header>
+
+<section>
+  <div class="eyebrow">Today, on your actual lane</div>
+  <h2>25 open PRs, and the drafts region hides an owner the lens has never heard of</h2>
+  <p class="qsub">Every row in this document is one of your real open PRs, read live on
+  2026-07-26. The shape matters more than the count: your <strong>active</strong> region knows two
+  owners, your <strong>drafts</strong> region has three.</p>
+
+  <div class="today">
+    <h3>The split the presenter computes right now</h3>
+    <div class="tablewrap">
+      <table class="ledger">
+        <thead><tr><th>Region</th><th>Rows</th><th>Owners present</th><th>Governed by the lens?</th></tr></thead>
+        <tbody>
+          <tr><td>active</td><td>11</td><td>acme (4) · pro-vi (7)</td><td class="verdict keep">yes — grouped, foldable</td></tr>
+          <tr><td>stale</td><td>5</td><td>pro-vi (5)</td><td class="verdict fold-v">no — flat caption</td></tr>
+          <tr><td>drafts</td><td>9</td><td>acme (5) · pro-vi (3) · <strong>facebook (1)</strong></td><td class="verdict fold-v">no — flat region</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p><code class="tok">facebook</code> appears in your lane exactly once — a draft on
+    <code class="tok">facebook/lexical#8710</code>. It has never been an owner the lens could
+    lead with, fold, or order, because the lens only ever sees <code class="tok">sections.active</code>.</p>
+    <p>Space: the lane caps at <code class="tok">perPaneMaxHeight = 240</code> (~6 rows). Active alone
+    is 11 rows plus 2 group headers. This is why enabling drafts read as a dead toggle — the reveal
+    landed ~13 rows below the fold.</p>
+  </div>
+
+  <div class="stage">
+    <div class="machine">today · drafts revealed · lens: grouped</div>
+    <div class="island">
+      <div class="isec">Your PRs</div>
+      <div class="isub">acme</div>
+      <div class="irow"><div class="gsb fail">!</div><div><div class="t">[PLAT-240] Deep-link addressability</div>
+        <div class="s">core #736 · merge conflict · 1h</div></div></div>
+      <div class="irow"><div class="gsb fail">!</div><div><div class="t">[PLAT-229] Question card layout</div>
+        <div class="s">core #719 · merge conflict · 2d</div></div></div>
+      <div class="irow"><div class="gsb ok">✓</div><div><div class="t">[PLAT-100] chore(web): pre-commit guardrails</div>
+        <div class="s">core #414 · checks green · 2d</div></div></div>
+      <div class="more">…1 more · then pro-vi ×7</div>
+      <div class="icap">5 gone quiet <span class="verb">(show)</span></div>
+      <div class="isub">Draft PRs <button class="hidelink" type="button">(hide)</button></div>
+      <div class="irow"><div class="gsb fail">!</div><div><div class="t">[PLAT-231] Export — PDF download</div>
+        <div class="s"><span class="org">acme</span>/core #720 · CI failing · 3d</div></div></div>
+      <div class="irow"><div class="gsb pend">·</div><div><div class="t">docs(design): direction-dock canon refresh</div>
+        <div class="s"><span class="org">acme</span>/core #716 · checks running · 1h</div></div></div>
+      <div class="irow"><div class="gsb fail">!</div><div><div class="t">[VID-508] Probe Image-to-Reading excerpt</div>
+        <div class="s"><span class="org">pro-vi</span>/toolkit #69 · merge conflict · 6d</div></div></div>
+      <div class="irow"><div class="gsb fail">!</div><div><div class="t">[lexical-utils] colors option for markSelection</div>
+        <div class="s"><span class="org">facebook</span>/lexical #8710 · merge conflict · 5w</div></div></div>
+      <div class="more">…5 more drafts, three owners interleaved by state</div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="eyebrow">The constraint the record hands us</div>
+  <h2>A draft may never rejoin its group's state sort</h2>
+  <p class="qsub">This isn't caution — it's a bug that was already found, already fixed, and is
+  live in your data right now. Five of your nine drafts roll up to <code class="tok">.blocked</code>.</p>
+
+  <div class="warnpanel">
+    <h3>What "drafts at the bottom of each org section" breaks if taken literally</h3>
+    <p>Drafts were pulled out of the main lane on 2026-06-18 and grouped by the
+    <code class="tok">isDraft</code> <em>fact</em>, specifically because a draft with failing CI rolls
+    up to <code class="tok">.blocked</code> (state) and bubbles to the top of the sort. Your
+    <code class="tok">core#720</code> is exactly that PR: draft, CI failing.</p>
+
+    <div class="sidebyside">
+      <div class="minilane">
+        <div class="mtitle bad">✕ drafts merged into the group's sort</div>
+        <div class="irow"><div class="gsb fail">!</div><div><div class="t">[PLAT-231] Export — PDF download</div>
+          <div class="s">core #720 · CI failing · <strong>draft</strong> · 3d</div></div></div>
+        <div class="irow"><div class="gsb fail">!</div><div><div class="t">[PLAT-240] Deep-link addressability</div>
+          <div class="s">core #736 · merge conflict · 1h</div></div></div>
+        <div class="irow"><div class="gsb ok">✓</div><div><div class="t">[PLAT-100] pre-commit guardrails</div>
+          <div class="s">core #414 · checks green · 2d</div></div></div>
+        <div class="more">a WIP you told nobody to look at now leads your work</div>
+      </div>
+      <div class="minilane">
+        <div class="mtitle">✓ drafts as a subordinate tail</div>
+        <div class="irow"><div class="gsb fail">!</div><div><div class="t">[PLAT-240] Deep-link addressability</div>
+          <div class="s">core #736 · merge conflict · 1h</div></div></div>
+        <div class="irow"><div class="gsb ok">✓</div><div><div class="t">[PLAT-100] pre-commit guardrails</div>
+          <div class="s">core #414 · checks green · 2d</div></div></div>
+        <div class="tailwrap">
+          <div class="isub tailsub">drafts</div>
+          <div class="irow"><div class="gsb wip">✎</div><div><div class="t">[PLAT-231] Export — PDF download</div>
+            <div class="s">core #720 · CI failing · 3d</div></div></div>
+        </div>
+      </div>
+    </div>
+
+    <p class="cite">2026-06-18-001-feat-signal-taxonomy-hardening-plan.md:33 — "Grouping drafts by
+    isDraft (not PulseState) is the load-bearing call… That dissolves the 'failing draft bubbles to
+    the top' inversion <em>without touching the priority lattice</em>." The alternative — reordering
+    the lattice so isDraft beats blocked — was considered and rejected.</p>
+  </div>
+  <p class="qsub">So per-org drafts is buildable, but it buys the structure at the price of one
+  explicit rule: <strong>the tail is positional, never sorted with its group.</strong> Every variant
+  below honors it.</p>
+</section>
+
+<section>
+  <div class="eyebrow">Three ways to put drafts under their owner</div>
+  <h2>Variants</h2>
+  <p class="qsub">All three use your live rows. acme is shown complete; pro-vi and
+  facebook are shown to structure, with the remainder marked honestly rather than dropped.</p>
+
+  <div class="vgrid">
+
+    <div class="vcard picked">
+      <div class="vhead">
+        <div class="vid">Variant 1</div>
+        <h3>Draft tail inside each group<span class="badge-pick rat">ratified</span></h3>
+        <p>The literal ask. Each owner group ends with its own drafts, indented and dimmed
+        under a quiet <code class="tok">drafts</code> label. "Draft PRs" as a region disappears.</p>
+      </div>
+      <div class="vbody">
+        <div class="stage">
+          <div class="machine">V1 · one org, everything about it</div>
+          <div class="island">
+            <div class="isec">Your PRs</div>
+            <div class="isub">acme <button class="hidelink" type="button">(hide)</button></div>
+            <div class="irow"><div class="gsb fail">!</div><div><div class="t">[PLAT-240] Deep-link addressability</div>
+              <div class="s">core #736 · merge conflict · 1h</div></div></div>
+            <div class="irow"><div class="gsb fail">!</div><div><div class="t">[PLAT-229] Question card layout</div>
+              <div class="s">core #719 · merge conflict · 2d</div></div></div>
+            <div class="irow"><div class="gsb ok">✓</div><div><div class="t">[PLAT-100] chore(web): pre-commit guardrails</div>
+              <div class="s">core #414 · checks green · 2d</div></div></div>
+            <div class="irow"><div class="gsb ok">✓</div><div><div class="t">[PLAT-207] Visual acceptance pass</div>
+              <div class="s">core #624 · checks green · 2d</div></div></div>
+            <div class="tailwrap">
+              <div class="isub tailsub">5 drafts</div>
+              <div class="irow"><div class="gsb wip">✎</div><div><div class="t">[PLAT-231] Export — PDF download</div>
+                <div class="s">core #720 · CI failing · 3d</div></div></div>
+              <div class="irow"><div class="gsb wip">✎</div><div><div class="t">docs(design): direction-dock canon refresh</div>
+                <div class="s">core #716 · checks running · 1h</div></div></div>
+              <div class="more">…3 more</div>
+            </div>
+            <div class="isub">pro-vi <button class="hidelink" type="button">(hide)</button></div>
+            <div class="irow"><div class="gsb fail">!</div><div><div class="t">feat(spawn): workspace-trust dialog</div>
+              <div class="s">panes #33 · merge conflict · 9d</div></div></div>
+            <div class="irow"><div class="gsb ok">✓</div><div><div class="t">[FRAC-219] Retire cache keep-alive</div>
+              <div class="s">canvas #95 · checks green · 6h</div></div></div>
+            <div class="more">…5 more live</div>
+            <div class="tailwrap">
+              <div class="isub tailsub">3 drafts</div>
+              <div class="irow"><div class="gsb wip">✎</div><div><div class="t">[VID-508] Probe Image-to-Reading excerpt</div>
+                <div class="s">toolkit #69 · merge conflict · 6d</div></div></div>
+              <div class="more">…2 more</div>
+            </div>
+            <div class="isub">facebook <button class="hidelink" type="button">(hide)</button></div>
+            <div class="tailwrap">
+              <div class="isub tailsub">1 draft</div>
+              <div class="irow"><div class="gsb wip">✎</div><div><div class="t">[lexical-utils] colors option for markSelection</div>
+                <div class="s">lexical #8710 · merge conflict · 5w</div></div></div>
+            </div>
+            <div class="icap">5 gone quiet <span class="verb">(show)</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="vstrings">
+        <span class="lbl">tail label</span> <b>"5 drafts"</b> — count-bearing, lowercase, no (hide)<br>
+        <span class="lbl">fold</span> <b>folding acme now hides its drafts too</b><br>
+        <span class="lbl">ledger</span> <b>"acme · 4, 5 drafts"</b><br>
+        <span class="lbl">sort</span> <b>tail is positional — never joins the group sort</b><br>
+        <span class="lbl">facebook</span> <b>a real lens owner</b> — group with zero live rows,
+        ledger reads <b>"facebook · 1 draft"</b>
+      </div>
+    </div>
+
+    <div class="vcard">
+      <div class="vhead">
+        <div class="vid">Variant 2</div>
+        <h3>Owner headers inside Draft PRs</h3>
+        <p>The conservative move. "Draft PRs" survives as a region; owners become sub-headers
+        <em>within</em> it, in the same lens order.</p>
+      </div>
+      <div class="vbody">
+        <div class="stage">
+          <div class="machine">V2 · region kept, structure added</div>
+          <div class="island">
+            <div class="isec">Your PRs</div>
+            <div class="isub">acme</div>
+            <div class="irow"><div class="gsb fail">!</div><div><div class="t">[PLAT-240] Deep-link addressability</div>
+              <div class="s">core #736 · merge conflict · 1h</div></div></div>
+            <div class="irow"><div class="gsb ok">✓</div><div><div class="t">[PLAT-100] pre-commit guardrails</div>
+              <div class="s">core #414 · checks green · 2d</div></div></div>
+            <div class="more">…2 more · then pro-vi ×7</div>
+            <div class="icap">5 gone quiet <span class="verb">(show)</span></div>
+            <div class="isub">Draft PRs <button class="hidelink" type="button">(hide)</button></div>
+            <div class="tailwrap">
+              <div class="isub tailsub">acme · 5</div>
+              <div class="irow"><div class="gsb wip">✎</div><div><div class="t">[PLAT-231] Export — PDF download</div>
+                <div class="s">core #720 · CI failing · 3d</div></div></div>
+              <div class="more">…4 more</div>
+              <div class="isub tailsub">pro-vi · 3</div>
+              <div class="irow"><div class="gsb wip">✎</div><div><div class="t">[VID-508] Probe Image-to-Reading excerpt</div>
+                <div class="s">toolkit #69 · merge conflict · 6d</div></div></div>
+              <div class="more">…2 more</div>
+              <div class="isub tailsub">facebook · 1</div>
+              <div class="irow"><div class="gsb wip">✎</div><div><div class="t">[lexical-utils] colors option for markSelection</div>
+                <div class="s">lexical #8710 · merge conflict · 5w</div></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="vstrings">
+        <span class="lbl">safe</span> <b>inversion impossible — drafts stay a region</b><br>
+        <span class="lbl">fold</span> <span class="bad">folding acme still leaves 5 drafts printing</span><br>
+        <span class="lbl">costs</span> owner names render twice per lane<br>
+        <span class="lbl">verdict</span> <span class="bad">doesn't answer the ask</span> — still a
+        separate section from orgs
+      </div>
+    </div>
+
+    <div class="vcard">
+      <div class="vhead">
+        <div class="vid">Variant 3</div>
+        <h3>One org, one block — stale follows too</h3>
+        <p>V1 taken to its conclusion. If drafts belong to their owner, so does quiet work.
+        Regions dissolve entirely; the lane becomes org-first.</p>
+      </div>
+      <div class="vbody">
+        <div class="stage">
+          <div class="machine">V3 · regions dissolve into owners</div>
+          <div class="island">
+            <div class="isec">Your PRs</div>
+            <div class="isub">acme <button class="hidelink" type="button">(hide)</button></div>
+            <div class="irow"><div class="gsb fail">!</div><div><div class="t">[PLAT-240] Deep-link addressability</div>
+              <div class="s">core #736 · merge conflict · 1h</div></div></div>
+            <div class="irow"><div class="gsb ok">✓</div><div><div class="t">[PLAT-100] pre-commit guardrails</div>
+              <div class="s">core #414 · checks green · 2d</div></div></div>
+            <div class="more">…2 more live</div>
+            <div class="tailwrap">
+              <div class="isub tailsub">5 drafts</div>
+              <div class="irow"><div class="gsb wip">✎</div><div><div class="t">[PLAT-231] Export — PDF download</div>
+                <div class="s">core #720 · CI failing · 3d</div></div></div>
+              <div class="more">…4 more</div>
+            </div>
+            <div class="isub">pro-vi <button class="hidelink" type="button">(hide)</button></div>
+            <div class="irow"><div class="gsb fail">!</div><div><div class="t">feat(spawn): workspace-trust dialog</div>
+              <div class="s">panes #33 · merge conflict · 9d</div></div></div>
+            <div class="more">…6 more live</div>
+            <div class="icap">5 gone quiet at pro-vi <span class="verb">(show)</span></div>
+            <div class="tailwrap">
+              <div class="isub tailsub">3 drafts</div>
+              <div class="irow"><div class="gsb wip">✎</div><div><div class="t">[VID-508] Probe Image-to-Reading excerpt</div>
+                <div class="s">toolkit #69 · merge conflict · 6d</div></div></div>
+              <div class="more">…2 more</div>
+            </div>
+            <div class="isub">facebook <button class="hidelink" type="button">(hide)</button></div>
+            <div class="tailwrap">
+              <div class="isub tailsub">1 draft</div>
+              <div class="irow"><div class="gsb wip">✎</div><div><div class="t">[lexical-utils] colors option for markSelection</div>
+                <div class="s">lexical #8710 · merge conflict · 5w</div></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="vstrings">
+        <span class="lbl">gain</span> <b>one mental model — an owner is a complete answer</b><br>
+        <span class="lbl">note</span> all 5 of your stale PRs are pro-vi's — the caption
+        moves under one owner and acme gets none<br>
+        <span class="lbl">costs</span> kills two ratified regions + the flat stale caption;
+        largest diff of the three<br>
+        <span class="lbl">verdict</span> <b>where V1 logically leads</b> — but earn it with V1 first
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<section>
+  <div class="eyebrow">Resolved, 2026-07-26</div>
+  <h2>The three open questions, closed</h2>
+  <div class="qgrid">
+    <div class="qcard resolved">
+      <h4>Does facebook belong in the lens card?</h4>
+      <p>The Owners card is built from active rows, so a draft-only owner has never appeared in it.
+      Under V1 facebook gets a lane group — but can you lead with it, fold it, drag it?</p>
+      <p class="ans"><b>Yes — a first-class org.</b> The card is built from live + draft owners.
+      Two knock-ons: your drag order outranks the sink rule (a placed draft-only owner can lead),
+      and a zero-live owner's ledger prints the tail alone — <b>"facebook · 1 draft"</b>, never
+      "facebook · 0, 1 drafts".</p>
+    </div>
+    <div class="qcard resolved">
+      <h4>Does the folded ledger count drafts?</h4>
+      <p>Fold-not-filter says a folded owner always prints its count. Today that count is live rows
+      only. "acme · 4" while 5 drafts hide inside it is arguably a lie.</p>
+      <p class="ans"><b>Yes — two facts, one line:</b> "acme · 4, 5 drafts". Taken as
+      the honest default; it's a copy change, reversible on dogfood.</p>
+    </div>
+    <div class="qcard resolved">
+      <h4>Does the <code class="tok">showDrafts</code> pref survive?</h4>
+      <p>A per-org tail is small and self-labelling. The default-off pref existed to keep WIP out of
+      the glance — a dimmed 2-row tail may do that on its own.</p>
+      <p class="ans"><b>Kept, still default-off</b> — now gating the tails rather than a region.
+      Cheap to retire later if the tail proves quiet enough on its own.</p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="eyebrow">Ratified — build from this</div>
+  <h2>The spec, in five lines</h2>
+  <div class="spec">
+    <ol>
+      <li><b>The lens takes all three regions, not just active.</b>
+        <code class="tok">lensLayout(active:)</code> becomes owner-partitioned over live + drafts;
+        each <code class="tok">LensEntry.group</code> carries <code class="tok">rows</code> and a
+        separate <code class="tok">tail</code>. Group rank still comes from the lead <em>live</em> row.</li>
+      <li><b>The tail is positional, never sorted.</b> Drafts sort among themselves
+        (state-then-updated, unchanged) and always render last within the group. This is the
+        2026-06-18 inversion guard restated at group scope — it wants a pinned test.</li>
+      <li><b>A draft-only owner is a first-class lens owner</b> — group with an empty live region
+        (header, then tail), listed in the Owners card, foldable and draggable. Order:
+        <code class="tok">ownerOrder</code> wins as always; among <em>unplaced</em> owners the
+        draft-only ones sink below everyone with live work, regardless of recency.</li>
+      <li><b>Folding an owner folds its drafts</b>, and the ledger prints both facts —
+        "acme · 4, 5 drafts". A zero-live owner prints the tail alone:
+        "facebook · 1 draft". This is the real win: today, folding acme leaves its 5 drafts
+        on screen, which quietly breaks fold-not-filter.</li>
+      <li><b>"Draft PRs" as a region retires</b>, along with its revealed header and (hide).
+        <code class="tok">showDrafts</code> now gates the tails. Stale is untouched — it stays a flat
+        caption, and that asymmetry is the open question V3 answers.</li>
+    </ol>
+  </div>
+</section>
+
+<footer class="close">
+  <strong>V1 ratified 2026-07-26</strong> · draft-only owners are first-class lens orgs ·
+  rows read live from <code class="tok">viewer.pullRequests</code> on 2026-07-26 · 25 open,
+  11 active / 5 stale / 9 draft · lane cap 240px · closes the 2026-07-14 open mic for drafts;
+  stale stays flat until V3 · companion to <code class="tok">2026-07-12-org-grouping-mocks.html</code>
+</footer>
+
+</div>

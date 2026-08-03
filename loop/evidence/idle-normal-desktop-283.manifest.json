@@ -1,0 +1,41 @@
+{
+  "captured_at": "2026-06-19T23:42:54Z",
+  "commit": "35ebb40",
+  "condition": "idle",
+  "frontmost_after": "ASN:0x0-0x390390:",
+  "frontmost_before": "ASN:0x0-0x390390:",
+  "frontmost_unchanged": true,
+  "idle_cpu": 0.2,
+  "iter": 283,
+  "pixel_live": true,
+  "pixel_stats": {
+    "distinct_colors": 75,
+    "live": true,
+    "max": 206.45,
+    "mean": 26.89,
+    "min": 3.09,
+    "src_h": 914,
+    "src_w": 1040,
+    "variance": 648.23
+  },
+  "png": "loop/evidence/idle-normal-desktop-283.png",
+  "png_sha256": "572e3d0291551d7dc8fbb611c3de2f2299848f8710c58a8a40f3849d7703c39e",
+  "reason": null,
+  "scenario": "normal-desktop",
+  "screen": {
+    "h": 1117,
+    "w": 1728,
+    "x": 0,
+    "y": 0
+  },
+  "size_class": "other",
+  "status": "captured",
+  "window_bounds": {
+    "h": 457,
+    "w": 520,
+    "x": 604,
+    "y": 46
+  },
+  "window_count": 1,
+  "within_screen": true
+}

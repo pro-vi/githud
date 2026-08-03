@@ -1,0 +1,134 @@
+{
+  "total_count": 8,
+  "incomplete_results": false,
+  "items": [
+    {
+      "number": 112,
+      "title": "chore(deps)(deps): bump the patch-and-minor group with 3 updates",
+      "html_url": "https://github.com/pro-vi/designer/pull/112",
+      "state": "open",
+      "created_at": "2026-07-06T16:08:01Z",
+      "updated_at": "2026-07-06T16:08:02Z",
+      "repository_url": "https://api.github.com/repos/pro-vi/designer",
+      "draft": false,
+      "user": {
+        "login": "dependabot[bot]",
+        "type": "Bot"
+      },
+      "pull_request": {
+        "url": "https://api.github.com/repos/pro-vi/designer/pulls/112"
+      }
+    },
+    {
+      "number": 111,
+      "title": "chore(deps): weekly lockfile refresh",
+      "html_url": "https://github.com/pro-vi/designer/pull/111",
+      "state": "open",
+      "created_at": "2026-07-05T15:09:27Z",
+      "updated_at": "2026-07-05T15:09:28Z",
+      "repository_url": "https://api.github.com/repos/pro-vi/designer",
+      "draft": false,
+      "user": {
+        "login": "github-actions[bot]",
+        "type": "Bot"
+      },
+      "pull_request": {
+        "url": "https://api.github.com/repos/pro-vi/designer/pulls/111"
+      }
+    },
+    {
+      "number": 110,
+      "title": "fix: Linux support (cross-platform Chrome default + GNU-safe ps probe)",
+      "html_url": "https://github.com/pro-vi/designer/pull/110",
+      "state": "open",
+      "created_at": "2026-07-01T23:04:08Z",
+      "updated_at": "2026-07-01T23:11:01Z",
+      "repository_url": "https://api.github.com/repos/pro-vi/designer",
+      "draft": false,
+      "user": {
+        "login": "tomo",
+        "type": "User"
+      },
+      "pull_request": {
+        "url": "https://api.github.com/repos/pro-vi/designer/pulls/110"
+      }
+    },
+    {
+      "number": 109,
+      "title": "chore(deps): bump actions/checkout from 6 to 7",
+      "html_url": "https://github.com/pro-vi/designer/pull/109",
+      "state": "open",
+      "created_at": "2026-07-01T07:12:01Z",
+      "updated_at": "2026-07-01T07:12:02Z",
+      "repository_url": "https://api.github.com/repos/pro-vi/designer",
+      "draft": false,
+      "user": {
+        "login": "dependabot[bot]",
+        "type": "Bot"
+      },
+      "pull_request": {
+        "url": "https://api.github.com/repos/pro-vi/designer/pulls/109"
+      }
+    },
+    {
+      "number": 1,
+      "title": "\ud83c\udf89 Featured in awesome-claude-code-hooks",
+      "html_url": "https://github.com/pro-vi/agent-dice/issues/1",
+      "state": "open",
+      "created_at": "2026-03-23T16:11:59Z",
+      "updated_at": "2026-03-23T16:11:59Z",
+      "repository_url": "https://api.github.com/repos/pro-vi/agent-dice",
+      "user": {
+        "login": "mira",
+        "type": "User"
+      }
+    },
+    {
+      "number": 3,
+      "title": "Add uvx and uv transport support for Python MCP servers",
+      "html_url": "https://github.com/pro-vi/mcp-filter/pull/3",
+      "state": "open",
+      "created_at": "2026-01-14T13:34:37Z",
+      "updated_at": "2026-02-24T17:44:26Z",
+      "repository_url": "https://api.github.com/repos/pro-vi/mcp-filter",
+      "draft": false,
+      "user": {
+        "login": "kesh",
+        "type": "User"
+      },
+      "pull_request": {
+        "url": "https://api.github.com/repos/pro-vi/mcp-filter/pulls/3"
+      }
+    },
+    {
+      "number": 2,
+      "title": "Python MCP servers via uvx/uv not working - wrong transport selected",
+      "html_url": "https://github.com/pro-vi/mcp-filter/issues/2",
+      "state": "open",
+      "created_at": "2026-01-14T13:13:35Z",
+      "updated_at": "2026-01-14T13:13:35Z",
+      "repository_url": "https://api.github.com/repos/pro-vi/mcp-filter",
+      "user": {
+        "login": "kesh",
+        "type": "User"
+      }
+    },
+    {
+      "number": 1,
+      "title": "feat: add --stdio-env option for passing environment variables",
+      "html_url": "https://github.com/pro-vi/mcp-filter/pull/1",
+      "state": "open",
+      "created_at": "2025-12-29T14:19:08Z",
+      "updated_at": "2025-12-29T14:51:02Z",
+      "repository_url": "https://api.github.com/repos/pro-vi/mcp-filter",
+      "draft": false,
+      "user": {
+        "login": "arun",
+        "type": "User"
+      },
+      "pull_request": {
+        "url": "https://api.github.com/repos/pro-vi/mcp-filter/pulls/1"
+      }
+    }
+  ]
+}

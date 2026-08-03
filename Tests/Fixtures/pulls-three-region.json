@@ -1,0 +1,148 @@
+{
+  "data": {
+    "viewer": {
+      "pullRequests": {
+        "nodes": [
+          {
+            "number": 736,
+            "title": "Deep-link addressability",
+            "url": "https://github.com/acme/core/pull/736",
+            "isDraft": false,
+            "updatedAt": "2026-07-29T11:00:00Z",
+            "reviewDecision": null,
+            "mergeable": "CONFLICTING",
+            "repository": {
+              "nameWithOwner": "acme/core"
+            },
+            "commits": {
+              "nodes": [
+                {
+                  "commit": {
+                    "statusCheckRollup": {
+                      "state": "SUCCESS"
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "number": 100,
+            "title": "Legacy record migration",
+            "url": "https://github.com/acme/core/pull/100",
+            "isDraft": false,
+            "updatedAt": "2026-04-08T12:00:00Z",
+            "reviewDecision": null,
+            "mergeable": "CONFLICTING",
+            "repository": {
+              "nameWithOwner": "acme/core"
+            },
+            "commits": {
+              "nodes": [
+                {
+                  "commit": {
+                    "statusCheckRollup": {
+                      "state": "SUCCESS"
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "number": 214,
+            "title": "Per-org quiet tails",
+            "url": "https://github.com/pro-vi/githud/pull/214",
+            "isDraft": false,
+            "updatedAt": "2026-07-29T06:00:00Z",
+            "reviewDecision": "APPROVED",
+            "mergeable": "MERGEABLE",
+            "repository": {
+              "nameWithOwner": "pro-vi/githud"
+            },
+            "commits": {
+              "nodes": [
+                {
+                  "commit": {
+                    "statusCheckRollup": {
+                      "state": "SUCCESS"
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "number": 69,
+            "title": "WIP: sweep-lane rewrite",
+            "url": "https://github.com/pro-vi/toolkit/pull/69",
+            "isDraft": true,
+            "updatedAt": "2026-07-23T12:00:00Z",
+            "reviewDecision": null,
+            "mergeable": "MERGEABLE",
+            "repository": {
+              "nameWithOwner": "pro-vi/toolkit"
+            },
+            "commits": {
+              "nodes": [
+                {
+                  "commit": {
+                    "statusCheckRollup": {
+                      "state": "SUCCESS"
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "number": 8710,
+            "title": "WIP: selection provenance",
+            "url": "https://github.com/facebook/lexical/pull/8710",
+            "isDraft": true,
+            "updatedAt": "2026-06-22T00:00:00Z",
+            "reviewDecision": null,
+            "mergeable": "MERGEABLE",
+            "repository": {
+              "nameWithOwner": "facebook/lexical"
+            },
+            "commits": {
+              "nodes": [
+                {
+                  "commit": {
+                    "statusCheckRollup": {
+                      "state": "SUCCESS"
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "number": 88,
+            "title": "Roundtrip delimiter fidelity",
+            "url": "https://github.com/helios-oss/hx-parse/pull/88",
+            "isDraft": false,
+            "updatedAt": "2026-03-11T12:00:00Z",
+            "reviewDecision": null,
+            "mergeable": "MERGEABLE",
+            "repository": {
+              "nameWithOwner": "helios-oss/hx-parse"
+            },
+            "commits": {
+              "nodes": [
+                {
+                  "commit": {
+                    "statusCheckRollup": {
+                      "state": "SUCCESS"
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    }
+  }
+}

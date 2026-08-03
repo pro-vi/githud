@@ -1,0 +1,1281 @@
+<title>githud — the mark &amp; the settings surface</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --card: #ffffff; --ink: #1a2129; --ink2: #5a6572; --ink3: #8b95a3;
+    --line: #dde3ea; --accent: #2464c4; --accent-ink: #ffffff;
+    --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, monospace;
+    --sys: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) { :root {
+    --bg: #0b0e13; --card: #121722; --ink: #e7edf4; --ink2: #98a2b0; --ink3: #6b7683;
+    --line: #232b36; --accent: #4c94f8; --accent-ink: #0b0e13;
+  } }
+  :root[data-theme="light"] {
+    --bg: #f6f7f9; --card: #ffffff; --ink: #1a2129; --ink2: #5a6572; --ink3: #8b95a3;
+    --line: #dde3ea; --accent: #2464c4; --accent-ink: #ffffff;
+  }
+  :root[data-theme="dark"] {
+    --bg: #0b0e13; --card: #121722; --ink: #e7edf4; --ink2: #98a2b0; --ink3: #6b7683;
+    --line: #232b36; --accent: #4c94f8; --accent-ink: #0b0e13;
+  }
+  * { box-sizing: border-box; }
+  body { background: var(--bg); color: var(--ink); font: 15px/1.6 var(--sys); margin: 0; }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 0 24px 80px; }
+  header.lead { padding: 44px 0 8px; max-width: 78ch; }
+  header.lead h1 { font-size: 27px; font-weight: 750; letter-spacing: -0.022em; margin: 0 0 10px; text-wrap: balance; }
+  header.lead p { color: var(--ink2); margin: 0 0 8px; }
+  .doctrine-note { font: 500 12px/1.5 var(--mono); color: var(--ink3); border-left: 2px solid var(--accent);
+    padding: 2px 0 2px 12px; margin: 16px 0 0; }
+  .doctrine-note em { color: var(--ink2); font-style: normal; }
+  section { margin: 46px 0 0; }
+  .eyebrow { font: 600 11px/1 var(--mono); letter-spacing: .09em; text-transform: uppercase; color: var(--accent); margin: 0 0 10px; }
+  section h2 { font-size: 21px; font-weight: 700; letter-spacing: -0.015em; margin: 0 0 6px; max-width: 72ch; text-wrap: balance; }
+  .qsub { color: var(--ink2); max-width: 80ch; margin: 0 0 20px; }
+  code.tok { font: 500 11.5px var(--mono); background: color-mix(in srgb, var(--ink) 7%, transparent); border-radius: 4px; padding: 1px 4px; }
+
+  /* mark cards */
+  .mgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 18px; }
+  .mcard { background: var(--card); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; display: flex; flex-direction: column; }
+  .mhead { padding: 13px 16px 11px; border-bottom: 1px solid var(--line); display: flex; align-items: baseline; gap: 8px; }
+  .mhead .mid { font: 700 10px var(--mono); letter-spacing: .07em; color: var(--accent); text-transform: uppercase; }
+  .mhead h3 { margin: 0; font-size: 15px; font-weight: 700; letter-spacing: -0.008em; }
+  .mhead .angle { margin-left: auto; font: 600 10px var(--mono); letter-spacing: .05em; color: var(--ink3); text-transform: uppercase; }
+  .mbody { padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 12px; flex: 1; }
+  .mhero { display: flex; align-items: center; gap: 18px; }
+  .mhero .big { width: 64px; height: 64px; color: var(--ink); flex: none; }
+  .mhero .icon { width: 64px; height: 64px; border-radius: 15px; display: flex; align-items: center; justify-content: center; flex: none; }
+  .mhero .icon.li { background: #f4f4f6; color: #1c1c1e; border: 1px solid var(--line); }
+  .mhero .icon.da { background: #1c2027; color: #f2f4f8; border: 1px solid var(--line); }
+  .mhero .icon svg { width: 40px; height: 40px; }
+  .mhero .cap { font: 500 11px var(--mono); color: var(--ink3); }
+
+  /* menu-bar strips — deliberately single-theme each: one light bar, one dark bar */
+  .strip { display: flex; align-items: center; gap: 13px; height: 26px; border-radius: 7px; padding: 0 12px;
+    font: 500 12px var(--sys); }
+  .strip.light { background: linear-gradient(180deg, #f7f7f9, #ededf1); color: #1c1c1e; border: 1px solid #d9d9de; }
+  .strip.dark { background: linear-gradient(180deg, #2a2a2e, #202024); color: #f4f4f6; border: 1px solid #3a3a3f; }
+  .strip .spring { flex: 1; }
+  .strip svg.mext { width: 15px; height: 15px; opacity: .85; }
+  .strip .clock { font-variant-numeric: tabular-nums; }
+  .mpill { display: inline-flex; align-items: center; justify-content: center; height: 20px; min-width: 34px;
+    border-radius: 999px; }
+  .strip.light .mpill { background: rgba(0,0,0,0.06); }
+  .strip.dark .mpill { background: rgba(255,255,255,0.10); }
+  .mpill svg { width: 13px; height: 13px; }
+  .mpill .dimdot { width: 6px; height: 6px; border-radius: 3px; opacity: .38; background: currentColor; }
+
+  .mtext { font-size: 12.5px; color: var(--ink2); }
+  .mtext b { color: var(--ink); font-weight: 650; }
+  .mweak { font-size: 12px; color: var(--ink3); border-top: 1px dashed var(--line); padding-top: 9px; margin-top: auto; }
+  .mweak b { color: var(--ink2); font-weight: 650; }
+
+  /* settings option cards */
+  .sgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 18px; }
+  .scard { background: var(--card); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; display: flex; flex-direction: column; }
+  .scard.reco { border-color: var(--accent); }
+  .scard .badge { font: 700 9px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--accent-ink);
+    background: var(--accent); border-radius: 4px; padding: 2px 6px; margin-left: auto; }
+  .sbody { padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 12px; flex: 1; }
+  .stage { background:
+      radial-gradient(1000px 420px at 70% -10%, #2a3242 0%, transparent 60%),
+      linear-gradient(180deg, #171b22, #10141a);
+    border-radius: 10px; padding: 18px 14px; display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; align-items: flex-start; }
+
+  /* macOS menu mock — single-theme dark (matches the app's world) */
+  .menu { background: rgba(40, 44, 52, 0.97); border: 1px solid rgba(255,255,255,0.12); border-radius: 8px;
+    box-shadow: 0 14px 34px rgba(0,0,0,0.5); padding: 5px; min-width: 190px;
+    font: 400 12.5px var(--sys); color: rgba(255,255,255,0.88); }
+  .menu .mi { padding: 4px 22px 4px 10px; border-radius: 5px; position: relative; white-space: nowrap; }
+  .menu .mi:hover { background: #3478f6; color: #fff; }
+  .menu .mi.check::before { content: "✓"; position: absolute; left: 10px; }
+  .menu .mi.check { padding-left: 26px; }
+  .menu .mi.sub::after { content: "›"; position: absolute; right: 9px; opacity: .6; }
+  .menu .msep { height: 1px; background: rgba(255,255,255,0.14); margin: 5px 10px; }
+  .menu .mhdr { padding: 3px 10px 2px; font-size: 11px; color: rgba(255,255,255,0.45); }
+
+  /* island settings card mock — dark glass */
+  .island { width: 100%; max-width: 380px; background: rgba(30,34,42,0.96); border: 1px solid rgba(255,255,255,0.09);
+    border-radius: 14px; box-shadow: 0 18px 44px rgba(0,0,0,0.5); padding: 13px 14px;
+    font-family: var(--sys); color: rgba(255,255,255,0.85); }
+  .island h4 { margin: 0 0 10px; font-size: 13px; font-weight: 600; color: rgba(255,255,255,0.85); }
+  .island .grp { font-size: 11px; font-weight: 600; color: rgba(255,255,255,0.5); margin: 12px 0 7px; }
+  .island .grp:first-of-type { margin-top: 0; }
+  .swatches { display: flex; gap: 7px; flex-wrap: wrap; }
+  .swatch { width: 62px; border-radius: 7px; border: 1px solid rgba(255,255,255,0.14); overflow: hidden; cursor: pointer; }
+  .swatch.sel { border-color: #4c94f8; box-shadow: 0 0 0 1px #4c94f8; }
+  .swatch .chip { height: 26px; display: flex; align-items: center; justify-content: center; gap: 3px; font-size: 8px; }
+  .swatch .nm { font-size: 9px; text-align: center; color: rgba(255,255,255,0.55); padding: 3px 0 4px; }
+  .minipills { display: flex; gap: 8px; }
+  .minipill { border: 1px solid rgba(255,255,255,0.14); border-radius: 999px; padding: 3px 10px; font-size: 10px;
+    color: rgba(255,255,255,0.7); }
+  .minipill.sel { border-color: #4c94f8; color: #fff; }
+  .togglerow { display: flex; align-items: center; gap: 8px; font-size: 12px; color: rgba(255,255,255,0.75); padding: 3px 0; }
+  .togglerow .box { width: 12px; height: 12px; border: 1px solid rgba(255,255,255,0.35); border-radius: 3px; flex: none;
+    display: inline-flex; align-items: center; justify-content: center; font-size: 9px; }
+  .togglerow .box.on::before { content: "✓"; }
+
+  .mech { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px 18px; margin: 18px 0 0;
+    font-size: 13.5px; color: var(--ink2); }
+  .mech h3 { margin: 0 0 6px; font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--ink3); }
+  .mech ul { margin: 0; padding-left: 18px; }
+  .mech li { margin: 3px 0; }
+  .decide { border: 1px solid var(--line); border-left: 3px solid var(--accent); background: var(--card);
+    border-radius: 10px; padding: 16px 20px; margin-top: 20px; }
+  .decide h3 { margin: 0 0 8px; font-size: 15px; }
+  .decide p { margin: 0 0 6px; color: var(--ink2); font-size: 13.5px; }
+  footer.colophon { margin-top: 56px; border-top: 1px solid var(--line); padding-top: 14px;
+    font: 500 11.5px var(--mono); color: var(--ink3); }
+</style>
+
+<!-- the six marks, defined once -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="m-bead" viewBox="0 0 24 24">
+    <path fill="currentColor" fill-rule="evenodd" d="M12 3a6.6 6.6 0 1 0 0 13.2 6.6 6.6 0 0 0 0-13.2Zm0 3.9a2.7 2.7 0 1 1 0 5.4 2.7 2.7 0 0 1 0-5.4Z"/>
+    <path stroke="currentColor" stroke-width="3" stroke-linecap="round" fill="none" d="M16.2 14.4c1.6 2.4 1.2 5.2-1.9 6.2-1.7.5-3.4 0-4.3-1.1"/>
+  </symbol>
+  <symbol id="m-monog" viewBox="0 0 24 24">
+    <path stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" fill="none" d="M12 4A6 6 0 1 0 16.6 14C18 17 16.5 20.5 12.5 20.5"/>
+  </symbol>
+  <symbol id="m-scope" viewBox="0 0 24 24">
+    <circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="2.4"/>
+    <circle cx="16" cy="5.1" r="2.4" fill="currentColor"/>
+  </symbol>
+  <symbol id="m-island" viewBox="0 0 24 24">
+    <path fill="currentColor" fill-rule="evenodd" d="M8 7H16A5 5 0 0 1 16 17H8A5 5 0 0 1 8 7ZM17.4 12a2.4 2.4 0 1 0-4.8 0a2.4 2.4 0 1 0 4.8 0Z"/>
+  </symbol>
+  <symbol id="m-notch" viewBox="0 0 24 24">
+    <path d="M4 7.5C4 6.12 5.12 5 6.5 5H9a3 3 0 0 0 6 0H17.5C18.88 5 20 6.12 20 7.5V16.5C20 17.88 18.88 19 17.5 19H6.5C5.12 19 4 17.88 4 16.5Z" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round"/>
+    <circle cx="14" cy="13" r="1.75" fill="currentColor"/>
+  </symbol>
+  <symbol id="m-aperture" viewBox="0 0 24 24">
+    <path d="M14.4 4.6a8 8 0 1 0 5 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+    <circle cx="12" cy="4" r="2" fill="currentColor"/>
+  </symbol>
+  <!-- round five: Glyphling g fine cuts -->
+  <symbol id="m5-wide" viewBox="0 0 24 24">
+    <path fill="currentColor" fill-rule="evenodd" d="M12 3.6a6.4 6.4 0 1 0 0 12.8 6.4 6.4 0 0 0 0-12.8Zm0 2.3a4.1 4.1 0 1 1 0 8.2 4.1 4.1 0 0 1 0-8.2Z"/>
+    <path fill="currentColor" fill-rule="evenodd" d="M12 8.2a1.8 1.8 0 1 0 0 3.6 1.8 1.8 0 0 0 0-3.6Zm-.75.5a.55.55 0 1 1 0 1.1.55.55 0 0 1 0-1.1Z"/>
+    <path stroke="currentColor" stroke-width="2.8" stroke-linecap="round" fill="none" d="M16.4 14.0C17.9 16.6 17.3 19.6 14.3 20.5 13 20.9 11.8 20.6 11 19.9"/>
+  </symbol>
+  <symbol id="m5-night" viewBox="0 0 24 24">
+    <path fill="currentColor" fill-rule="evenodd" d="M12 3.6a6.4 6.4 0 1 0 0 12.8 6.4 6.4 0 0 0 0-12.8Zm0 2.7a3.7 3.7 0 1 1 0 7.4 3.7 3.7 0 0 1 0-7.4Z"/>
+    <path fill="currentColor" fill-rule="evenodd" d="M12 7.9a2.1 2.1 0 1 0 0 4.2 2.1 2.1 0 0 0 0-4.2Zm-.85.55a.65.65 0 1 1 0 1.3.65.65 0 0 1 0-1.3Z"/>
+    <path stroke="currentColor" stroke-width="2.8" stroke-linecap="round" fill="none" d="M16.4 14.0C17.9 16.6 17.3 19.6 14.3 20.5 13 20.9 11.8 20.6 11 19.9"/>
+  </symbol>
+  <symbol id="m5-sidelong" viewBox="0 0 24 24">
+    <path fill="currentColor" fill-rule="evenodd" d="M12 3.6a6.4 6.4 0 1 0 0 12.8 6.4 6.4 0 0 0 0-12.8Zm0 2.7a3.7 3.7 0 1 1 0 7.4 3.7 3.7 0 0 1 0-7.4Z"/>
+    <path fill="currentColor" fill-rule="evenodd" d="M12.8 7.6a1.7 1.7 0 1 0 0 3.4 1.7 1.7 0 0 0 0-3.4Zm-.7.45a.55.55 0 1 1 0 1.1.55.55 0 0 1 0-1.1Z"/>
+    <path stroke="currentColor" stroke-width="2.8" stroke-linecap="round" fill="none" d="M16.4 14.0C17.9 16.6 17.3 19.6 14.3 20.5 13 20.9 11.8 20.6 11 19.9"/>
+  </symbol>
+  <symbol id="m5-halflid" viewBox="0 0 24 24">
+    <path fill="currentColor" fill-rule="evenodd" d="M12 3.6a6.4 6.4 0 1 0 0 12.8 6.4 6.4 0 0 0 0-12.8Zm0 2.7a3.7 3.7 0 1 1 0 7.4 3.7 3.7 0 0 1 0-7.4Z"/>
+    <path fill="currentColor" d="M8.54 8.7A3.7 3.7 0 0 1 15.46 8.7Z"/>
+    <path fill="currentColor" fill-rule="evenodd" d="M12 8.8a1.6 1.6 0 1 0 0 3.2 1.6 1.6 0 0 0 0-3.2Zm-.65.42a.5.5 0 1 1 0 1 .5.5 0 0 1 0-1Z"/>
+    <path stroke="currentColor" stroke-width="2.8" stroke-linecap="round" fill="none" d="M16.4 14.0C17.9 16.6 17.3 19.6 14.3 20.5 13 20.9 11.8 20.6 11 19.9"/>
+  </symbol>
+  <symbol id="m5-heavytail" viewBox="0 0 24 24">
+    <path fill="currentColor" fill-rule="evenodd" d="M12 3.6a6.4 6.4 0 1 0 0 12.8 6.4 6.4 0 0 0 0-12.8Zm0 2.7a3.7 3.7 0 1 1 0 7.4 3.7 3.7 0 0 1 0-7.4Z"/>
+    <path fill="currentColor" fill-rule="evenodd" d="M12 8.3a1.7 1.7 0 1 0 0 3.4 1.7 1.7 0 0 0 0-3.4Zm-.7.45a.55.55 0 1 1 0 1.1.55.55 0 0 1 0-1.1Z"/>
+    <path stroke="currentColor" stroke-width="3.4" stroke-linecap="round" fill="none" d="M16.3 14.2C17.7 16.7 17.1 19.4 14.4 20.3 13.2 20.7 12.1 20.5 11.4 19.9"/>
+  </symbol>
+  <symbol id="m5-onehorn" viewBox="0 0 24 24">
+    <path fill="currentColor" fill-rule="evenodd" d="M12 3.6a6.4 6.4 0 1 0 0 12.8 6.4 6.4 0 0 0 0-12.8Zm0 2.7a3.7 3.7 0 1 1 0 7.4 3.7 3.7 0 0 1 0-7.4Z"/>
+    <path fill="currentColor" fill-rule="evenodd" d="M12 8.3a1.7 1.7 0 1 0 0 3.4 1.7 1.7 0 0 0 0-3.4Zm-.7.45a.55.55 0 1 1 0 1.1.55.55 0 0 1 0-1.1Z"/>
+    <path fill="currentColor" d="M9.7 5.9C8.2 5.0 7.2 3.4 7.0 1.1 9.0 2.0 10.3 3.6 10.9 5.6 10.5 5.65 10.1 5.75 9.7 5.9Z"/>
+    <path stroke="currentColor" stroke-width="2.8" stroke-linecap="round" fill="none" d="M16.4 14.0C17.9 16.6 17.3 19.6 14.3 20.5 13 20.9 11.8 20.6 11 19.9"/>
+  </symbol>
+  <!-- round four: the living glyph (eye-as-counter) -->
+  <symbol id="m4-glyphg" viewBox="0 0 24 24">
+    <path fill="currentColor" fill-rule="evenodd" d="M12 3.6a6.4 6.4 0 1 0 0 12.8 6.4 6.4 0 0 0 0-12.8Zm0 2.7a3.7 3.7 0 1 1 0 7.4 3.7 3.7 0 0 1 0-7.4Z"/>
+    <path fill="currentColor" fill-rule="evenodd" d="M12 8.3a1.7 1.7 0 1 0 0 3.4 1.7 1.7 0 0 0 0-3.4Zm-.7.45a.55.55 0 1 1 0 1.1.55.55 0 0 1 0-1.1Z"/>
+    <path stroke="currentColor" stroke-width="2.8" stroke-linecap="round" fill="none" d="M16.4 14.0C17.9 16.6 17.3 19.6 14.3 20.5 13 20.9 11.8 20.6 11 19.9"/>
+  </symbol>
+  <symbol id="m4-glyphcap" viewBox="0 0 24 24">
+    <path stroke="currentColor" stroke-width="3.2" stroke-linecap="round" fill="none" d="M16.6 6.6A7 7 0 1 0 19 12.6L14.6 12.6"/>
+    <path fill="currentColor" fill-rule="evenodd" d="M11.6 9.8a2 2 0 1 0 0 4 2 2 0 0 0 0-4Zm-.8.5a.6.6 0 1 1 0 1.2.6.6 0 0 1 0-1.2Z"/>
+  </symbol>
+  <symbol id="m4-wardenawake" viewBox="0 0 24 24">
+    <path fill="currentColor" fill-rule="evenodd" d="M12 3.6a6.4 6.4 0 1 0 0 12.8 6.4 6.4 0 0 0 0-12.8Zm0 2.9a3.5 3.5 0 1 1 0 7 3.5 3.5 0 0 1 0-7Z"/>
+    <path fill="currentColor" fill-rule="evenodd" d="M12 8.4a1.6 1.6 0 1 0 0 3.2 1.6 1.6 0 0 0 0-3.2Zm-.65.4a.5.5 0 1 1 0 1 .5.5 0 0 1 0-1Z"/>
+    <path fill="currentColor" d="M9.7 5.9C8.2 5.0 7.2 3.4 7.0 1.1 9.0 2.0 10.3 3.6 10.9 5.6 10.5 5.65 10.1 5.75 9.7 5.9Z"/>
+    <path fill="currentColor" d="M14.3 5.9C15.8 5.0 16.8 3.4 17.0 1.1 15.0 2.0 13.7 3.6 13.1 5.6 13.5 5.65 13.9 5.75 14.3 5.9Z"/>
+    <path stroke="currentColor" stroke-width="2.7" stroke-linecap="round" fill="none" d="M16.3 14.3C17.7 16.7 17.3 19.4 14.7 20.4 13.6 20.8 12.6 20.7 11.9 20.3"/>
+    <path stroke="currentColor" stroke-width="2.3" stroke-linecap="round" fill="none" d="M8.5 15.1C7.3 16.4 7.0 18.2 8.2 19.6 8.5 19.95 8.9 20.2 9.4 20.3"/>
+  </symbol>
+  <!-- round three: the bead-g × cthulhu × mercury direction -->
+  <symbol id="m3-horned" viewBox="0 0 24 24">
+    <path fill="currentColor" fill-rule="evenodd" d="M12 3a6.6 6.6 0 1 0 0 13.2 6.6 6.6 0 0 0 0-13.2Zm0 3.9a2.7 2.7 0 1 1 0 5.4 2.7 2.7 0 0 1 0-5.4Z"/>
+    <path stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none" d="M9.7 4Q8 3 7.3 1.6M14.3 4Q16 3 16.7 1.6"/>
+    <path stroke="currentColor" stroke-width="3" stroke-linecap="round" fill="none" d="M16.2 14.4c1.6 2.4 1.2 5.2-1.9 6.2-1.5.44-3 .12-4-.8"/>
+    <path stroke="currentColor" stroke-width="2.6" stroke-linecap="round" fill="none" d="M13.2 20.9q-.6 1.3-2 1.5"/>
+  </symbol>
+  <symbol id="m3-deep" viewBox="0 0 24 24">
+    <path fill="currentColor" fill-rule="evenodd" d="M12 3a6.6 6.6 0 1 0 0 13.2 6.6 6.6 0 0 0 0-13.2Zm0 3.9a2.7 2.7 0 1 1 0 5.4 2.7 2.7 0 0 1 0-5.4Z"/>
+    <path stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none" d="M7 2.2Q12 5.4 17 2.2"/>
+    <path stroke="currentColor" stroke-width="3" stroke-linecap="round" fill="none" d="M16.2 14.4c1.6 2.4 1.2 5.2-1.9 6.2-1.7.5-3.4 0-4.3-1.1"/>
+    <path stroke="currentColor" stroke-width="2.3" stroke-linecap="round" fill="none" d="M12.2 16.2c-.2 2-.6 3.4-1.9 4.2"/>
+  </symbol>
+  <symbol id="m3-imp" viewBox="0 0 24 24">
+    <path fill="currentColor" fill-rule="evenodd" d="M12 3.6a6 6 0 1 0 0 12 6 6 0 0 0 0-12ZM10.4 9.4a2.4 2.4 0 1 0 4.8 0 2.4 2.4 0 1 0-4.8 0Z"/>
+    <path fill="currentColor" d="M13.6 5 15.4 4.8 16.2 2.2ZM8.8 5.2 10.4 4.6 9 2.6Z"/>
+    <path fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" d="M16 14.4C17.6 16.8 17 19.8 13.8 20.6 12 21 10.5 20.3 9.8 19.1M10 15C8.8 16.8 9.4 18.2 8.6 19.6"/>
+  </symbol>
+  <symbol id="m3-warden" viewBox="0 0 24 24">
+    <path fill="currentColor" fill-rule="evenodd" d="M12 3.6a6.4 6.4 0 1 0 0 12.8 6.4 6.4 0 0 0 0-12.8Zm0 3.3a2.6 2.6 0 1 1 0 5.2 2.6 2.6 0 0 1 0-5.2Z"/>
+    <path fill="currentColor" d="M9.7 5.9C8.2 5.0 7.2 3.4 7.0 1.1 9.0 2.0 10.3 3.6 10.9 5.6 10.5 5.65 10.1 5.75 9.7 5.9Z"/>
+    <path fill="currentColor" d="M14.3 5.9C15.8 5.0 16.8 3.4 17.0 1.1 15.0 2.0 13.7 3.6 13.1 5.6 13.5 5.65 13.9 5.75 14.3 5.9Z"/>
+    <path stroke="currentColor" stroke-width="2.7" stroke-linecap="round" fill="none" d="M16.3 14.3C17.7 16.7 17.3 19.4 14.7 20.4 13.6 20.8 12.6 20.7 11.9 20.3"/>
+    <path stroke="currentColor" stroke-width="2.3" stroke-linecap="round" fill="none" d="M8.5 15.1C7.3 16.4 7.0 18.2 8.2 19.6 8.5 19.95 8.9 20.2 9.4 20.3"/>
+  </symbol>
+  <symbol id="m3-familiar" viewBox="0 0 24 24">
+    <path fill="currentColor" fill-rule="evenodd" d="M12 3.6a6 6 0 1 0 0 12 6 6 0 0 0 0-12ZM11.3 8.4a2.2 2.2 0 1 0 4.4 0 2.2 2.2 0 1 0-4.4 0Z"/>
+    <path fill="currentColor" d="M13.8 5 16.6 4.6 17.6 0.6ZM8.4 5.2 10.6 4.4 8 1.4Z"/>
+    <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M9.2 14.8C8 17 9.6 18.4 8.4 20.4M12 15.6C12.8 17.6 11.4 19.2 12.4 21.6M15 14.6C16.4 16 15.2 17.8 17 19"/>
+  </symbol>
+  <symbol id="m3-hermes" viewBox="0 0 24 24">
+    <path fill="currentColor" fill-rule="evenodd" d="M12 3.8A5.6 5.6 0 1 0 12 15 5.6 5.6 0 1 0 12 3.8ZM12 6.8A2.6 2.6 0 1 0 12 12 2.6 2.6 0 1 0 12 6.8Z"/>
+    <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M8 2.6Q12 4.9 16 2.6"/>
+    <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M13.8 14.4C15.4 17 14.6 20.6 11 21.1 9.2 21.35 8 20.5 7.6 19.5"/>
+    <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M12.3 17.2 16.3 17.2"/>
+  </symbol>
+  <symbol id="m3-grimoire" viewBox="0 0 24 24">
+    <path fill="currentColor" fill-rule="evenodd" d="M12 3.8A5.6 5.6 0 1 0 12 15 5.6 5.6 0 1 0 12 3.8ZM12 6.8A2.6 2.6 0 1 0 12 12 2.6 2.6 0 1 0 12 6.8Z"/>
+    <path fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" d="M7 1.9Q12 5.3 17 1.9"/>
+    <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M10.6 14.6C8.1 17 7.6 19.6 9.1 21.6M13.4 14.6C15.9 17 16.4 19.6 14.9 21.6"/>
+  </symbol>
+  <!-- round two -->
+  <symbol id="m2-watch" viewBox="0 0 24 24">
+    <path fill="currentColor" fill-rule="evenodd" d="M4.5 9 C4.5 5.5 5 3 6.5 3 C7.8 3 8.4 4.6 8.6 5.6 C9.4 4.7 10.6 4.2 12 4.2 C13.4 4.2 14.6 4.7 15.4 5.6 C15.6 4.6 16.2 3 17.5 3 C19 3 19.5 5.5 19.5 9 C19.5 15.5 16.5 20.5 12 20.5 C7.5 20.5 4.5 15.5 4.5 9 Z M7.1 10.2 a2.1 2.1 0 1 0 4.2 0 a2.1 2.1 0 1 0 -4.2 0 Z M12.7 10.2 a2.1 2.1 0 1 0 4.2 0 a2.1 2.1 0 1 0 -4.2 0 Z"/>
+  </symbol>
+  <symbol id="m2-watch-full" viewBox="0 0 24 24">
+    <path fill="currentColor" fill-rule="evenodd" d="M4.5 9 C4.5 5.5 5 3 6.5 3 C7.8 3 8.4 4.6 8.6 5.6 C9.4 4.7 10.6 4.2 12 4.2 C13.4 4.2 14.6 4.7 15.4 5.6 C15.6 4.6 16.2 3 17.5 3 C19 3 19.5 5.5 19.5 9 C19.5 15.5 16.5 20.5 12 20.5 C7.5 20.5 4.5 15.5 4.5 9 Z M7.1 10.2 a2.1 2.1 0 1 0 4.2 0 a2.1 2.1 0 1 0 -4.2 0 Z M12.7 10.2 a2.1 2.1 0 1 0 4.2 0 a2.1 2.1 0 1 0 -4.2 0 Z"/>
+    <circle fill="currentColor" cx="9.2" cy="10.2" r="0.9"/>
+    <circle fill="currentColor" cx="14.8" cy="10.2" r="0.9"/>
+    <path fill="currentColor" d="M12 11.6 L13 13 L11 13 Z"/>
+  </symbol>
+  <symbol id="m2-sweep" viewBox="0 0 24 24">
+    <path fill="currentColor" fill-opacity="0.55" d="M13 6.5 L22 3.5 L22 10 Z"/>
+    <path fill="currentColor" d="M12 2.4 C10.6 2.4 10.2 4 11 4.6 L11 5.2 L8.6 5.2 L9.4 6.8 L14.6 6.8 L15.4 5.2 L13 5.2 L13 4.6 C13.8 4 13.4 2.4 12 2.4 Z M10 8 L14 8 L16.2 21.2 L7.8 21.2 Z"/>
+  </symbol>
+  <symbol id="m2-keeper" viewBox="0 0 13 13">
+    <g fill="currentColor" shape-rendering="crispEdges">
+      <rect x="6" y="0" width="1" height="1"/>
+      <rect x="5" y="1" width="3" height="1"/>
+      <rect x="4" y="2" width="5" height="1"/>
+      <rect x="5" y="3" width="3" height="4"/>
+      <rect x="4" y="7" width="5" height="2"/>
+      <rect x="2" y="9" width="9" height="1"/>
+      <rect x="1" y="10" width="11" height="1"/>
+      <g fill-opacity="0.45">
+        <rect x="4" y="1" width="1" height="1"/><rect x="8" y="1" width="1" height="1"/>
+        <rect x="0" y="11" width="1" height="1"/><rect x="2" y="11" width="1" height="1"/><rect x="4" y="11" width="1" height="1"/><rect x="6" y="11" width="1" height="1"/><rect x="8" y="11" width="1" height="1"/><rect x="10" y="11" width="1" height="1"/><rect x="12" y="11" width="1" height="1"/>
+        <rect x="1" y="12" width="1" height="1"/><rect x="3" y="12" width="1" height="1"/><rect x="5" y="12" width="1" height="1"/><rect x="7" y="12" width="1" height="1"/><rect x="9" y="12" width="1" height="1"/><rect x="11" y="12" width="1" height="1"/>
+      </g>
+    </g>
+  </symbol>
+  <symbol id="m2-door" viewBox="0 0 13 13">
+    <g fill="currentColor" shape-rendering="crispEdges">
+      <rect x="6" y="0" width="1" height="1"/>
+      <rect x="5" y="1" width="3" height="1"/>
+      <rect x="4" y="2" width="5" height="1"/>
+      <rect x="3" y="3" width="7" height="1"/>
+      <rect x="2" y="4" width="9" height="1"/>
+      <rect x="3" y="5" width="7" height="1"/>
+      <rect x="3" y="6" width="1" height="1"/><rect x="5" y="6" width="3" height="1"/><rect x="9" y="6" width="1" height="1"/>
+      <rect x="3" y="7" width="7" height="1"/>
+      <rect x="3" y="8" width="3" height="1"/><rect x="7" y="8" width="3" height="1"/>
+      <rect x="3" y="9" width="3" height="1"/><rect x="7" y="9" width="3" height="1"/>
+      <g fill-opacity="0.45">
+        <rect x="4" y="6" width="1" height="1"/><rect x="8" y="6" width="1" height="1"/>
+      </g>
+    </g>
+  </symbol>
+  <symbol id="m2-quill" viewBox="0 0 24 24">
+    <g fill="currentColor" transform="translate(1.7,0) skewX(-7)">
+      <path fill-rule="evenodd" d="M11 3.9C13.98 3.9 16.4 6.18 16.4 9 16.4 11.82 13.98 14.1 11 14.1 8.02 14.1 5.6 11.82 5.6 9 5.6 6.18 8.02 3.9 11 3.9ZM11.4 5.6C13.17 5.6 14.6 6.94 14.6 8.6 14.6 10.26 13.17 11.6 11.4 11.6 9.63 11.6 8.2 10.26 8.2 8.6 8.2 6.94 9.63 5.6 11.4 5.6Z"/>
+      <path d="M15.3 11.5C16.7 14 16.6 17 15.1 19.2 13.9 20.9 11.6 21.7 9.2 21.2 11.1 21 12.8 20 13.4 18.1 14.2 15.9 13.9 13.4 12.9 11.6Z"/>
+    </g>
+  </symbol>
+  <symbol id="m2-inkwell" viewBox="0 0 24 24">
+    <path fill="currentColor" fill-rule="evenodd" d="M10 3.4C12.76 3.4 15 5.46 15 8 15 10.54 12.76 12.6 10 12.6 7.24 12.6 5 10.54 5 8 5 5.46 7.24 3.4 10 3.4ZM10 5.3C11.71 5.3 13.1 6.6 13.1 8.2 13.1 9.8 11.71 11.1 10 11.1 8.29 11.1 6.9 9.8 6.9 8.2 6.9 6.6 8.29 5.3 10 5.3Z"/>
+    <path fill="currentColor" d="M14.3 9.8C15.1 12.8 15.1 16 13.9 18.4 13.1 20 11.6 20.9 9.9 20.7 11 20.3 12 19.8 12.5 18.2 13.1 16 13.1 12.9 12.6 10.3ZM9.4 18.9C10.23 18.9 10.9 19.57 10.9 20.4 10.9 21.23 10.23 21.9 9.4 21.9 8.57 21.9 7.9 21.23 7.9 20.4 7.9 19.57 8.57 18.9 9.4 18.9Z"/>
+  </symbol>
+  <symbol id="mext-wifi" viewBox="0 0 24 24">
+    <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M3 9.5C8 4.8 16 4.8 21 9.5M6.2 13C9.6 9.9 14.4 9.9 17.8 13M9.4 16.4c1.5-1.3 3.7-1.3 5.2 0"/>
+    <circle cx="12" cy="19.4" r="1.6" fill="currentColor"/>
+  </symbol>
+  <symbol id="mext-batt" viewBox="0 0 24 24">
+    <rect x="2" y="8" width="17" height="8" rx="2.4" fill="none" stroke="currentColor" stroke-width="1.6"/>
+    <rect x="4" y="10" width="10" height="4" rx="1" fill="currentColor"/>
+    <path d="M21 10.6v2.8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+  </symbol>
+</svg>
+
+<div class="wrap">
+  <header class="lead">
+    <h1>The mark &amp; the settings surface</h1>
+    <p>Two threads from today's dogfood conversation. <b>Thread one:</b> the pill's loading state — currently a dim,
+      claim-free dot — becomes the app's mark, and that same mark is githud's logo in the menu bar and beyond. Loading
+      is the one state with nothing true to display, so identity is the honest filler; the island header already does
+      this with the bare "githud" wordmark. <b>Thread two:</b> whether settings deserve real UI — an island settings
+      card — or a properly-built pop menu.</p>
+    <p class="doctrine-note">Every mark below is shown at its <em>real first job</em>: ~13px of monochrome ink inside
+      the menu-bar pill, both appearances, beside real menu-bar neighbors. A mark that only works at 128px fails the
+      brief. Marks are template images — <em>ink only, never color</em>.</p>
+  </header>
+
+  <section id="unconfirmed-marks">
+    <p class="eyebrow">Thread 1 · the g takes the bar — constant mark, working eye (2026-07-22)</p>
+    <h2>The g stands in the menu bar; its eye does the states</h2>
+    <p class="qsub">Your call: <i>"i still want the g glyph in menu bar; on the bubble we could have a probing eye for
+      loading etc."</i> So the proposal grows: the Glyphling g replaces the arcs instrument as the bar's <b>constant
+      mark</b> — identity always standing — and every clear-family state expresses through its <b>eye</b>. The pupil
+      is the checking: dilated while it probes, sidelong while unconfirmed, and it <b>departs</b> when every source
+      confirms — the 0ms same-mark flip the A2 tests already pin. Count text keeps carrying action; the shield still
+      supersedes everything for a critical (the one emergency the identity yields to); degraded's dashed arcs return
+      as flanking chrome around the g. The bubble keeps the full waking creature for loading, exactly as landed.</p>
+    <div class="mgrid">
+      <div class="mcard" style="grid-column: 1 / -1"><div class="mhead"><span class="mid">bar</span><h3>The g's five states, 18pt geometry</h3><span class="angle">runner · fable · render-verified</span></div>
+        <div class="mbody">
+          <div class="stage" style="background:#f4f4f6; gap:30px; padding:22px 16px; flex-wrap:wrap">
+            <svg viewBox="0 0 18 18" style="width:54px;height:54px;color:#1a2129">
+              <path fill="currentColor" fill-rule="evenodd" d="M9 2.7a4.8 4.8 0 1 0 0 9.6 4.8 4.8 0 0 0 0-9.6Zm0 2.02a2.78 2.78 0 1 1 0 5.56 2.78 2.78 0 0 1 0-5.56Z"/>
+              <circle cx="9" cy="7.5" r="1.7" fill="currentColor"/>
+              <path stroke="currentColor" stroke-width="2.1" stroke-linecap="round" fill="none" d="M12.3 10.5C13.4 12.45 12.98 14.7 10.7 15.4 9.75 15.7 8.85 15.45 8.25 14.9"/>
+            </svg>
+            <svg viewBox="0 0 18 18" style="width:54px;height:54px;color:#1a2129">
+              <path fill="currentColor" fill-rule="evenodd" d="M9 2.7a4.8 4.8 0 1 0 0 9.6 4.8 4.8 0 0 0 0-9.6Zm0 2.02a2.78 2.78 0 1 1 0 5.56 2.78 2.78 0 0 1 0-5.56Z"/>
+              <circle cx="9.65" cy="6.85" r="1.45" fill="currentColor"/>
+              <path stroke="currentColor" stroke-width="2.1" stroke-linecap="round" fill="none" d="M12.3 10.5C13.4 12.45 12.98 14.7 10.7 15.4 9.75 15.7 8.85 15.45 8.25 14.9"/>
+            </svg>
+            <svg viewBox="0 0 18 18" style="width:54px;height:54px;color:#1a2129">
+              <path fill="currentColor" fill-rule="evenodd" d="M9 2.7a4.8 4.8 0 1 0 0 9.6 4.8 4.8 0 0 0 0-9.6Zm0 2.02a2.78 2.78 0 1 1 0 5.56 2.78 2.78 0 0 1 0-5.56Z"/>
+              <path fill="currentColor" d="M6.4 6.525A2.78 2.78 0 0 1 11.6 6.525Z"/>
+              <circle cx="9" cy="8.35" r="1.2" fill="currentColor"/>
+              <path stroke="currentColor" stroke-width="2.1" stroke-linecap="round" fill="none" d="M12.3 10.5C13.4 12.45 12.98 14.7 10.7 15.4 9.75 15.7 8.85 15.45 8.25 14.9"/>
+            </svg>
+            <span style="display:inline-flex; align-items:center; gap:4px">
+              <svg viewBox="0 0 18 18" style="width:54px;height:54px;color:#1a2129">
+                <path fill="currentColor" fill-rule="evenodd" d="M9 2.7a4.8 4.8 0 1 0 0 9.6 4.8 4.8 0 0 0 0-9.6Zm0 2.02a2.78 2.78 0 1 1 0 5.56 2.78 2.78 0 0 1 0-5.56Z"/>
+                <circle cx="9" cy="7.5" r="1.45" fill="currentColor"/>
+                <path stroke="currentColor" stroke-width="2.1" stroke-linecap="round" fill="none" d="M12.3 10.5C13.4 12.45 12.98 14.7 10.7 15.4 9.75 15.7 8.85 15.45 8.25 14.9"/>
+              </svg>
+              <span style="font:600 28px -apple-system, sans-serif; color:#1a2129">3</span>
+            </span>
+            <svg viewBox="0 0 18 18" style="width:54px;height:54px;color:#1a2129">
+              <g stroke="currentColor" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-dasharray="2.1 1.5">
+                <path d="M 2.9 12.4 A 5.5 5.5 0 0 1 2.9 5.6"/>
+                <path d="M 15.1 5.6 A 5.5 5.5 0 0 1 15.1 12.4"/>
+              </g>
+              <path fill="currentColor" fill-rule="evenodd" d="M9 2.7a4.8 4.8 0 1 0 0 9.6 4.8 4.8 0 0 0 0-9.6Zm0 2.02a2.78 2.78 0 1 1 0 5.56 2.78 2.78 0 0 1 0-5.56Z"/>
+              <path stroke="currentColor" stroke-width="2.1" stroke-linecap="round" fill="none" d="M12.3 10.5C13.4 12.45 12.98 14.7 10.7 15.4 9.75 15.7 8.85 15.45 8.25 14.9"/>
+            </svg>
+          </div>
+          <p class="mtext">Left to right: <b>loading</b> — dilated pupil, probing · <b>unconfirmed clear</b> — sidelong
+            pupil, still looking · <b>confirmed clear</b> — <b>the half-lid comes down</b>, the pupil settles: at ease,
+            done looking (the pack's own at-ease face — identical anatomy to the app icon's, so the creature is one
+            being across surfaces) · <b>action</b> — pupil locked, the count text does the counting (count shows only
+            for action, so the text's presence separates it from loading structurally) · <b>degraded</b> — the dashed
+            arcs return as flanking chrome, composing over any state, same rule as the shield's. <b>Critical stays the
+            shield</b>, superseding the g entirely. With this, the gesture pack IS the state vocabulary: probing →
+            noticing → at ease, all three ratified gestures, each on the state where it is true.</p>
+          <p class="mweak"><b>Honest risks:</b> the g at 18pt is denser than the arcs instrument — the sclera annulus
+            runs ~1.2pt and needs Retina to breathe (non-Retina bars will read the eye states coarsely); loading vs
+            action share a centered pupil, disambiguated by size + the count text; and this retires an audited
+            instrument — the arcs' degraded/critical composition rules carry over, but the swap deserves the full
+            panel, not a focused pass.</p>
+        </div>
+      </div>
+      <div class="mcard"><div class="mhead"><span class="mid">bubble</span><h3>How the eye works in the pill</h3></div>
+        <div class="mbody">
+          <p class="mtext">The pill is the <b>reading</b>, so the eye appears only where githud hasn't finished
+            reading — never over facts. The ladder: <b>loading</b> = the full waking creature (landed, c4f4209) ·
+            <b>unconfirmed clear</b> = the <b>eye alone</b> — iris ring + sidelong night pupil, no bowl, no tail —
+            width-matched to the check so the flip moves nothing · <b>confirmed clear</b> = the earned <b>✓</b>,
+            unchanged (the check stays the check: on the pill the claim is the fact, and the ✓ is its ratified form) ·
+            every fact state (radar counts, the tray queue, the gauge, the shield) keeps its instrument glyph, no eye
+            ever. Family grammar: full creature = taking its first look; eye alone = still looking; ✓ = looked
+            everywhere, earned.</p>
+          <p class="mweak"><b>On "probing" as motion:</b> a static probing eye ships; an animated wander during
+            loading would be honest (real work in progress) but needs a timer — the idle-footprint doctrine's one
+            hard currency. Recorded as a separately-ratifiable option, not bundled. And the two surfaces deliberately
+            diverge at confirmed: the bar's constant mark rests (half-lid); the pill's reading concludes (✓) — the
+            creature is the watcher, the pill is what it read.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="gesture-pack">
+    <p class="eyebrow">Thread 1 · the gesture pack — cuts 2 · 3 · 4 as one system</p>
+    <h2>One creature, three true moments</h2>
+    <p class="qsub">Your read: 2, 3, 4 cohere. They do — because they vary only the <b>gesture</b>, never the anatomy:
+      the same bowl, tail, and eye, dilating → glancing → settling. That makes a mark <i>system</i>, and doctrine
+      shapes the mapping: each face belongs to a moment where it is true, never decoration.</p>
+    <div class="mgrid">
+      <div class="mcard"><div class="mhead"><span class="mid">waking</span><h3>Night pupil → the loading pill</h3></div>
+        <div class="mbody">
+          <div class="mhero">
+            <svg class="big"><use href="#m5-night"/></svg>
+            <div class="icon li"><svg><use href="#m5-night"/></svg></div>
+            <div class="icon da"><svg><use href="#m5-night"/></svg></div>
+          </div>
+          <div class="strip dark"><svg class="mext"><use href="#mext-wifi"/></svg><svg class="mext"><use href="#mext-batt"/></svg><span class="mpill"><svg><use href="#m5-night"/></svg></span><span class="spring"></span><span class="clock">Thu 09:41</span></div>
+          <p class="mtext">Dark-adapted, taking its first look — the pill's pre-first-poll state, the only claim-free
+            moment on the bar. <b>This is the menu-bar mark</b>; it disappears the instant a real reading arrives.</p>
+        </div>
+      </div>
+      <div class="mcard"><div class="mhead"><span class="mid">noticing</span><h3>Sidelong → the outward face</h3></div>
+        <div class="mbody">
+          <div class="mhero">
+            <svg class="big"><use href="#m5-sidelong"/></svg>
+            <div class="icon li"><svg><use href="#m5-sidelong"/></svg></div>
+            <div class="icon da"><svg><use href="#m5-sidelong"/></svg></div>
+          </div>
+          <p class="mtext">The glance is for surfaces that face a <i>reader</i>: README header, social cards, the
+            welcome card's greeting. It looks at you — the right register for the one surface whose job is to meet
+            someone.</p>
+        </div>
+      </div>
+      <div class="mcard"><div class="mhead"><span class="mid">at ease</span><h3>Half-lid → the app icon</h3></div>
+        <div class="mbody">
+          <div class="mhero">
+            <svg class="big"><use href="#m5-halflid"/></svg>
+            <div class="icon li"><svg><use href="#m5-halflid"/></svg></div>
+            <div class="icon da"><svg><use href="#m5-halflid"/></svg></div>
+          </div>
+          <p class="mtext">Calm at rest in the Dock and Finder — unbothered <i>because</i> it's watching so you don't
+            have to. The icon is the only surface where "settled" is the honest daily state.</p>
+        </div>
+      </div>
+    </div>
+    <div class="mcard" style="margin-top:18px">
+      <div class="mhead"><span class="mid">live</span><h3>The web face — it follows your cursor</h3><span class="angle">try it</span></div>
+      <div class="mbody">
+        <div class="stage" style="padding:26px 16px; background:#10141a">
+          <svg id="demo-eye" viewBox="0 0 24 24" style="width:120px;height:120px;color:#e7edf4">
+            <path fill="currentColor" fill-rule="evenodd" d="M12 3.6a6.4 6.4 0 1 0 0 12.8 6.4 6.4 0 0 0 0-12.8Zm0 2.7a3.7 3.7 0 1 1 0 7.4 3.7 3.7 0 0 1 0-7.4Z"/>
+            <g id="demo-pupil">
+              <circle cx="12" cy="10" r="1.9" fill="currentColor"/>
+              <circle id="demo-dot" cx="11.25" cy="9.3" r=".58" fill="#10141a"/>
+            </g>
+            <path stroke="currentColor" stroke-width="2.8" stroke-linecap="round" fill="none" d="M16.4 14.0C17.9 16.6 17.3 19.6 14.3 20.5 13 20.9 11.8 20.6 11 19.9"/>
+          </svg>
+        </div>
+        <p class="mtext">Move your cursor — the <b>iris</b> (light disc) shifts toward it, and the <b>dot slides
+          across the iris in the same direction, leading the gaze</b>: when the eye looks bottom-right, the dot rides
+          the bottom-right edge, aimed at you. The dot is the seeing part (ratified, two corrections deep). This is
+          the <b>landing page</b> treatment: motion mapped 1:1 to the visitor's own hand. Not possible in a GitHub
+          README — GitHub strips every script — so the README gets the printed sidelong face, as mapped. (Honors
+          Reduce Motion: the eye stays put.)</p>
+      </div>
+    </div>
+
+    <div class="mech">
+      <h3>What the pack rules out, on purpose</h3>
+      <ul>
+        <li>No gesture ever plays <b>inside</b> live pill states — radar/gauge/check keep their ratified glyph
+          vocabulary; the creature appears only where identity is the honest content (loading, icon, reader-facing).</li>
+        <li>No animated blinking/idle motion — the doctrine stands; the only candidate motion remains the loading
+          pulse, mapped to real polls.</li>
+        <li>The three gestures never mix on one surface: one face per home, so the creature reads as one being seen at
+          different hours, not a sticker set.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section id="marks-r5">
+    <p class="eyebrow">Round five — Glyphling g, fine cuts (2·3·4 adopted as the gesture pack above)</p>
+    <h2>Six subtle variations on the one you liked</h2>
+    <p class="qsub">The base is round four's <b>Glyphling g</b>
+      <span class="strip light" style="display:inline-flex; vertical-align:middle; height:22px; gap:8px; margin:0 4px;">
+        <span class="mpill"><svg style="width:13px;height:13px"><use href="#m4-glyphg"/></svg></span></span> —
+      each cut below changes exactly one thing, so what you're choosing is a single trait: eye size, pupil size, gaze,
+      lid, limb weight, or one whisper of the horn. All render-verified; all identical physics.</p>
+
+    <div class="mgrid">
+      <div class="mcard"><div class="mhead"><span class="mid">1</span><h3>Wide-eyed</h3><span class="angle">bigger sclera</span></div>
+        <div class="mbody">
+          <div class="mhero">
+            <svg class="big"><use href="#m5-wide"/></svg>
+            <div class="icon li"><svg><use href="#m5-wide"/></svg></div>
+            <div class="icon da"><svg><use href="#m5-wide"/></svg></div>
+          </div>
+          <div class="strip light"><svg class="mext"><use href="#mext-wifi"/></svg><svg class="mext"><use href="#mext-batt"/></svg><span class="mpill"><svg><use href="#m5-wide"/></svg></span><span class="spring"></span><span class="clock">Thu 09:41</span></div>
+          <div class="strip dark"><svg class="mext"><use href="#mext-wifi"/></svg><svg class="mext"><use href="#mext-batt"/></svg><span class="mpill"><svg><use href="#m5-wide"/></svg></span><span class="spring"></span><span class="clock">Thu 09:41</span></div>
+          <p class="mtext">Sclera up from 3.7 to 4.1, bowl wall thinner — the most alert and the closest to your
+            reference's eye-dominant proportion.</p>
+          <p class="mweak"><b>Trade:</b> the thinner wall is the first thing to soften at 13px.</p>
+        </div>
+      </div>
+
+      <div class="mcard"><div class="mhead"><span class="mid">2</span><h3>Night pupil</h3><span class="angle">dilated</span></div>
+        <div class="mbody">
+          <div class="mhero">
+            <svg class="big"><use href="#m5-night"/></svg>
+            <div class="icon li"><svg><use href="#m5-night"/></svg></div>
+            <div class="icon da"><svg><use href="#m5-night"/></svg></div>
+          </div>
+          <div class="strip light"><svg class="mext"><use href="#mext-wifi"/></svg><svg class="mext"><use href="#mext-batt"/></svg><span class="mpill"><svg><use href="#m5-night"/></svg></span><span class="spring"></span><span class="clock">Thu 09:41</span></div>
+          <div class="strip dark"><svg class="mext"><use href="#mext-wifi"/></svg><svg class="mext"><use href="#mext-batt"/></svg><span class="mpill"><svg><use href="#m5-night"/></svg></span><span class="spring"></span><span class="clock">Thu 09:41</span></div>
+          <p class="mtext">Pupil up from 1.7 to 2.1 — dark-adapted, the night watch's eye. Friendlier and softer than
+            the base's steady stare.</p>
+          <p class="mweak"><b>Trade:</b> the sclera ring thins toward ~0.9px at bar size.</p>
+        </div>
+      </div>
+
+      <div class="mcard"><div class="mhead"><span class="mid">3</span><h3>Sidelong</h3><span class="angle">gaze offset</span></div>
+        <div class="mbody">
+          <div class="mhero">
+            <svg class="big"><use href="#m5-sidelong"/></svg>
+            <div class="icon li"><svg><use href="#m5-sidelong"/></svg></div>
+            <div class="icon da"><svg><use href="#m5-sidelong"/></svg></div>
+          </div>
+          <div class="strip light"><svg class="mext"><use href="#mext-wifi"/></svg><svg class="mext"><use href="#mext-batt"/></svg><span class="mpill"><svg><use href="#m5-sidelong"/></svg></span><span class="spring"></span><span class="clock">Thu 09:41</span></div>
+          <div class="strip dark"><svg class="mext"><use href="#mext-wifi"/></svg><svg class="mext"><use href="#mext-batt"/></svg><span class="mpill"><svg><use href="#m5-sidelong"/></svg></span><span class="spring"></span><span class="clock">Thu 09:41</span></div>
+          <p class="mtext">Pupil glances up-and-right — toward the rest of your menu bar, as it happens. The offset is
+            what makes a drawn eye feel <b>inhabited</b> rather than printed.</p>
+          <p class="mweak"><b>Trade:</b> a directional gaze is a stronger personality commitment; some will ask what
+            it's looking at.</p>
+        </div>
+      </div>
+
+      <div class="mcard"><div class="mhead"><span class="mid">4</span><h3>Half-lid</h3><span class="angle">calm lid</span></div>
+        <div class="mbody">
+          <div class="mhero">
+            <svg class="big"><use href="#m5-halflid"/></svg>
+            <div class="icon li"><svg><use href="#m5-halflid"/></svg></div>
+            <div class="icon da"><svg><use href="#m5-halflid"/></svg></div>
+          </div>
+          <div class="strip light"><svg class="mext"><use href="#mext-wifi"/></svg><svg class="mext"><use href="#mext-batt"/></svg><span class="mpill"><svg><use href="#m5-halflid"/></svg></span><span class="spring"></span><span class="clock">Thu 09:41</span></div>
+          <div class="strip dark"><svg class="mext"><use href="#mext-wifi"/></svg><svg class="mext"><use href="#mext-batt"/></svg><span class="mpill"><svg><use href="#m5-halflid"/></svg></span><span class="spring"></span><span class="clock">Thu 09:41</span></div>
+          <p class="mtext">A lid across the eye's top third — unhurried, unimpressed, exactly the register of a tool
+            whose whole doctrine is <b>calm</b>. The strongest personality-per-pixel of the six.</p>
+          <p class="mweak"><b>Trade:</b> at 13px the lid can read as the eye being partly closed/asleep — arguably
+            wrong for a watcher.</p>
+        </div>
+      </div>
+
+      <div class="mcard"><div class="mhead"><span class="mid">5</span><h3>Heavy tail</h3><span class="angle">limb weight</span></div>
+        <div class="mbody">
+          <div class="mhero">
+            <svg class="big"><use href="#m5-heavytail"/></svg>
+            <div class="icon li"><svg><use href="#m5-heavytail"/></svg></div>
+            <div class="icon da"><svg><use href="#m5-heavytail"/></svg></div>
+          </div>
+          <div class="strip light"><svg class="mext"><use href="#mext-wifi"/></svg><svg class="mext"><use href="#mext-batt"/></svg><span class="mpill"><svg><use href="#m5-heavytail"/></svg></span><span class="spring"></span><span class="clock">Thu 09:41</span></div>
+          <div class="strip dark"><svg class="mext"><use href="#mext-wifi"/></svg><svg class="mext"><use href="#mext-batt"/></svg><span class="mpill"><svg><use href="#m5-heavytail"/></svg></span><span class="spring"></span><span class="clock">Thu 09:41</span></div>
+          <p class="mtext">Tail up from 2.8 to 3.4 and slightly shorter — the limb weight of your reference's chunky
+            strokes. Makes the whole mark read more <b>molded</b>, less written.</p>
+          <p class="mweak"><b>Trade:</b> loses a little of the g's pen-stroke lightness; the tail can crowd the bowl at
+            13px.</p>
+        </div>
+      </div>
+
+      <div class="mcard"><div class="mhead"><span class="mid">6</span><h3>One horn</h3><span class="angle">the whisper</span></div>
+        <div class="mbody">
+          <div class="mhero">
+            <svg class="big"><use href="#m5-onehorn"/></svg>
+            <div class="icon li"><svg><use href="#m5-onehorn"/></svg></div>
+            <div class="icon da"><svg><use href="#m5-onehorn"/></svg></div>
+          </div>
+          <div class="strip light"><svg class="mext"><use href="#mext-wifi"/></svg><svg class="mext"><use href="#mext-batt"/></svg><span class="mpill"><svg><use href="#m5-onehorn"/></svg></span><span class="spring"></span><span class="clock">Thu 09:41</span></div>
+          <div class="strip dark"><svg class="mext"><use href="#mext-wifi"/></svg><svg class="mext"><use href="#mext-batt"/></svg><span class="mpill"><svg><use href="#m5-onehorn"/></svg></span><span class="spring"></span><span class="clock">Thu 09:41</span></div>
+          <p class="mtext">The base plus a single left horn from the Warden — one whisper of the daemon kept, asymmetric
+            on purpose. The eye does the watching; the horn does the remembering.</p>
+          <p class="mweak"><b>Trade:</b> the lone horn can read as a cowlick or a hat at a glance; symmetry-lovers will
+            itch.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="marks-r4">
+    <p class="eyebrow">Round four — the living glyph (base ratified: Glyphling g)</p>
+    <h2>The eye opens: your alphabet-creature reference, G-shaped</h2>
+    <p class="qsub">Your reference: the alphabet-creature whose whole body is a letter and whose counter is a
+      <b>big eye</b> — sclera, pupil, highlight. It translates natively into template ink: solid bowl, knocked-out
+      sclera, ink pupil (the highlight is a knockout inside the pupil, appearing only at scale). Drawn as <b>our own g</b>,
+      not a trace — the letter-with-an-eye is common ground; the specific creature you pasted is Nintendo's, so we
+      take the move, not the body. Three cuts by the runner, each render-verified. All keep 13px physics: at bar
+      size the eye compresses to a donut-and-dot that still reads as a watching eye.</p>
+
+    <div class="mgrid">
+      <!-- R4-1 Glyphling g -->
+      <div class="mcard"><div class="mhead"><span class="mid">1</span><h3>Glyphling g</h3><span class="angle">runner · fable</span></div>
+        <div class="mbody">
+          <div class="mhero">
+            <svg class="big"><use href="#m4-glyphg"/></svg>
+            <div class="icon li"><svg><use href="#m4-glyphg"/></svg></div>
+            <div class="icon da"><svg><use href="#m4-glyphg"/></svg></div>
+            <span class="cap">the clean cut — letter and eye, nothing else</span>
+          </div>
+          <div class="strip light"><svg class="mext"><use href="#mext-wifi"/></svg><svg class="mext"><use href="#mext-batt"/></svg><span class="mpill"><svg><use href="#m4-glyphg"/></svg></span><span class="spring"></span><span class="clock">Tue 09:41</span></div>
+          <div class="strip dark"><svg class="mext"><use href="#mext-wifi"/></svg><svg class="mext"><use href="#mext-batt"/></svg><span class="mpill"><svg><use href="#m4-glyphg"/></svg></span><span class="spring"></span><span class="clock">Tue 09:41</span></div>
+          <p class="mtext">The Bead g with its counter opened wide into the eye — big sclera, centered pupil, a
+            highlight that arrives at icon scale. Unmistakably a g, unmistakably <b>awake</b>: the mark watches, which
+            is the product's whole claim. No horns, no extra limbs — the letter and the eye carry everything.</p>
+          <p class="mweak"><b>Honest weakness:</b> at 13px the sclera thins to a ~1px ring — the eye reads as
+            donut-and-dot; the "watching" fully lands from 16px up.</p>
+        </div>
+      </div>
+
+      <!-- R4-2 Glyphling G -->
+      <div class="mcard"><div class="mhead"><span class="mid">2</span><h3>Glyphling G</h3><span class="angle">runner · fable</span></div>
+        <div class="mbody">
+          <div class="mhero">
+            <svg class="big"><use href="#m4-glyphcap"/></svg>
+            <div class="icon li"><svg><use href="#m4-glyphcap"/></svg></div>
+            <div class="icon da"><svg><use href="#m4-glyphcap"/></svg></div>
+            <span class="cap">uppercase — the pupil floats free in the letter's open middle</span>
+          </div>
+          <div class="strip light"><svg class="mext"><use href="#mext-wifi"/></svg><svg class="mext"><use href="#mext-batt"/></svg><span class="mpill"><svg><use href="#m4-glyphcap"/></svg></span><span class="spring"></span><span class="clock">Tue 09:41</span></div>
+          <div class="strip dark"><svg class="mext"><use href="#mext-wifi"/></svg><svg class="mext"><use href="#mext-batt"/></svg><span class="mpill"><svg><use href="#m4-glyphcap"/></svg></span><span class="spring"></span><span class="clock">Tue 09:41</span></div>
+          <p class="mtext">The uppercase G — ring, gap, inward bar — with the pupil floating in its open middle. The
+            closest composition to your reference (a stroke-letter wrapping an eye), and the boldest silhouette of the
+            three in the bar.</p>
+          <p class="mweak"><b>Honest weakness:</b> the floating pupil can drift toward "copyright symbol" or round-one's
+            Scope at a glance; the bar and pupil crowd each other at 13px.</p>
+        </div>
+      </div>
+
+      <!-- R4-3 The Warden, awake -->
+      <div class="mcard"><div class="mhead"><span class="mid">3</span><h3>The Warden, awake</h3><span class="angle">runner · fable</span></div>
+        <div class="mbody">
+          <div class="mhero">
+            <svg class="big"><use href="#m4-wardenawake"/></svg>
+            <div class="icon li"><svg><use href="#m4-wardenawake"/></svg></div>
+            <div class="icon da"><svg><use href="#m4-wardenawake"/></svg></div>
+            <span class="cap">round three's horns &amp; tentacles, eye opened</span>
+          </div>
+          <div class="strip light"><svg class="mext"><use href="#mext-wifi"/></svg><svg class="mext"><use href="#mext-batt"/></svg><span class="mpill"><svg><use href="#m4-wardenawake"/></svg></span><span class="spring"></span><span class="clock">Tue 09:41</span></div>
+          <div class="strip dark"><svg class="mext"><use href="#mext-wifi"/></svg><svg class="mext"><use href="#mext-batt"/></svg><span class="mpill"><svg><use href="#m4-wardenawake"/></svg></span><span class="spring"></span><span class="clock">Tue 09:41</span></div>
+          <p class="mtext">The full synthesis of everything you've ratified: the Warden's wedge horns and twin
+            tentacles, with the counter opened into the eye. The night-watch daemon complete — horns, limbs, and a
+            gaze. The most character per square unit in the whole session.</p>
+          <p class="mweak"><b>Honest weakness:</b> the busiest mark of the three — at 13px the eye's inner detail and
+            the horns compete; it's the icon/README star that asks the most of the menu bar.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="mech">
+      <h3>Runner's notes on round four</h3>
+      <ul>
+        <li>The eye is doctrine made visible: a mark that <b>watches</b> is the product's claim drawn. And the pupil is
+          an honest loading-pulse candidate (blink on poll — motion mapped to a real event).</li>
+        <li>A workable split, if you want it: <b>Glyphling g</b> in the menu bar (cleanest at 13px), <b>The Warden,
+          awake</b> as the icon/README identity — same skeleton, more character where detail can breathe.</li>
+        <li>IP note, plainly: the letter-with-an-eye move is generic and ours is drawn from our own Bead g; the
+          specific pasted creature (Unown) is Nintendo's and nothing here traces it.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section id="marks-r3">
+    <p class="eyebrow">Round three — the cthulhu turn, kept for comparison</p>
+    <h2>Bead g × cthulhu × Mercury: seven variants on one spectrum</h2>
+    <p class="qsub">Your call: <i>"build on bead g and go a bit cthulhu with tentacles and horns, a bit like mercury
+      sign."</i> Every variant below is the round-one Bead g wearing horns above the bowl (Mercury's crescent) and
+      tentacle descenders where ☿ carries its cross. Arranged as a spectrum — <b>letter-first → creature → sigil</b> —
+      so the real decision is how far toward the otherworld the g leans. Three Opus designers plus one variant by the
+      runner itself. Same physics as every round: 13px first, template ink.</p>
+
+    <div class="mgrid">
+      <!-- R3-1 Horned Bead g -->
+      <div class="mcard"><div class="mhead"><span class="mid">1</span><h3>Horned Bead g</h3><span class="angle">letter-first</span></div>
+        <div class="mbody">
+          <div class="mhero">
+            <svg class="big"><use href="#m3-horned"/></svg>
+            <div class="icon li"><svg><use href="#m3-horned"/></svg></div>
+            <div class="icon da"><svg><use href="#m3-horned"/></svg></div>
+            <span class="cap">≈70 g · 18 mercury · 12 cthulhu</span>
+          </div>
+          <div class="strip light"><svg class="mext"><use href="#mext-wifi"/></svg><svg class="mext"><use href="#mext-batt"/></svg><span class="mpill"><svg><use href="#m3-horned"/></svg></span><span class="spring"></span><span class="clock">Tue 09:41</span></div>
+          <div class="strip dark"><svg class="mext"><use href="#mext-wifi"/></svg><svg class="mext"><use href="#mext-batt"/></svg><span class="mpill"><svg><use href="#m3-horned"/></svg></span><span class="spring"></span><span class="clock">Tue 09:41</span></div>
+          <p class="mtext">The untouched Bead g wearing the smallest honest otherworld: two crescent horn-tips breaking
+            the crown, and the tail forking once into a tentacle-tongue. The reader sees a g; a beat later they see
+            it's a little horned thing — <b>the double-take is the charm</b>.</p>
+          <p class="mweak"><b>Honest weakness:</b> the floating horn-tips can read as antennae or stray specks at 13px
+            until the eye learns them.</p>
+        </div>
+      </div>
+
+      <!-- R3-2 Deep g -->
+      <div class="mcard"><div class="mhead"><span class="mid">2</span><h3>Deep g</h3><span class="angle">letter-first</span></div>
+        <div class="mbody">
+          <div class="mhero">
+            <svg class="big"><use href="#m3-deep"/></svg>
+            <div class="icon li"><svg><use href="#m3-deep"/></svg></div>
+            <div class="icon da"><svg><use href="#m3-deep"/></svg></div>
+            <span class="cap">≈62 g · 22 mercury · 16 cthulhu</span>
+          </div>
+          <div class="strip light"><svg class="mext"><use href="#mext-wifi"/></svg><svg class="mext"><use href="#mext-batt"/></svg><span class="mpill"><svg><use href="#m3-deep"/></svg></span><span class="spring"></span><span class="clock">Tue 09:41</span></div>
+          <div class="strip dark"><svg class="mext"><use href="#mext-wifi"/></svg><svg class="mext"><use href="#mext-batt"/></svg><span class="mpill"><svg><use href="#m3-deep"/></svg></span><span class="spring"></span><span class="clock">Tue 09:41</span></div>
+          <p class="mtext">The full Mercury crescent worn as a <b>helm</b> — one unbroken arc skimming the crown, tips
+            up — and a second shorter tentacle hanging inside the tail's sweep. The most "little sea-god" of the
+            letter-first pair at scale, still parsing as g.</p>
+          <p class="mweak"><b>Honest weakness:</b> the crescent adds mass at the crown (can read as a smudge at 13px)
+            and the twin descenders risk clumping before the eye separates them.</p>
+        </div>
+      </div>
+
+      <!-- R3-3 Mercury's Imp -->
+      <div class="mcard"><div class="mhead"><span class="mid">3</span><h3>Mercury's Imp</h3><span class="angle">creature</span></div>
+        <div class="mbody">
+          <div class="mhero">
+            <svg class="big"><use href="#m3-imp"/></svg>
+            <div class="icon li"><svg><use href="#m3-imp"/></svg></div>
+            <div class="icon da"><svg><use href="#m3-imp"/></svg></div>
+            <span class="cap">g and creature co-equal; ☿ nearly literal</span>
+          </div>
+          <div class="strip light"><svg class="mext"><use href="#mext-wifi"/></svg><svg class="mext"><use href="#mext-batt"/></svg><span class="mpill"><svg><use href="#m3-imp"/></svg></span><span class="spring"></span><span class="clock">Tue 09:41</span></div>
+          <div class="strip dark"><svg class="mext"><use href="#mext-wifi"/></svg><svg class="mext"><use href="#mext-batt"/></svg><span class="mpill"><svg><use href="#m3-imp"/></svg></span><span class="spring"></span><span class="clock">Tue 09:41</span></div>
+          <p class="mtext">A charming imp hiding inside an ordinary letter: the counter doubles as a near-centered
+            <b>watching eye</b>, two small asymmetric horns nick the crown, and the true g-hook gets one opposing-curl
+            sibling. Horns / round / forked tail — the ☿ skeleton, worn casually.</p>
+          <p class="mweak"><b>Honest weakness:</b> subtle enough that at a glance it may read as just a g with a
+            flourish — the creature can be missed entirely at small sizes.</p>
+        </div>
+      </div>
+
+      <!-- R3-4 The Warden -->
+      <div class="mcard"><div class="mhead"><span class="mid">4</span><h3>The Warden</h3><span class="angle">runner · fable</span></div>
+        <div class="mbody">
+          <div class="mhero">
+            <svg class="big"><use href="#m3-warden"/></svg>
+            <div class="icon li"><svg><use href="#m3-warden"/></svg></div>
+            <div class="icon da"><svg><use href="#m3-warden"/></svg></div>
+            <span class="cap">≈60 g · 25 cthulhu · 15 mercury</span>
+          </div>
+          <div class="strip light"><svg class="mext"><use href="#mext-wifi"/></svg><svg class="mext"><use href="#mext-batt"/></svg><span class="mpill"><svg><use href="#m3-warden"/></svg></span><span class="spring"></span><span class="clock">Tue 09:41</span></div>
+          <div class="strip dark"><svg class="mext"><use href="#mext-wifi"/></svg><svg class="mext"><use href="#mext-batt"/></svg><span class="mpill"><svg><use href="#m3-warden"/></svg></span><span class="spring"></span><span class="clock">Tue 09:41</span></div>
+          <p class="mtext">The runner's own cut, render-verified: the horns are <b>filled wedges sunk into the crown</b>
+            (solid like the bowl itself — no floating strokes, so they can't detach at 13px), the counter drifts half a
+            unit up (a quiet face-void that only appears at scale), and the true tail keeps one live sibling with a
+            terminal flick. Horns lean outward — proud, not spooky.</p>
+          <p class="mweak"><b>Honest weakness:</b> the wedge horns merge with the crown into one mass at the smallest
+            sizes — they read as a tufted silhouette (owl-adjacent) before they read as horns; the counter drift is
+            invisible in the bar.</p>
+        </div>
+      </div>
+
+      <!-- R3-5 The Familiar -->
+      <div class="mcard"><div class="mhead"><span class="mid">5</span><h3>The Familiar</h3><span class="angle">creature</span></div>
+        <div class="mbody">
+          <div class="mhero">
+            <svg class="big"><use href="#m3-familiar"/></svg>
+            <div class="icon li"><svg><use href="#m3-familiar"/></svg></div>
+            <div class="icon da"><svg><use href="#m3-familiar"/></svg></div>
+            <span class="cap">creature leads; letter follows</span>
+          </div>
+          <div class="strip light"><svg class="mext"><use href="#mext-wifi"/></svg><svg class="mext"><use href="#mext-batt"/></svg><span class="mpill"><svg><use href="#m3-familiar"/></svg></span><span class="spring"></span><span class="clock">Tue 09:41</span></div>
+          <div class="strip dark"><svg class="mext"><use href="#mext-wifi"/></svg><svg class="mext"><use href="#mext-batt"/></svg><span class="mpill"><svg><use href="#m3-familiar"/></svg></span><span class="spring"></span><span class="clock">Tue 09:41</span></div>
+          <p class="mtext">The night-watch daemon outright: a sly <b>off-center eye</b>, one proud horn and one shy,
+            three tentacles of varied length — asymmetry as animation. The g survives only as a whisper; this is the
+            woodcut-chapbook creature end of the spectrum.</p>
+          <p class="mweak"><b>Honest weakness:</b> at 13px the three tentacles fuse into a dark fringe (insect-leg
+            risk) — it buys the most creature at the highest small-size cost.</p>
+        </div>
+      </div>
+
+      <!-- R3-6 Hermes Hook -->
+      <div class="mcard"><div class="mhead"><span class="mid">6</span><h3>Hermes Hook</h3><span class="angle">sigil</span></div>
+        <div class="mbody">
+          <div class="mhero">
+            <svg class="big"><use href="#m3-hermes"/></svg>
+            <div class="icon li"><svg><use href="#m3-hermes"/></svg></div>
+            <div class="icon da"><svg><use href="#m3-hermes"/></svg></div>
+            <span class="cap">g + mercury share the lead</span>
+          </div>
+          <div class="strip light"><svg class="mext"><use href="#mext-wifi"/></svg><svg class="mext"><use href="#mext-batt"/></svg><span class="mpill"><svg><use href="#m3-hermes"/></svg></span><span class="spring"></span><span class="clock">Tue 09:41</span></div>
+          <div class="strip dark"><svg class="mext"><use href="#mext-wifi"/></svg><svg class="mext"><use href="#mext-batt"/></svg><span class="mpill"><svg><use href="#m3-hermes"/></svg></span><span class="spring"></span><span class="clock">Tue 09:41</span></div>
+          <p class="mtext">The g wearing a Mercury costume: a light crescent, the single thickened tentacle-hook, and
+            ☿'s <b>cross-bar struck through the tail's neck</b> — the most explicitly alchemical detail in the set.</p>
+          <p class="mweak"><b>Honest weakness:</b> the floating cross-bar can read as a stray mark when antialiasing
+            bites; only one tentacle, so the least cthulhu here.</p>
+        </div>
+      </div>
+
+      <!-- R3-7 Grimoire -->
+      <div class="mcard"><div class="mhead"><span class="mid">7</span><h3>Grimoire ☿</h3><span class="angle">sigil</span></div>
+        <div class="mbody">
+          <div class="mhero">
+            <svg class="big"><use href="#m3-grimoire"/></svg>
+            <div class="icon li"><svg><use href="#m3-grimoire"/></svg></div>
+            <div class="icon da"><svg><use href="#m3-grimoire"/></svg></div>
+            <span class="cap">mercury dominant; symmetric</span>
+          </div>
+          <div class="strip light"><svg class="mext"><use href="#mext-wifi"/></svg><svg class="mext"><use href="#mext-batt"/></svg><span class="mpill"><svg><use href="#m3-grimoire"/></svg></span><span class="spring"></span><span class="clock">Tue 09:41</span></div>
+          <div class="strip dark"><svg class="mext"><use href="#mext-wifi"/></svg><svg class="mext"><use href="#mext-batt"/></svg><span class="mpill"><svg><use href="#m3-grimoire"/></svg></span><span class="spring"></span><span class="clock">Tue 09:41</span></div>
+          <p class="mtext">The full sigil: crescent horns, open-countered circle, two symmetric tentacles splaying where
+            ☿ carries its cross — a glyph inked in a grimoire margin. At scale it starts to feel like a <b>seated,
+            watching creature</b>.</p>
+          <p class="mweak"><b>Honest weakness:</b> sacrifices the g's one-sided hook for symmetry — the least legible as
+            a letter; can read as a pure astrological sign.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="mech">
+      <h3>Runner's notes on round three</h3>
+      <ul>
+        <li>The real decision is a <b>dial, not a pick</b>: how far toward the creature/sigil should the letter lean?
+          Naming a variant sets the dial; hybrids are cheap ("4 but with 2's crescent helm").</li>
+        <li>All seven keep the loading-pill physics; whichever wins, the icon/README version can lean one notch further
+          toward the creature than the menu-bar template does (same skeleton, more modeling).</li>
+        <li>Trademark check holds: Mercury (☿) and Lovecraft's imagery are public commons; nothing here touches the
+          Octocat's silhouette.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section id="marks-r2">
+    <p class="eyebrow">Round two — superseded by the Bead-g direction</p>
+    <h2>The warmth round, kept for comparison</h2>
+    <p class="qsub">Round one was set aside ("not happy on the logos") and the octocat impulse named what was missing:
+      <b>life</b>. Octo-anything is closed off by GitHub's brand terms, so round two chases the impulse itself, from
+      githud's own world: a <b>creature</b> angle (the night-watch made animate), a <b>pixel-era</b> angle (the
+      earlier-web favicon idiom — hand-placed pixels, designed <i>at</i> 13px, the same register as the copy you
+      ratified), and a <b>humanist letterform</b> angle (the g written by a hand, not a compass). Same physics: 13px
+      first, monochrome template ink. Baseline —
+      <span class="strip light" style="display:inline-flex; vertical-align:middle; height:22px; gap:8px; margin:0 4px;">
+        <span class="mpill"><span class="dimdot"></span></span></span>
+      today's dim dot.</p>
+
+    <div class="mgrid">
+      <!-- C1 The Watch -->
+      <div class="mcard"><div class="mhead"><span class="mid">C1</span><h3>The Watch</h3><span class="angle">creature</span></div>
+        <div class="mbody">
+          <div class="mhero">
+            <svg class="big"><use href="#m2-watch-full"/></svg>
+            <div class="icon li"><svg><use href="#m2-watch-full"/></svg></div>
+            <div class="icon da"><svg><use href="#m2-watch-full"/></svg></div>
+            <span class="cap">64px + icon scale (pupils &amp; beak appear); the bar wears the silhouette only</span>
+          </div>
+          <div class="strip light"><svg class="mext"><use href="#mext-wifi"/></svg><svg class="mext"><use href="#mext-batt"/></svg><span class="mpill"><svg><use href="#m2-watch"/></svg></span><span class="spring"></span><span class="clock">Mon 09:41</span></div>
+          <div class="strip dark"><svg class="mext"><use href="#mext-wifi"/></svg><svg class="mext"><use href="#mext-batt"/></svg><span class="mpill"><svg><use href="#m2-watch"/></svg></span><span class="spring"></span><span class="clock">Mon 09:41</span></div>
+          <p class="mtext">A night owl, perched — the quiet watcher who stays awake so you don't have to. The silhouette
+            <b>is</b> the character: two ear-tufts, two eye-holes punched from one solid body. At 13px you read "awake
+            watcher" with zero interior detail; at icon scale the pupils drop in and it <b>looks back at you</b>.</p>
+          <p class="mweak"><b>Honest weakness:</b> two eyes bend the one-feature rule (they ARE the owl, but it's the one
+            argument with the brief); un-pupiled it can read faintly feline.</p>
+        </div>
+      </div>
+
+      <!-- C2 The Sweep -->
+      <div class="mcard"><div class="mhead"><span class="mid">C2</span><h3>The Sweep</h3><span class="angle">creature</span></div>
+        <div class="mbody">
+          <div class="mhero">
+            <svg class="big"><use href="#m2-sweep"/></svg>
+            <div class="icon li"><svg><use href="#m2-sweep"/></svg></div>
+            <div class="icon da"><svg><use href="#m2-sweep"/></svg></div>
+            <span class="cap">64px · icon scale, both grounds</span>
+          </div>
+          <div class="strip light"><svg class="mext"><use href="#mext-wifi"/></svg><svg class="mext"><use href="#mext-batt"/></svg><span class="mpill"><svg><use href="#m2-sweep"/></svg></span><span class="spring"></span><span class="clock">Mon 09:41</span></div>
+          <div class="strip dark"><svg class="mext"><use href="#mext-wifi"/></svg><svg class="mext"><use href="#mext-batt"/></svg><span class="mpill"><svg><use href="#m2-sweep"/></svg></span><span class="spring"></span><span class="clock">Mon 09:41</span></div>
+          <p class="mtext">The lighthouse mid-sweep — the beam thrown asymmetrically to one side, so the mark is
+            <b>doing something</b>: it points, it watches. The most literal carrier of the app's radar/night-watch
+            doctrine, with the half-tone beam as the gesture that keeps it alive.</p>
+          <p class="mweak"><b>Honest weakness:</b> the lantern crown muddies toward a gray smudge at 13px and the
+            55%-ink beam renders softly; a solid beam is the fallback, at the cost of the gesture.</p>
+        </div>
+      </div>
+
+      <!-- P1 The Keeper -->
+      <div class="mcard"><div class="mhead"><span class="mid">P1</span><h3>The Keeper</h3><span class="angle">pixel-era</span></div>
+        <div class="mbody">
+          <div class="mhero">
+            <svg class="big"><use href="#m2-keeper"/></svg>
+            <div class="icon li"><svg><use href="#m2-keeper"/></svg></div>
+            <div class="icon da"><svg><use href="#m2-keeper"/></svg></div>
+            <span class="cap">the same 13×13 pixels at every size — nothing to lose</span>
+          </div>
+          <div class="strip light"><svg class="mext"><use href="#mext-wifi"/></svg><svg class="mext"><use href="#mext-batt"/></svg><span class="mpill"><svg><use href="#m2-keeper"/></svg></span><span class="spring"></span><span class="clock">Mon 09:41</span></div>
+          <div class="strip dark"><svg class="mext"><use href="#mext-wifi"/></svg><svg class="mext"><use href="#mext-batt"/></svg><span class="mpill"><svg><use href="#m2-keeper"/></svg></span><span class="spring"></span><span class="clock">Mon 09:41</span></div>
+          <p class="mtext">A hand-placed pixel lighthouse on its island — lamp lit (two half-tone glow pixels the
+            loading state can <b>pulse</b>), dashed water below. Authored <i>at</i> 13px, one pixel at a time, so the
+            menu bar renders it with zero loss; at README scale it becomes a woodblock/cross-stitch lighthouse.</p>
+          <p class="mweak"><b>Honest weakness:</b> busiest of the pixel pair — deck flare and water dashes are first to
+            muddy under subpixel antialiasing; cropped of its island it edges toward chess-pawn.</p>
+        </div>
+      </div>
+
+      <!-- P2 At Your Door -->
+      <div class="mcard"><div class="mhead"><span class="mid">P2</span><h3>At Your Door</h3><span class="angle">pixel-era</span></div>
+        <div class="mbody">
+          <div class="mhero">
+            <svg class="big"><use href="#m2-door"/></svg>
+            <div class="icon li"><svg><use href="#m2-door"/></svg></div>
+            <div class="icon da"><svg><use href="#m2-door"/></svg></div>
+            <span class="cap">the same 13×13 pixels at every size</span>
+          </div>
+          <div class="strip light"><svg class="mext"><use href="#mext-wifi"/></svg><svg class="mext"><use href="#mext-batt"/></svg><span class="mpill"><svg><use href="#m2-door"/></svg></span><span class="spring"></span><span class="clock">Mon 09:41</span></div>
+          <div class="strip dark"><svg class="mext"><use href="#mext-wifi"/></svg><svg class="mext"><use href="#mext-batt"/></svg><span class="mpill"><svg><use href="#m2-door"/></svg></span><span class="spring"></span><span class="clock">Mon 09:41</span></div>
+          <p class="mtext">The keeper's cottage — pitched roof, overhanging eaves, and the door cut as a <b>notch in the
+            bottom edge</b>: literally "at your door," the app's own queue metaphor. Two half-tone windows glow — lights
+            on, someone's home — and the loader can pulse them. The friendliest, most drawn-with-love mark in either round.</p>
+          <p class="mweak"><b>Honest weakness:</b> if the lit windows wash out, it falls back to a generic "home" glyph —
+            its ownability rides on those two pixels surviving.</p>
+        </div>
+      </div>
+
+      <!-- H1 Quill -->
+      <div class="mcard"><div class="mhead"><span class="mid">H1</span><h3>Quill</h3><span class="angle">humanist letterform</span></div>
+        <div class="mbody">
+          <div class="mhero">
+            <svg class="big"><use href="#m2-quill"/></svg>
+            <div class="icon li"><svg><use href="#m2-quill"/></svg></div>
+            <div class="icon da"><svg><use href="#m2-quill"/></svg></div>
+            <span class="cap">64px · icon scale, both grounds</span>
+          </div>
+          <div class="strip light"><svg class="mext"><use href="#mext-wifi"/></svg><svg class="mext"><use href="#mext-batt"/></svg><span class="mpill"><svg><use href="#m2-quill"/></svg></span><span class="spring"></span><span class="clock">Mon 09:41</span></div>
+          <div class="strip dark"><svg class="mext"><use href="#mext-wifi"/></svg><svg class="mext"><use href="#mext-batt"/></svg><span class="mpill"><svg><use href="#m2-quill"/></svg></span><span class="spring"></span><span class="clock">Mon 09:41</span></div>
+          <p class="mtext">A slanted broad-nib <b>g</b> — the bowl deliberately uneven (fat bottom-left, thin top-right,
+            the fingerprint of a pen held at 40°), tail hooking hard left-and-under. Pen-in-motion: the italic energy
+            round one's compass g's didn't have.</p>
+          <p class="mweak"><b>Honest weakness:</b> flirts closest with reading as a <i>9</i> at exactly 13px on low-DPI;
+            the most energetic, least "planted" of the set.</p>
+        </div>
+      </div>
+
+      <!-- H2 Inkwell -->
+      <div class="mcard"><div class="mhead"><span class="mid">H2</span><h3>Inkwell</h3><span class="angle">humanist letterform</span></div>
+        <div class="mbody">
+          <div class="mhero">
+            <svg class="big"><use href="#m2-inkwell"/></svg>
+            <div class="icon li"><svg><use href="#m2-inkwell"/></svg></div>
+            <div class="icon da"><svg><use href="#m2-inkwell"/></svg></div>
+            <span class="cap">64px · icon scale, both grounds</span>
+          </div>
+          <div class="strip light"><svg class="mext"><use href="#mext-wifi"/></svg><svg class="mext"><use href="#mext-batt"/></svg><span class="mpill"><svg><use href="#m2-inkwell"/></svg></span><span class="spring"></span><span class="clock">Mon 09:41</span></div>
+          <div class="strip dark"><svg class="mext"><use href="#mext-wifi"/></svg><svg class="mext"><use href="#mext-batt"/></svg><span class="mpill"><svg><use href="#m2-inkwell"/></svg></span><span class="spring"></span><span class="clock">Mon 09:41</span></div>
+          <p class="mtext">An upright, bookish <b>g</b> finished with a <b>ball terminal</b> — the ink-drop where a brush
+            lifts off the page. Brush-at-rest where Quill is pen-in-motion: warm, calm, planted — the register of a
+            night-watch instrument.</p>
+          <p class="mweak"><b>Honest weakness:</b> the ball terminal can momentarily detach into a floating dot on a bad
+            display; the quieter mark — only a half-step warmer than a plain type g if warmth was the whole point.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="mech">
+      <h3>Runner's notes on round two</h3>
+      <ul>
+        <li>The pixel pair (P1/P2) is the only angle designed <b>at</b> the target size — no downsampling loss, and its
+          register (hand-placed, earlier-web) matches the taste that ratified the plain-words copy.</li>
+        <li>Both pixel marks carry a half-tone the loading state can honestly <b>pulse</b> (lamp / windows) — motion
+          mapped to a real state (loading), not decoration.</li>
+        <li>The creature and pixel angles share one world (island, keeper, door) — whichever wins, the README/social
+          identity can extend it; the letterforms stand alone.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section id="marks">
+    <p class="eyebrow">Round one — set aside, kept for comparison</p>
+    <h2>The six geometric candidates</h2>
+    <p class="qsub">The first round: <b>letterform</b> (the name's own geometry), <b>instrument</b> (the product's own
+      shapes), <b>system-native</b> (SF-optical with one degree of deviation). Verdict: competent, cold — set aside.</p>
+
+    <div class="mgrid">
+      <!-- L1 Bead -->
+      <div class="mcard"><div class="mhead"><span class="mid">L1</span><h3>Bead g</h3><span class="angle">letterform</span></div>
+        <div class="mbody">
+          <div class="mhero">
+            <svg class="big"><use href="#m-bead"/></svg>
+            <div class="icon li"><svg><use href="#m-bead"/></svg></div>
+            <div class="icon da"><svg><use href="#m-bead"/></svg></div>
+            <span class="cap">64px · icon 128-scale, both grounds</span>
+          </div>
+          <div class="strip light"><svg class="mext"><use href="#mext-wifi"/></svg><svg class="mext"><use href="#mext-batt"/></svg><span class="mpill"><svg><use href="#m-bead"/></svg></span><span class="spring"></span><span class="clock">Fri 09:41</span></div>
+          <div class="strip dark"><svg class="mext"><use href="#mext-wifi"/></svg><svg class="mext"><use href="#mext-batt"/></svg><span class="mpill"><svg><use href="#m-bead"/></svg></span><span class="spring"></span><span class="clock">Fri 09:41</span></div>
+          <p class="mtext">A solid single-story <b>g</b> — filled bowl, punched counter, short chunky hook. Reads as a
+            coin or bead: dense, quiet, literate. The ink wall never thins below legibility; the counter is a fat round
+            hole that stays open at 13px. At icon scale the bowl gains true type-design optical correction.</p>
+          <p class="mweak"><b>Honest weakness:</b> can flash as a lowercase <i>a</i> at 13px, and it's the heaviest ink
+            in the set — if the pill should feel lighter than a dot, this feels heavier.</p>
+        </div>
+      </div>
+
+      <!-- L2 Monoline g -->
+      <div class="mcard"><div class="mhead"><span class="mid">L2</span><h3>Monoline g</h3><span class="angle">letterform</span></div>
+        <div class="mbody">
+          <div class="mhero">
+            <svg class="big"><use href="#m-monog"/></svg>
+            <div class="icon li"><svg><use href="#m-monog"/></svg></div>
+            <div class="icon da"><svg><use href="#m-monog"/></svg></div>
+            <span class="cap">64px · icon 128-scale, both grounds</span>
+          </div>
+          <div class="strip light"><svg class="mext"><use href="#mext-wifi"/></svg><svg class="mext"><use href="#mext-batt"/></svg><span class="mpill"><svg><use href="#m-monog"/></svg></span><span class="spring"></span><span class="clock">Fri 09:41</span></div>
+          <div class="strip dark"><svg class="mext"><use href="#mext-wifi"/></svg><svg class="mext"><use href="#mext-batt"/></svg><span class="mpill"><svg><use href="#m-monog"/></svg></span><span class="spring"></span><span class="clock">Fri 09:41</span></div>
+          <p class="mtext">The same <b>g</b> as one unbroken pen stroke — open bowl flowing into a descending tail. The
+            counter is the whole open interior, which gets <i>more</i> legible as it shrinks. SF-body stroke weight, so
+            it sits beside tray/shield without pretending to be one. At icon scale the monoline can modulate into a
+            genuinely type-designed stroke.</p>
+          <p class="mweak"><b>Honest weakness:</b> flirts with <i>e</i>, <i>c</i>, or a spinner at a glance; leans on the
+            tail — if the capsule ever clips it, the g-ness collapses.</p>
+        </div>
+      </div>
+
+      <!-- I1 Scope -->
+      <div class="mcard"><div class="mhead"><span class="mid">I1</span><h3>Scope</h3><span class="angle">instrument</span></div>
+        <div class="mbody">
+          <div class="mhero">
+            <svg class="big"><use href="#m-scope"/></svg>
+            <div class="icon li"><svg><use href="#m-scope"/></svg></div>
+            <div class="icon da"><svg><use href="#m-scope"/></svg></div>
+            <span class="cap">64px · icon 128-scale, both grounds</span>
+          </div>
+          <div class="strip light"><svg class="mext"><use href="#mext-wifi"/></svg><svg class="mext"><use href="#mext-batt"/></svg><span class="mpill"><svg><use href="#m-scope"/></svg></span><span class="spring"></span><span class="clock">Fri 09:41</span></div>
+          <div class="strip dark"><svg class="mext"><use href="#mext-wifi"/></svg><svg class="mext"><use href="#mext-batt"/></svg><span class="mpill"><svg><use href="#m-scope"/></svg></span><span class="spring"></span><span class="clock">Fri 09:41</span></div>
+          <p class="mtext">A calm instrument ring holding exactly <b>one contact</b> — the bead riding the rim at one
+            o'clock is the single thing the honest filter surfaced; everything else stayed below. No sweep, no blips —
+            the radar cliché refused. Two primitives; the icon version gains a faint graticule.</p>
+          <p class="mweak"><b>Honest weakness:</b> ring-plus-rim-dot can register as "an icon wearing a notification
+            badge" in a crowded bar rather than one unified mark.</p>
+        </div>
+      </div>
+
+      <!-- I2 Island -->
+      <div class="mcard"><div class="mhead"><span class="mid">I2</span><h3>Island</h3><span class="angle">instrument</span></div>
+        <div class="mbody">
+          <div class="mhero">
+            <svg class="big"><use href="#m-island"/></svg>
+            <div class="icon li"><svg><use href="#m-island"/></svg></div>
+            <div class="icon da"><svg><use href="#m-island"/></svg></div>
+            <span class="cap">64px · icon 128-scale, both grounds</span>
+          </div>
+          <div class="strip light"><svg class="mext"><use href="#mext-wifi"/></svg><svg class="mext"><use href="#mext-batt"/></svg><span class="mpill"><svg><use href="#m-island"/></svg></span><span class="spring"></span><span class="clock">Fri 09:41</span></div>
+          <div class="strip dark"><svg class="mext"><use href="#mext-wifi"/></svg><svg class="mext"><use href="#mext-batt"/></svg><span class="mpill"><svg><use href="#m-island"/></svg></span><span class="spring"></span><span class="clock">Fri 09:41</span></div>
+          <p class="mtext">The product's own body: the solid wide capsule with <b>one window knocked out</b> — the one
+            surfaced item framed in quiet ink. Self-referential (a tiny picture of the thing in your menu bar) and the
+            most bulletproof render here: no strokes at all, nothing to thin out.</p>
+          <p class="mweak"><b>Honest weakness:</b> very literal — more diagram than mark — and the loudest ink mass in
+            the bar, pushing against "calm, never busy." The window can read as a plain O.</p>
+        </div>
+      </div>
+
+      <!-- S1 Notch -->
+      <div class="mcard"><div class="mhead"><span class="mid">S1</span><h3>Notch</h3><span class="angle">system-native</span></div>
+        <div class="mbody">
+          <div class="mhero">
+            <svg class="big"><use href="#m-notch"/></svg>
+            <div class="icon li"><svg><use href="#m-notch"/></svg></div>
+            <div class="icon da"><svg><use href="#m-notch"/></svg></div>
+            <span class="cap">64px · icon 128-scale, both grounds</span>
+          </div>
+          <div class="strip light"><svg class="mext"><use href="#mext-wifi"/></svg><svg class="mext"><use href="#mext-batt"/></svg><span class="mpill"><svg><use href="#m-notch"/></svg></span><span class="spring"></span><span class="clock">Fri 09:41</span></div>
+          <div class="strip dark"><svg class="mext"><use href="#mext-wifi"/></svg><svg class="mext"><use href="#mext-batt"/></svg><span class="mpill"><svg><use href="#m-notch"/></svg></span><span class="spring"></span><span class="clock">Fri 09:41</span></div>
+          <p class="mtext">The island as a rounded enclosure with a <b>bite taken from its top edge</b> — the strip the
+            system taught everyone to read — and one fact-dot inside, off-center. SF-Regular stroke discipline, optical
+            cap height; the broken top contour is what survives downsampling.</p>
+          <p class="mweak"><b>Honest weakness:</b> can read as "iPhone with a Dynamic Island" — borrowed equity — and on
+            low-DPI displays the bite can silt into a dent.</p>
+        </div>
+      </div>
+
+      <!-- S2 Aperture -->
+      <div class="mcard"><div class="mhead"><span class="mid">S2</span><h3>Aperture</h3><span class="angle">system-native</span></div>
+        <div class="mbody">
+          <div class="mhero">
+            <svg class="big"><use href="#m-aperture"/></svg>
+            <div class="icon li"><svg><use href="#m-aperture"/></svg></div>
+            <div class="icon da"><svg><use href="#m-aperture"/></svg></div>
+            <span class="cap">64px · icon 128-scale, both grounds</span>
+          </div>
+          <div class="strip light"><svg class="mext"><use href="#mext-wifi"/></svg><svg class="mext"><use href="#mext-batt"/></svg><span class="mpill"><svg><use href="#m-aperture"/></svg></span><span class="spring"></span><span class="clock">Fri 09:41</span></div>
+          <div class="strip dark"><svg class="mext"><use href="#mext-wifi"/></svg><svg class="mext"><use href="#mext-batt"/></svg><span class="mpill"><svg><use href="#m-aperture"/></svg></span><span class="spring"></span><span class="clock">Fri 09:41</span></div>
+          <p class="mtext">A near-closed ring with one clean gap at twelve o'clock and the ink dot <b>seated in the
+            gap's mouth</b> — the filter that is deliberately, honestly open; the gap is what it lets through. Heavier
+            stroke than a symbol ring so it holds ink at 13px.</p>
+          <p class="mweak"><b>Honest weakness:</b> open-ring-plus-dot flirts hard with the loading-spinner cliché —
+            treacherous when the mark's first job <i>is</i> the loading state. The most anonymous of the six.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="mech">
+      <h3>What ratifying a mark buys immediately (and what it doesn't)</h3>
+      <ul>
+        <li><b>Immediately buildable:</b> the loading pill renders the mark instead of the dim dot (a small WP — vector
+          → template NSImage, one glyph swap in the loading tier). Doctrine-clean: a mark claims nothing about your inbox.</li>
+        <li><b>Rides later work:</b> app icon, README wordmark lockup, Homebrew page — the launch package consumes the
+          same mark. Picking now means the identity is designed 13px-first instead of README-first.</li>
+        <li><b>Not decided here:</b> color treatment at icon scale (marks are ink; the icon's ground color is a later,
+          smaller decision), and the wordmark lockup typography.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section id="settings">
+    <p class="eyebrow">Thread 2 · the settings surface — RESOLVED: B, ratified 2026-07-14, shipped in the owner-lens PR</p>
+    <h2>Does config deserve UI, or a good menu? (it got the UI)</h2>
+    <p class="qsub">Today's gear menu mixes three kinds of item: <b>system verbs</b> (Quit, Hide island, Launch at
+      Login), <b>quick toggles</b> (drafts / gone-quiet / bots &amp; drafts — which now also live in-island as
+      (show)/(hide)), and <b>preview-bearing config</b> (Theme, Pill style) — of which Pill style got the ratified
+      config-with-preview card and Theme is still a blind pick from a submenu. The three options below are honest about
+      that tension.</p>
+
+    <div class="sgrid">
+      <!-- A -->
+      <div class="scard"><div class="mhead"><span class="mid">A</span><h3>A good menu</h3></div>
+        <div class="sbody">
+          <div class="stage">
+            <div class="menu">
+              <div class="mi sub">Surface…</div>
+              <div class="mi sub">Theme</div>
+              <div class="mi">Pill style…</div>
+              <div class="msep"></div>
+              <div class="mi check">Launch at Login</div>
+              <div class="mi">Hide island</div>
+              <div class="msep"></div>
+              <div class="mi">Quit githud</div>
+            </div>
+          </div>
+          <p class="mtext">Keep the pop menu; tighten it — kind-ordered groups (config, then system verbs, then quit),
+            reveal toggles fold fully into <b>Surface…</b> where they already live. Native, zero new chrome, muscle-memory
+            fast.</p>
+          <p class="mweak"><b>The honest limit:</b> menus cannot preview. Theme stays a blind pick, which contradicts the
+            philosophy you ratified with the pill chooser — "config with actual visual preview."</p>
+        </div>
+      </div>
+
+      <!-- B -->
+      <div class="scard reco"><div class="mhead"><span class="mid">B</span><h3>One settings card</h3><span class="badge">runner's pick</span></div>
+        <div class="sbody">
+          <div class="stage">
+            <div class="menu" style="min-width:150px">
+              <div class="mi">Settings…</div>
+              <div class="msep"></div>
+              <div class="mi check">Launch at Login</div>
+              <div class="mi">Hide island</div>
+              <div class="msep"></div>
+              <div class="mi">Quit githud</div>
+            </div>
+            <div class="island">
+              <h4>Settings</h4>
+              <div class="grp">Theme</div>
+              <div class="swatches">
+                <div class="swatch sel"><div class="chip" style="background:#1d2430;color:#e7edf4">Aa ✓⚠</div><div class="nm">System</div></div>
+                <div class="swatch"><div class="chip" style="background:#0d1117;color:#e6edf3">Aa ✓⚠</div><div class="nm">Dim</div></div>
+                <div class="swatch"><div class="chip" style="background:#15161e;color:#c0caf5">Aa ✓⚠</div><div class="nm">Tokyo</div></div>
+                <div class="swatch"><div class="chip" style="background:#002b36;color:#93a1a1">Aa ✓⚠</div><div class="nm">Solar</div></div>
+              </div>
+              <div class="grp">Pill style</div>
+              <div class="minipills"><span class="minipill sel">Door first</span><span class="minipill">Quiet mark</span><span class="minipill">With count</span></div>
+              <div class="grp">Surface which reasons</div>
+              <div class="togglerow"><span class="box on"></span> review requested</div>
+              <div class="togglerow"><span class="box on"></span> mentioned · assigned · inbound</div>
+              <div class="togglerow"><span class="box"></span> ci activity</div>
+            </div>
+          </div>
+          <p class="mtext">The pill-style chooser, generalized: one island <b>Settings card</b> — theme swatches
+            rendered in each theme's own ink (a real preview, finally), pill styles live, surface reasons in plain
+            language. The menu shrinks to verbs. One home for config, and it's the island — the one-home rule extended
+            to preferences.</p>
+          <p class="mweak"><b>The honest cost:</b> the biggest build of the three (a sectioned card, swatch rendering,
+            scroll behavior), and quick toggles move one click deeper for whoever used the menu for them — softened by
+            the fact that (show)/(hide) now lives directly on the glass.</p>
+        </div>
+      </div>
+
+      <!-- C -->
+      <div class="scard"><div class="mhead"><span class="mid">C</span><h3>Hybrid: Theme joins Pill style</h3></div>
+        <div class="sbody">
+          <div class="stage">
+            <div class="menu">
+              <div class="mi sub">Surface…</div>
+              <div class="mi">Theme…</div>
+              <div class="mi">Pill style…</div>
+              <div class="msep"></div>
+              <div class="mi check">Launch at Login</div>
+              <div class="mi">Hide island</div>
+              <div class="msep"></div>
+              <div class="mi">Quit githud</div>
+            </div>
+            <div class="island" style="max-width:300px">
+              <h4>Theme</h4>
+              <div class="swatches">
+                <div class="swatch sel"><div class="chip" style="background:#1d2430;color:#e7edf4">Aa ✓⚠</div><div class="nm">System</div></div>
+                <div class="swatch"><div class="chip" style="background:#0d1117;color:#e6edf3">Aa ✓⚠</div><div class="nm">Dim</div></div>
+                <div class="swatch"><div class="chip" style="background:#15161e;color:#c0caf5">Aa ✓⚠</div><div class="nm">Tokyo</div></div>
+              </div>
+            </div>
+          </div>
+          <p class="mtext">The menu stays the home; only <b>Theme</b> graduates to a card beside Pill style (the two
+            preview-bearing configs get preview treatment; everything else stays a menu item). Smallest change that
+            removes the blind pick.</p>
+          <p class="mweak"><b>The honest cost:</b> two sibling cards and a menu — three settings surfaces. The
+            inconsistency the question started from survives, just smaller.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="mech">
+      <h3>Why B is the runner's pick</h3>
+      <ul>
+        <li>It's your own ratified philosophy finishing the job: "the best approach is to allow config with actual
+          visual preview" (D-pill, 2026-07-10). Theme is exactly that material; a submenu of theme names is a blind pick.</li>
+        <li>The one-home rule: the island is where the app lives; a Settings card keeps config where the consequences
+          render. The menu keeps what menus are actually good at — verbs.</li>
+        <li>It subsumes C: the Theme card is a section of B's card. Building C first means rebuilding it into B later.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section id="decide">
+    <p class="eyebrow">Decide — two independent one-liners</p>
+    <div class="decide">
+      <h3>Ratify each thread separately</h3>
+      <p><b>The mark — RATIFIED 2026-07-16:</b> the gesture pack as mapped (waking→loading pill, noticing→README
+        printed, at-ease→app icon), the bar-idle extension skipped (the ✓ stays; the creature never enters live pill
+        states), and the website eye follows the cursor (live demo above; not possible in a README — script-stripped).
+        The loading-pill WP landed (c4f4209 — the waking face is live).</p>
+      <p><b>Open — the g takes the bar (top section):</b> one line ratifies the g as the bar's constant mark with the
+        working-eye states (probing / sidelong / <b>half-lid at ease</b> / locked+count; shield and dashed-arc
+        composition carried over), plus the bubble's eye-alone unconfirmed mark (the pill's ✓ stays). This retires
+        the arcs constant-mark and goes through the full three-lens gauntlet. Static forms ship first; animated
+        probing during loading is a separate, optional ratification (it costs a timer).</p>
+      <p><b>The settings surface — RESOLVED (B, dogfood-ratified 2026-07-14, built via the owner-lens PR):</b> the
+        in-island Settings card ships and is the daily driver; the gear menu holds verbs only (Settings… ⌘, / Hide
+        island / Quit). The section below is kept as the decision record.</p>
+      <p>Recorded as set aside, per your word: the draggable island.</p>
+    </div>
+  </section>
+
+  <footer class="colophon">githud · mark &amp; settings session · round one 2026-07-12 (set aside) · round two
+    2026-07-14 warmth (superseded) · round three 2026-07-14 cthulhu×mercury (kept) · round four 2026-07-14 — the
+    living glyph: eye-as-counter after the user's alphabet-creature reference (base ratified: Glyphling g) · round
+    five 2026-07-16 — six fine cuts, one trait each (eye, pupil, gaze, lid, limb, horn), runner-made and
+    render-verified · every candidate shown at its real 13px job in both menu-bar appearances · settings thread
+    unchanged, still awaiting A/B/C · page follows your theme; strips and island mocks are single-theme (the surfaces
+    they depict)</footer>
+</div>
+
+<script>
+(function () {
+  var svg = document.getElementById('demo-eye');
+  var pupil = document.getElementById('demo-pupil');
+  var dot = document.getElementById('demo-dot');
+  if (!svg || !pupil || !dot) return;
+  if (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  document.addEventListener('mousemove', function (e) {
+    var r = svg.getBoundingClientRect();
+    if (!r.width) return;
+    var cx = r.left + r.width * 0.5;
+    var cy = r.top + r.height * (10 / 24);
+    var scale = 24 / r.width;
+    var ux = (e.clientX - cx) * scale;
+    var uy = (e.clientY - cy) * scale;
+    var m = Math.hypot(ux, uy);
+    if (!m) return;
+    // iris shifts toward the cursor; the dot slides further across the iris in
+    // the same direction — it LEADS the gaze (the dot is the seeing part).
+    var c = Math.min(1.5, m);
+    pupil.setAttribute('transform', 'translate(' + (ux / m * c).toFixed(2) + ' ' + (uy / m * c).toFixed(2) + ')');
+    dot.setAttribute('cx', (12 + ux / m * 0.9).toFixed(2));
+    dot.setAttribute('cy', (10 + uy / m * 0.9).toFixed(2));
+  });
+})();
+</script>

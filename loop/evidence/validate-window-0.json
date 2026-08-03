@@ -1,0 +1,25 @@
+{
+  "areaNonzero" : true,
+  "count" : 1,
+  "primarySizeClass" : "collapsed",
+  "screen" : {
+    "h" : 1117,
+    "w" : 1728,
+    "x" : 0,
+    "y" : 0
+  },
+  "targetPID" : 80024,
+  "windows" : [
+    {
+      "h" : 42,
+      "layer" : 25,
+      "ownerName" : "githud",
+      "ownerPID" : 80024,
+      "w" : 280,
+      "windowNumber" : 12815,
+      "x" : 724,
+      "y" : 46
+    }
+  ],
+  "withinScreen" : true
+}

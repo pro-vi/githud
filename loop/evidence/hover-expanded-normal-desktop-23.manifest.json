@@ -1,0 +1,41 @@
+{
+  "captured_at": "2026-06-17T00:09:43Z",
+  "commit": "cf81004",
+  "condition": "hover-expanded",
+  "frontmost_after": "ASN:0x0-0x215b159:",
+  "frontmost_before": "ASN:0x0-0x215b159:",
+  "frontmost_unchanged": true,
+  "idle_cpu": null,
+  "iter": 23,
+  "pixel_live": true,
+  "pixel_stats": {
+    "distinct_colors": 110,
+    "live": true,
+    "max": 216.22,
+    "mean": 74.27,
+    "min": 15.15,
+    "src_h": 514,
+    "src_w": 1040,
+    "variance": 1078.05
+  },
+  "png": "loop/evidence/hover-expanded-normal-desktop-23.png",
+  "png_sha256": "b48ed83d2df0fadeef8d754bcb9f328909b44c0f8fab53cb9e62f2f7fa20b90c",
+  "reason": null,
+  "scenario": "normal-desktop",
+  "screen": {
+    "h": 1117,
+    "w": 1728,
+    "x": 0,
+    "y": 0
+  },
+  "size_class": "other",
+  "status": "captured",
+  "window_bounds": {
+    "h": 257,
+    "w": 520,
+    "x": 604,
+    "y": 46
+  },
+  "window_count": 2,
+  "within_screen": true
+}

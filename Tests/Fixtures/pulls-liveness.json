@@ -1,0 +1,106 @@
+{
+  "data": {
+    "viewer": {
+      "pullRequests": {
+        "nodes": [
+          {
+            "number": 501,
+            "title": "feat(api): durable agent entrypoint",
+            "url": "https://github.com/you/api/pull/501",
+            "isDraft": false,
+            "createdAt": "2026-06-23T07:13:00Z",
+            "updatedAt": "2026-06-23T07:13:00Z",
+            "reviewDecision": "APPROVED",
+            "mergeable": "MERGEABLE",
+            "repository": { "nameWithOwner": "you/api" },
+            "commits": { "nodes": [ { "commit": { "statusCheckRollup": { "state": "SUCCESS" } } } ] }
+          },
+          {
+            "number": 500,
+            "title": "fix(report): direct-emit composer (exec-summary)",
+            "url": "https://github.com/you/dashboard/pull/500",
+            "isDraft": false,
+            "createdAt": "2026-06-23T07:25:00Z",
+            "updatedAt": "2026-06-23T07:25:00Z",
+            "reviewDecision": null,
+            "mergeable": "MERGEABLE",
+            "repository": { "nameWithOwner": "you/dashboard" },
+            "commits": { "nodes": [ { "commit": { "statusCheckRollup": { "state": "PENDING" } } } ] }
+          },
+          {
+            "number": 480,
+            "title": "feat(keeper): physics-driven goalkeeper dive",
+            "url": "https://github.com/you/pitch/pull/480",
+            "isDraft": false,
+            "createdAt": "2026-06-19T09:00:00Z",
+            "updatedAt": "2026-06-21T09:00:00Z",
+            "reviewDecision": "APPROVED",
+            "mergeable": "MERGEABLE",
+            "repository": { "nameWithOwner": "you/pitch" },
+            "commits": { "nodes": [ { "commit": { "statusCheckRollup": { "state": "FAILURE" } } } ] }
+          },
+          {
+            "number": 495,
+            "title": "refactor(engine): de-personalize the sim",
+            "url": "https://github.com/you/worldcup/pull/495",
+            "isDraft": false,
+            "createdAt": "2026-06-20T09:00:00Z",
+            "updatedAt": "2026-06-22T09:00:00Z",
+            "reviewDecision": "APPROVED",
+            "mergeable": "MERGEABLE",
+            "repository": { "nameWithOwner": "you/worldcup" },
+            "commits": { "nodes": [ { "commit": { "statusCheckRollup": { "state": "SUCCESS" } } } ] }
+          },
+          {
+            "number": 20,
+            "title": "feat(reader): decluttered v3 reader card",
+            "url": "https://github.com/you/reader/pull/20",
+            "isDraft": false,
+            "createdAt": "2026-05-15T09:00:00Z",
+            "updatedAt": "2026-06-01T09:00:00Z",
+            "reviewDecision": "APPROVED",
+            "mergeable": "MERGEABLE",
+            "repository": { "nameWithOwner": "you/reader" },
+            "commits": { "nodes": [ { "commit": { "statusCheckRollup": { "state": "SUCCESS" } } } ] }
+          },
+          {
+            "number": 34,
+            "title": "feat(obs): integrate Sentry across runtimes",
+            "url": "https://github.com/you/market/pull/34",
+            "isDraft": false,
+            "createdAt": "2026-05-01T09:00:00Z",
+            "updatedAt": "2026-05-10T09:00:00Z",
+            "reviewDecision": "APPROVED",
+            "mergeable": "CONFLICTING",
+            "repository": { "nameWithOwner": "you/market" },
+            "commits": { "nodes": [ { "commit": { "statusCheckRollup": { "state": "FAILURE" } } } ] }
+          },
+          {
+            "number": 44,
+            "title": "feat(lexical): markdown-aware paste handler",
+            "url": "https://github.com/you/canvas/pull/44",
+            "isDraft": false,
+            "createdAt": "2026-02-20T09:00:00Z",
+            "updatedAt": "2026-03-01T09:00:00Z",
+            "reviewDecision": "APPROVED",
+            "mergeable": "CONFLICTING",
+            "repository": { "nameWithOwner": "you/canvas" },
+            "commits": { "nodes": [ { "commit": { "statusCheckRollup": { "state": "FAILURE" } } } ] }
+          },
+          {
+            "number": 8,
+            "title": "feat(pairing): 4-layer pane-addressing protocol",
+            "url": "https://github.com/you/panes/pull/8",
+            "isDraft": true,
+            "createdAt": "2026-06-20T09:00:00Z",
+            "updatedAt": "2026-06-22T09:00:00Z",
+            "reviewDecision": "APPROVED",
+            "mergeable": "MERGEABLE",
+            "repository": { "nameWithOwner": "you/panes" },
+            "commits": { "nodes": [ { "commit": { "statusCheckRollup": { "state": "SUCCESS" } } } ] }
+          }
+        ]
+      }
+    }
+  }
+}

@@ -1,0 +1,440 @@
+<title>G1 — the way out</title>
+
+<style>
+:root {
+  --ground:      #e9ebef;
+  --ground-2:    #dfe2e8;
+  --rule:        #c7ccd6;
+  --text:        #1e2127;
+  --text-2:      #565c69;
+  --text-3:      #838a97;
+  --flag:        #b3612f;
+  --flag-soft:   #f0d9c8;
+  --ok:          #3f6f5e;
+
+  /* The island is a fixed dark object — it does not follow the page theme,
+     because the real one does not either. */
+  --hud:         #4f5054;
+  --hud-edge:    #6a6b70;
+  --ink-1:       #f1f1f2;
+  --ink-2:       #8e8f94;
+  --ink-3:       #6d6e73;
+  --hud-hover:   rgba(255,255,255,.07);
+
+  --measure: 68ch;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ground:    #15171b;
+    --ground-2:  #1c1f24;
+    --rule:      #2e333b;
+    --text:      #e6e8ec;
+    --text-2:    #a2a9b6;
+    --text-3:    #767d8a;
+    --flag:      #d98a53;
+    --flag-soft: #3a2a1e;
+    --ok:        #7fb39c;
+  }
+}
+:root[data-theme="dark"] {
+  --ground:#15171b; --ground-2:#1c1f24; --rule:#2e333b;
+  --text:#e6e8ec; --text-2:#a2a9b6; --text-3:#767d8a;
+  --flag:#d98a53; --flag-soft:#3a2a1e; --ok:#7fb39c;
+}
+:root[data-theme="light"] {
+  --ground:#e9ebef; --ground-2:#dfe2e8; --rule:#c7ccd6;
+  --text:#1e2127; --text-2:#565c69; --text-3:#838a97;
+  --flag:#b3612f; --flag-soft:#f0d9c8; --ok:#3f6f5e;
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--text);
+  font: 400 17px/1.62 Georgia, "Iowan Old Style", "Times New Roman", serif;
+  -webkit-font-smoothing: antialiased;
+}
+.wrap { max-width: 1080px; margin: 0 auto; padding: 0 28px 120px; }
+.col  { max-width: var(--measure); }
+
+/* ── masthead ─────────────────────────────────────────────── */
+header { padding: 88px 0 44px; }
+.kicker {
+  font: 600 11px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: .16em; text-transform: uppercase;
+  color: var(--flag); margin: 0 0 20px;
+}
+h1 {
+  font: 400 46px/1.08 Georgia, serif;
+  letter-spacing: -.017em; text-wrap: balance;
+  margin: 0 0 22px; max-width: 16ch;
+}
+.standfirst { font-size: 20px; line-height: 1.5; color: var(--text-2); margin: 0; }
+.meta {
+  margin-top: 34px; padding-top: 18px; border-top: 1px solid var(--rule);
+  font: 400 12.5px/1.7 ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--text-3); display: flex; flex-wrap: wrap; gap: 6px 26px;
+}
+
+/* ── structure ────────────────────────────────────────────── */
+section { padding: 52px 0 8px; border-top: 1px solid var(--rule); }
+h2 {
+  font: 400 30px/1.2 Georgia, serif; letter-spacing: -.012em;
+  margin: 0 0 8px; text-wrap: balance;
+}
+h3 { font: 600 15px/1.4 system-ui, sans-serif; letter-spacing: .005em; margin: 30px 0 10px; }
+p { margin: 0 0 17px; }
+.lede { font-size: 18.5px; color: var(--text-2); margin-bottom: 26px; }
+em.term { font-style: italic; color: var(--text); }
+strong { font-weight: 700; }
+code {
+  font: 400 .855em/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+  background: var(--ground-2); padding: .12em .38em; border-radius: 3px;
+}
+
+/* ── the island replica ───────────────────────────────────── */
+.stage {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(292px, 1fr));
+  gap: 22px; margin: 26px 0 8px;
+}
+.frame { display: flex; flex-direction: column; gap: 9px; min-width: 0; }
+.frame-label {
+  font: 500 11px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: .09em; text-transform: uppercase; color: var(--text-3);
+}
+.hud {
+  background: var(--hud); border: 1px solid var(--hud-edge);
+  border-radius: 13px; padding: 13px 0 11px;
+  font: 400 13px/1.35 system-ui, -apple-system, "Helvetica Neue", sans-serif;
+  box-shadow: 0 10px 30px rgba(0,0,0,.22);
+  user-select: none;
+}
+.hud-pad { padding: 0 15px; }
+.lane-head {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 12px; font-weight: 600; color: var(--ink-1);
+  padding: 0 15px 9px;
+}
+.lane-head .eye { margin-left: auto; color: var(--ink-3); font-size: 13px; }
+.grp {
+  font-size: 11px; font-weight: 600; color: var(--ink-3);
+  padding: 7px 15px 4px;
+}
+.row { display: flex; gap: 9px; align-items: flex-start; padding: 5px 15px; border-radius: 6px; }
+.row .dot {
+  width: 17px; height: 17px; border-radius: 50%; flex: 0 0 17px; margin-top: 1px;
+  display: grid; place-items: center; font-size: 10px; font-weight: 700; color: #fff;
+}
+.dot.warn { background: #3f4d63; }
+.dot.ok   { background: #3f8f5f; }
+.dot.wip  { background: #5b5c61; }
+.row .txt { min-width: 0; }
+.row .t { font-size: 13px; font-weight: 500; color: var(--ink-1); }
+.row .s { font-size: 11px; color: var(--ink-3); margin-top: 1px; }
+.row.dim .t { font-weight: 400; color: var(--ink-2); }
+.row.dim .dot { opacity: .78; }
+
+.tail {
+  font-size: 10px; font-weight: 500; color: var(--ink-3); opacity: .78;
+  padding: 6px 15px 2px 29px;
+  display: flex; align-items: center; gap: 8px;
+}
+.tail .grow { flex: 1; }
+
+.cap {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 11px; color: var(--ink-3);
+  padding: 6px 15px 6px 29px; margin: 2px 0;
+  border-radius: 6px; cursor: pointer; background: none; border: 0; width: 100%;
+  font-family: system-ui, -apple-system, sans-serif; text-align: left;
+}
+.cap:hover, .cap:focus-visible { background: var(--hud-hover); outline: none; }
+.cap:focus-visible { box-shadow: inset 0 0 0 1.5px var(--ink-2); }
+.cap u { text-underline-offset: 2.5px; }
+.hidectl {
+  font-size: 11px; color: var(--ink-3); cursor: pointer;
+  background: none; border: 0; padding: 2px 5px; border-radius: 4px;
+  font-family: system-ui, -apple-system, sans-serif;
+}
+.hidectl u { text-underline-offset: 2.5px; }
+.hidectl:hover, .hidectl:focus-visible { background: var(--hud-hover); outline: none; }
+.hidectl:focus-visible { box-shadow: inset 0 0 0 1.5px var(--ink-2); }
+.foot {
+  display: flex; align-items: center; font-size: 11px; color: var(--ink-3);
+  padding: 9px 15px 0; margin-top: 4px; border-top: 1px solid rgba(255,255,255,.07);
+}
+
+/* the absence marker — where the control is not */
+.ghost {
+  margin-left: auto;
+  border: 1px dashed var(--flag); color: var(--flag);
+  border-radius: 4px; padding: 1px 6px;
+  font: 500 9.5px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: .06em; opacity: .95;
+}
+
+/* ── verdicts + diffs ─────────────────────────────────────── */
+.trade { display: grid; grid-template-columns: repeat(auto-fit, minmax(232px, 1fr)); gap: 0 30px; margin: 22px 0 4px; }
+.trade div { padding: 13px 0; border-top: 1px solid var(--rule); }
+.trade dt {
+  font: 600 10.5px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: .12em; text-transform: uppercase; color: var(--text-3); margin-bottom: 7px;
+}
+.trade dd { margin: 0; font-size: 15.5px; line-height: 1.5; color: var(--text-2); }
+
+.diff {
+  overflow-x: auto; background: var(--ground-2); border: 1px solid var(--rule);
+  border-radius: 7px; padding: 15px 17px; margin: 20px 0 6px;
+  font: 400 12.8px/1.72 ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--text-2); white-space: pre;
+}
+.diff .add { color: var(--ok); }
+.diff .del { color: var(--flag); }
+.diff .cm  { color: var(--text-3); font-style: italic; }
+.diff b { color: var(--text); font-weight: 600; }
+
+.badge {
+  display: inline-block; vertical-align: middle; margin-left: 12px;
+  font: 600 10px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: .11em; text-transform: uppercase;
+  padding: 5px 9px; border-radius: 3px;
+  background: var(--flag-soft); color: var(--flag);
+}
+.pull {
+  border-left: 2px solid var(--flag); padding: 3px 0 3px 20px;
+  margin: 26px 0; font-size: 18px; line-height: 1.5; color: var(--text);
+}
+.note {
+  font-size: 15px; color: var(--text-3); border-top: 1px solid var(--rule);
+  padding-top: 14px; margin-top: 26px;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .cap, .hidectl, .row { transition: background-color .13s ease; }
+}
+@media (max-width: 620px) { h1 { font-size: 34px; } .wrap { padding: 0 18px 80px; } }
+</style>
+
+<div class="wrap">
+
+<header>
+  <p class="kicker">githud · known gap G1 · undecided</p>
+  <h1>The way in is on the glass. The way out is in the gear.</h1>
+  <p class="standfirst col">Grouping your PRs by org gave every org its own <em class="term">gone quiet</em> tail,
+  and every tail its own way to open. Nothing gives them a way to close. Three fixes, one recommendation —
+  the mocks are live, so click them.</p>
+  <div class="meta">
+    <span>found by auditing docs/TOPOLOGY.md against the source</span>
+    <span>two prior code reviews missed it</span>
+    <span>2026-08-01</span>
+  </div>
+</header>
+
+<section>
+  <div class="col">
+    <h2>What's actually broken</h2>
+    <p class="lede">Not the reveal — that works, per org, exactly as designed. What's missing is its opposite.</p>
+    <p>When the lane wears org titles, each group's quiet rows collapse to the ratified caption:
+    <code>2 gone quiet (show)</code>. Click any one of them and every group's quiet opens at once,
+    because there is a single lane-wide preference behind them all. That part is deliberate.</p>
+    <p>But the lane-level <strong>Gone quiet</strong> header — the one that normally carries
+    <code>(hide)</code> on its right edge — only renders in the flat shape. Group the lane and it never
+    appears. So once quiet is open, nothing on screen closes it. You have to know the gear exists.</p>
+  </div>
+
+  <div class="stage">
+    <div class="frame">
+      <div class="frame-label">Collapsed — a way in on every group</div>
+      <div class="hud" id="cur-a"></div>
+    </div>
+    <div class="frame">
+      <div class="frame-label">Revealed — and now?</div>
+      <div class="hud" id="cur-b"></div>
+    </div>
+  </div>
+  <p class="note col">The dashed marker sits where a <code>(hide)</code> would go if the lane were flat.
+  Click <em class="term">(show)</em> in the left panel to watch it become the right one.</p>
+</section>
+
+<section>
+  <div class="col">
+    <h2>A — the tail carries its own way back <span class="badge">recommended</span></h2>
+    <p class="lede">Give the revealed tail label the same right-edge control the flat header has.</p>
+    <p>I left this out on purpose when I built it, reasoning that one control per group is
+    <em class="term">N handles on one switch</em>. That reasoning doesn't survive contact with the
+    collapsed state, which <strong>already ships N handles on that same switch</strong> — one
+    <code>(show)</code> per group. Refusing the symmetric <code>(hide)</code> isn't restraint; it's the
+    inconsistency.</p>
+  </div>
+  <div class="stage">
+    <div class="frame"><div class="frame-label">Collapsed</div><div class="hud" id="a-a"></div></div>
+    <div class="frame"><div class="frame-label">Revealed — control returns</div><div class="hud" id="a-b"></div></div>
+  </div>
+  <div class="diff col"><b>IslandContentView.swift</b> — the .group arm
+<span class="cm">// tailLabel gains an optional right-edge control, reusing HideControlView</span>
+<span class="del">- private func tailLabel(_ text: String) -&gt; NSView {</span>
+<span class="add">+ private func tailLabel(_ text: String, onHide: (() -&gt; Void)? = nil) -&gt; NSView {</span>
+      ...
+<span class="add">+     guard let onHide else { return wrap }</span>
+<span class="add">+     // Same control the flat shape's revealed header carries — one home, so the</span>
+<span class="add">+     // two shapes cannot drift on what the affordance looks like or does.</span>
+<span class="add">+     let stack = NSStackView(views: [wrap, HideControlView(theme: theme, onHide: onHide)])</span>
+
+  if showStale {
+<span class="del">-     pulseRowViews.append(tailLabel(PlainWords.quietTailLabel(quiet.count)))</span>
+<span class="add">+     pulseRowViews.append(tailLabel(PlainWords.quietTailLabel(quiet.count),</span>
+<span class="add">+                                    onHide: onToggleStale))</span>
+      pulseRowViews += quiet.map { pulseRowView($0, elideOwner: true) }
+  }</div>
+  <div class="trade col">
+    <div><dt>Wins</dt><dd>Symmetric with the caption. The control sits on the thing it controls. Reuses the ratified <code>HideControlView</code>, so both shapes stay one grammar.</dd></div>
+    <div><dt>Costs</dt><dd>N controls for one preference — visually repetitive with many orgs, and clicking one closes all of them, which has to read as intended rather than as a bug.</dd></div>
+  </div>
+</section>
+
+<section>
+  <div class="col">
+    <h2>B — one control, on the lane header</h2>
+    <p class="lede">Put <code>(hide)</code> beside the lens eye, where the lane's other lane-wide control already lives.</p>
+    <p>This matches the preference's true scope exactly: one switch, one control. The cost is distance —
+    the thing you want to close is four rows down, and the control that closes it sits above content
+    that has nothing to do with quiet.</p>
+  </div>
+  <div class="stage">
+    <div class="frame"><div class="frame-label">Collapsed</div><div class="hud" id="b-a"></div></div>
+    <div class="frame"><div class="frame-label">Revealed — control on the header</div><div class="hud" id="b-b"></div></div>
+  </div>
+  <div class="diff col"><b>IslandContentView.swift</b> — the pinned lane header
+<span class="cm">// LensEyeHeaderView already composes title + eye; it gains a third slot.</span>
+<span class="add">+ let anyQuietShown = showStale &amp;&amp; lensLayout.entries.contains {</span>
+<span class="add">+     if case let .group(_, _, _, _, q) = $0 { return !q.isEmpty }; return false</span>
+<span class="add">+ }</span>
+  pulseLabel = LensEyeHeaderView(title: sectionHeader("Your PRs"), eye: eye<span class="add">,</span>
+<span class="add">+                                hide: anyQuietShown ? HideControlView(theme: theme,</span>
+<span class="add">+                                                                     onHide: onToggleStale) : nil)</span></div>
+  <div class="trade col">
+    <div><dt>Wins</dt><dd>One control for one preference. No repetition. Nothing new appears between the rows.</dd></div>
+    <div><dt>Costs</dt><dd>Far from what it closes. Crowds the header, which already carries the eye. And it closes quiet from a place that never mentions quiet.</dd></div>
+  </div>
+</section>
+
+<section>
+  <div class="col">
+    <h2>C — a closing line at the lane's foot</h2>
+    <p class="lede">Bring back the lane-level <strong>Gone quiet</strong> header — as a footer, after the groups.</p>
+    <p>The flat shape's header exists and is ratified; this keeps it and moves it below the content it
+    governs, so grouped and flat differ in position rather than in vocabulary. It reads as a summary
+    line, which is either honest or redundant depending on your eye.</p>
+  </div>
+  <div class="stage">
+    <div class="frame"><div class="frame-label">Collapsed</div><div class="hud" id="c-a"></div></div>
+    <div class="frame"><div class="frame-label">Revealed — closing line</div><div class="hud" id="c-b"></div></div>
+  </div>
+  <div class="diff col"><b>IslandContentView.swift</b> — after the entries loop
+<span class="cm">// Grouped shape only; the flat shape already renders this above its rows.</span>
+<span class="add">+ if lensLayout.isGrouped, showStale, anyQuietShown {</span>
+<span class="add">+     pulseRowViews.append(revealedHeader(PlainWords.staleHeader, onHide: onToggleStale))</span>
+<span class="add">+ }</span></div>
+  <div class="trade col">
+    <div><dt>Wins</dt><dd>One control, and it names what it closes. Reuses <code>revealedHeader</code> untouched — zero new vocabulary.</dd></div>
+    <div><dt>Costs</dt><dd>A header below its content is a strange object. With one org it sits directly under that org's tail and reads like a second, empty section.</dd></div>
+  </div>
+</section>
+
+<section>
+  <div class="col">
+    <h2>The call</h2>
+    <p class="lede">A. The argument that decided it isn't about ink — it's that the objection I built on
+    was already false when I built it.</p>
+    <div class="pull">The collapsed state ships one <code>(show)</code> per group. If N handles on one
+    switch were wrong, the caption would be wrong too — and the caption is ratified.</div>
+    <p>B is the better answer to <em class="term">how many controls should a preference have</em>, and the
+    worse answer to <em class="term">where should a control live</em>. C is tidy in isolation and odd on a
+    one-org lane. A is the only one where the shape you're in doesn't change the grammar you use.</p>
+    <h3>Doing nothing is still legitimate</h3>
+    <p>The gear does close it, and someone who opened quiet knows the preference exists. If you take that
+    view, the change isn't code — it's turning <strong>G1</strong> from a gap into an exemption in
+    <code>docs/TOPOLOGY.md</code>, with that reasoning written next to it. What's not defensible is
+    leaving it unrecorded, which is where this was yesterday.</p>
+  </div>
+  <p class="note col">Mocks are hand-built replicas at the island's real proportions and ink levels —
+  they demonstrate structure, not pixels. The island stays dark in both page themes because the real one does.</p>
+</section>
+
+</div>
+
+<script>
+const ROW = (cls, glyph, title, sub, dim) =>
+  `<div class="row${dim ? ' dim' : ''}"><div class="dot ${cls}">${glyph}</div>` +
+  `<div class="txt"><div class="t">${title}</div><div class="s">${sub}</div></div></div>`;
+
+const HEAD = (eye) => `<div class="lane-head">Your PRs${eye || '<span class="eye">◉</span>'}</div>`;
+
+// variant: 'cur' | 'a' | 'b' | 'c'   state: false = collapsed, true = revealed
+function render(el, variant, shown) {
+  const cap = (n, org) =>
+    `<button class="cap" data-org="${org}" aria-expanded="false">` +
+    `${n} gone quiet <u>(show)</u></button>`;
+
+  const tail = (n) => {
+    if (variant === 'a')
+      return `<div class="tail">${n} gone quiet<span class="grow"></span>` +
+             `<button class="hidectl" data-act="hide"><u>(hide)</u></button></div>`;
+    if (variant === 'cur')
+      return `<div class="tail">${n} gone quiet<span class="grow"></span>` +
+             `<span class="ghost">no way back</span></div>`;
+    return `<div class="tail">${n} gone quiet</div>`;
+  };
+
+  const eye = (variant === 'b' && shown)
+    ? `<span class="eye">◉</span><button class="hidectl" data-act="hide"><u>(hide)</u></button>`
+    : null;
+
+  let h = HEAD(eye);
+
+  h += `<div class="grp">acme</div>`;
+  h += ROW('warn', '!', 'Deep-link addressability', 'core #736 · CI passing · conflicts · 14h');
+  h += shown
+    ? tail(1) + ROW('warn', '!', 'Legacy record migration', 'core #100 · CI passing · conflicts · 16w', true)
+    : cap(1, 'acme');
+
+  h += `<div class="grp">pro-vi</div>`;
+  h += ROW('ok', '✓', 'Per-org quiet tails', 'githud #214 · CI passing · approved · 19h');
+  h += `<div class="tail">1 draft</div>`;
+  h += ROW('wip', '✎', 'WIP: sweep-lane rewrite', 'toolkit #69 · CI passing · draft · 6d', true);
+  h += shown
+    ? tail(2) + ROW('ok', '✓', 'Snapshot-store spike', 'githud #50 · CI passing · 30d', true)
+    : cap(2, 'pro-vi');
+
+  if (variant === 'c' && shown) {
+    h += `<div class="foot">Gone quiet<span style="flex:1"></span>` +
+         `<button class="hidectl" data-act="hide"><u>(hide)</u></button></div>`;
+  }
+
+  el.innerHTML = h;
+  el.querySelectorAll('.cap').forEach(b =>
+    b.addEventListener('click', () => setState(variant, true)));
+  el.querySelectorAll('[data-act="hide"]').forEach(b =>
+    b.addEventListener('click', () => setState(variant, false)));
+}
+
+const PANELS = {
+  cur: ['cur-a', 'cur-b'], a: ['a-a', 'a-b'], b: ['b-a', 'b-b'], c: ['c-a', 'c-b']
+};
+
+// Left panel always shows collapsed, right always revealed — until the reader
+// drives one, at which point BOTH follow, because one lane-wide preference is
+// exactly the thing being demonstrated.
+const driven = {};
+function setState(variant, shown) {
+  driven[variant] = true;
+  PANELS[variant].forEach(id => render(document.getElementById(id), variant, shown));
+}
+function init() {
+  Object.entries(PANELS).forEach(([variant, ids]) => {
+    render(document.getElementById(ids[0]), variant, false);
+    render(document.getElementById(ids[1]), variant, true);
+  });
+}
+init();
+</script>

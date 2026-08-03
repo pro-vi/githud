@@ -1,0 +1,666 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>githud — D-pill session mocks</title>
+<style>
+  /* ————— page tokens (chrome only; mock stages are committed-dark, they never theme-flip) ————— */
+  :root {
+    --bg: #f6f7f9; --card: #ffffff; --ink: #1a2129; --ink2: #5a6572; --ink3: #8b95a3;
+    --line: #dde3ea; --accent: #2464c4; --accent-ink: #ffffff;
+    --ok: #2da44e; --warn: #9a6700; --bad: #c93c37;
+    --chip-ok: #dcf2e3; --chip-warn: #f8ecd0; --chip-bad: #fadcda;
+    --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, monospace;
+    --sys: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) { :root {
+    --bg: #0b0e13; --card: #121722; --ink: #e7edf4; --ink2: #98a2b0; --ink3: #6b7683;
+    --line: #232b36; --accent: #4c94f8; --accent-ink: #0b0e13;
+    --ok: #4ac26b; --warn: #d29922; --bad: #f47067;
+    --chip-ok: #12351f; --chip-warn: #3a2d10; --chip-bad: #42201d;
+  }}
+  :root[data-theme="light"] {
+    --bg: #f6f7f9; --card: #ffffff; --ink: #1a2129; --ink2: #5a6572; --ink3: #8b95a3;
+    --line: #dde3ea; --accent: #2464c4; --accent-ink: #ffffff;
+    --ok: #2da44e; --warn: #9a6700; --bad: #c93c37;
+    --chip-ok: #dcf2e3; --chip-warn: #f8ecd0; --chip-bad: #fadcda;
+  }
+  :root[data-theme="dark"] {
+    --bg: #0b0e13; --card: #121722; --ink: #e7edf4; --ink2: #98a2b0; --ink3: #6b7683;
+    --line: #232b36; --accent: #4c94f8; --accent-ink: #0b0e13;
+    --ok: #4ac26b; --warn: #d29922; --bad: #f47067;
+    --chip-ok: #12351f; --chip-warn: #3a2d10; --chip-bad: #42201d;
+  }
+
+  html { scroll-behavior: smooth; }
+  body { background: var(--bg); color: var(--ink); font: 15px/1.6 var(--sys); margin: 0; }
+  * { box-sizing: border-box; }
+
+  .topbar { position: sticky; top: 0; z-index: 50; background: color-mix(in srgb, var(--bg) 88%, transparent);
+    backdrop-filter: blur(10px); border-bottom: 1px solid var(--line); }
+  .topbar-in { max-width: 1200px; margin: 0 auto; padding: 10px 24px; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+  .brand { font-weight: 700; font-size: 14px; letter-spacing: -0.01em; }
+  .brand span { color: var(--ink3); font-weight: 400; }
+  nav { display: flex; gap: 6px; flex-wrap: wrap; }
+  nav a { font: 600 11px/1 var(--mono); letter-spacing: .04em; color: var(--ink2); text-decoration: none;
+    padding: 6px 10px; border: 1px solid var(--line); border-radius: 999px; background: var(--card); }
+  nav a:hover { color: var(--ink); border-color: var(--ink3); }
+  nav a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .wrap { max-width: 1200px; margin: 0 auto; padding: 0 24px 96px; }
+  header.lead { padding: 44px 0 8px; max-width: 78ch; }
+  header.lead h1 { font-size: 27px; font-weight: 750; letter-spacing: -0.022em; margin: 0 0 10px; text-wrap: balance; }
+  header.lead p { color: var(--ink2); margin: 0 0 8px; }
+  .doctrine-note { font: 500 12px/1.5 var(--mono); color: var(--ink3); border-left: 2px solid var(--accent);
+    padding: 2px 0 2px 12px; margin-top: 14px; }
+
+  section.record { border-top: 1px solid var(--line); margin-top: 48px; padding-top: 34px; }
+  .eyebrow { font: 600 11px/1 var(--mono); letter-spacing: .09em; text-transform: uppercase; color: var(--accent); margin: 0 0 10px; }
+  section.record h2 { font-size: 21px; font-weight: 700; letter-spacing: -0.015em; margin: 0 0 6px; max-width: 72ch; text-wrap: balance; }
+  .qsub { color: var(--ink2); max-width: 78ch; margin: 0 0 20px; }
+  .qsub code, .today code, .spec code, .amendment code, .finding code, .decide code {
+    font: 500 11.5px var(--mono); background: color-mix(in srgb, var(--ink) 7%, transparent); border-radius: 4px; padding: 1px 4px; }
+
+  .today { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px 18px; margin: 0 0 22px; }
+  .today h3 { margin: 0 0 6px; font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--ink3); }
+  .today p { margin: 0; color: var(--ink2); font-size: 13.5px; }
+
+  /* findings */
+  .findings { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 14px; }
+  .finding { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 13px 15px; font-size: 13px; color: var(--ink2); }
+  .finding h3 { margin: 0 0 5px; font-size: 13.5px; font-weight: 700; color: var(--ink); letter-spacing: -0.005em; }
+  .finding .fid { font: 700 10px var(--mono); letter-spacing: .07em; color: var(--accent); text-transform: uppercase; display: block; margin-bottom: 4px; }
+  .finding.hot { border-color: color-mix(in srgb, var(--bad) 45%, var(--line)); }
+  .finding.hot .fid { color: var(--bad); }
+
+  .variants { display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 20px; }
+  .vcard { background: var(--card); border: 1px solid var(--line); border-radius: 12px; overflow: hidden;
+    display: flex; flex-direction: column; }
+  .vcard.rec { border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent); }
+  .vcard.dead { opacity: .82; }
+  .vbody { padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 10px; flex: 1; }
+  .vhead { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+  .vhead h3 { margin: 0; font-size: 15.5px; font-weight: 700; letter-spacing: -0.01em; }
+  .vcard.dead .vhead h3 { text-decoration: line-through; text-decoration-thickness: 1.5px; text-decoration-color: var(--bad); }
+  .vid { font: 500 10.5px var(--mono); color: var(--ink3); }
+  .essence { margin: 0; color: var(--ink2); font-size: 13.5px; }
+  .vflags { display: flex; gap: 6px; flex-wrap: wrap; margin-left: auto; }
+  .chip { font: 700 10px/1 var(--mono); letter-spacing: .05em; text-transform: uppercase; padding: 4px 8px; border-radius: 999px; }
+  .chip.keep { background: var(--chip-ok); color: var(--ok); }
+  .chip.amend { background: var(--chip-warn); color: var(--warn); }
+  .chip.kill { background: var(--chip-bad); color: var(--bad); }
+  .chip.pick { background: var(--accent); color: var(--accent-ink); }
+  .lenses { display: flex; gap: 6px; flex-wrap: wrap; }
+  .lens { font: 600 10px/1 var(--mono); letter-spacing: .03em; padding: 4px 8px; border-radius: 6px; border: 1px solid var(--line); color: var(--ink2); }
+  .lens b { font-weight: 800; }
+  .lens.l-keep b { color: var(--ok); } .lens.l-amend b { color: var(--warn); } .lens.l-kill b { color: var(--bad); }
+
+  details { border-top: 1px solid var(--line); padding-top: 8px; }
+  details summary { cursor: pointer; font: 600 11px/1.6 var(--mono); letter-spacing: .05em; text-transform: uppercase; color: var(--ink3); list-style: none; }
+  details summary::before { content: "▸ "; }
+  details[open] summary::before { content: "▾ "; }
+  details > div { padding: 8px 0 2px; font-size: 13px; color: var(--ink2); }
+  details .spec { white-space: pre-wrap; }
+  .verdict { border-top: 1px solid var(--line); padding-top: 10px; font-size: 12.5px; color: var(--ink2); }
+  .verdict b { color: var(--ink); font-weight: 650; }
+  .amendment { margin-top: 4px; }
+  .amendment::before { content: "amend → "; font: 700 10px var(--mono); letter-spacing: .05em; color: var(--warn); text-transform: uppercase; }
+
+  .decide { margin-top: 22px; background: color-mix(in srgb, var(--accent) 7%, var(--card)); border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--line));
+    border-radius: 10px; padding: 14px 18px; font-size: 13.5px; }
+  .decide h3 { margin: 0 0 6px; font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--accent); }
+  .decide p { margin: 0 0 6px; color: var(--ink2); } .decide p:last-child { margin: 0; }
+  .decide b { color: var(--ink); font-weight: 650; }
+  .dgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; margin-top: 16px; }
+
+  /* ————— mock stage (committed dark) ————— */
+  .stage { position: relative; background: linear-gradient(148deg, #232c4e 0%, #33234a 42%, #14263e 100%);
+    min-height: 128px; overflow: hidden; user-select: none; }
+  .stage .menubar { position: absolute; top: 0; left: 0; right: 0; height: 24px;
+    background: rgba(16,18,24,.78); display: flex; align-items: center; gap: 10px;
+    padding: 0 12px; font: 500 11px var(--sys); color: rgba(235,240,246,.82); }
+  .stage .menubar .mb-right { margin-left: auto; display: flex; align-items: center; gap: 12px; }
+  .stage .hint { position: absolute; left: 12px; bottom: 8px; font: 500 10.5px var(--mono); color: rgba(235,240,246,.5); }
+  .stage .wtag { position: absolute; right: 12px; bottom: 8px; font: 600 10.5px var(--mono); color: rgba(235,240,246,.6); font-variant-numeric: tabular-nums; }
+  .stage-ctl { display: flex; gap: 6px; align-items: center; padding: 10px 14px; border-top: 1px solid var(--line); background: var(--card); flex-wrap: wrap; }
+  .stage-ctl button { font: 600 11.5px var(--sys); color: var(--ink); background: var(--bg);
+    border: 1px solid var(--line); border-radius: 7px; padding: 4px 10px; cursor: pointer; }
+  .stage-ctl button:hover { border-color: var(--ink3); }
+  .stage-ctl button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+
+  /* the pill itself — GitHub theme, real geometry (36pt, radius 14) */
+  .mock-pill { position: absolute; top: 46px; left: 50%; transform: translateX(-50%);
+    height: 36px; background: #0d1117; border: 1px solid rgba(48,54,61,.85); border-radius: 14px;
+    box-shadow: 0 10px 30px rgba(0,0,0,.45), 0 2px 8px rgba(0,0,0,.35);
+    transition: width 150ms cubic-bezier(.2,0,0,1); }
+  .pill-c { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; gap: 6px;
+    font: 600 13px var(--sys); color: #e6edf3; font-variant-numeric: tabular-nums; white-space: nowrap;
+    transition: opacity 120ms cubic-bezier(.4,0,.2,1); }
+  .pill-c svg { display: block; }
+  .g-ink3 { color: #6e7681; } .g-ink2 { color: #7d8590; } .g-danger { color: #f85149; } .g-caution { color: #d29922; }
+  .badge { width: 16px; height: 16px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center;
+    font: 800 10px/1 var(--sys); color: #fff; flex: none; }
+  .badge.ok { background: #238636; } .badge.bad { background: #da3633; }
+  .seg { display: inline-flex; align-items: center; gap: 4px; }
+  .pip { width: 3px; height: 3px; border-radius: 50%; background: #6e7681; display: inline-block; }
+  .dim11 { color: #6e7681; display: inline-flex; align-items: center; gap: 3px; }
+  .ell { font: 700 13px/1 var(--sys); color: #6e7681; letter-spacing: 1px; }
+
+  @media (prefers-reduced-motion: reduce) { .stage *, .stage, .mock-pill, .pill-c { transition: none !important; animation: none !important; } }
+
+  .footer { margin-top: 56px; border-top: 1px solid var(--line); padding-top: 18px; color: var(--ink3); font-size: 12.5px; max-width: 78ch; }
+</style>
+
+<div class="topbar"><div class="topbar-in">
+  <div class="brand">githud <span>/ D-pill session — variants &amp; mocks · 2026-07-09</span></div>
+  <nav>
+    <a href="#findings">Findings</a><a href="#ladder">Ladder</a><a href="#composed">Composed ⛔</a>
+    <a href="#residue">Third way</a><a href="#hybrid">Hybrid ★</a><a href="#decide">Decide</a>
+  </nav>
+</div></div>
+
+<div class="wrap">
+<header class="lead">
+  <h1>One pill, three lanes — six vocabularies, three refuters, two survivors</h1>
+  <p>The collapsed pill grew a fourth fact-tier as a fix-round remedy, not a design. This session ran the redesign
+     properly: three designers each advocated one direction (pure ladder · composed strip · a third way), then three
+     adversarial refuters attacked all six variants through the calm/color, honesty/trust, and mechanics lenses —
+     every structural claim verified against the real code (<code>file:line</code> in the verdicts). Chips show what
+     survived: <b>keep</b> = clean under that lens, <b>amend</b> = clean after the named amendment, <b>kill</b> = struck
+     for the record. A blue ring marks the runner's recommendation — a default, not a decision. The decisions are yours,
+     at the bottom.</p>
+  <p class="doctrine-note">This page obeys the product's own doctrine: nothing on it moves until you click. Pill mocks render
+     the GitHub theme at real size (36pt, radius 14) and morph with the app's own ratified curves (content 120ms, width 150ms).</p>
+</header>
+
+<!-- ══════════════════════════ FINDINGS ══════════════════════════ -->
+<section class="record" id="findings">
+  <p class="eyebrow">What the refuters established — code-verified, before any taste enters</p>
+  <h2>Five load-bearing facts the design must answer to</h2>
+
+  <div class="findings">
+    <div class="finding">
+      <span class="fid">F1 · confirmed</span>
+      <h3>The inbound pill tier is dead code for you</h3>
+      <code>PillMorph.fingerprint</code> checks the gauge branch (<code>:99</code>) before the inbound branch (<code>:110</code>),
+      and the gauge exists whenever you have any live PR. You chronically hold ~7 — so the "5 waiting" tier built in 9012859
+      has <b>never once rendered on your pill</b>. It fires only at radar 0 ∧ zero live PRs ∧ queue &gt; 0.
+    </div>
+    <div class="finding">
+      <span class="fid">F2 · confirmed</span>
+      <h3>Radar and inbound can double-count one PR</h3>
+      A fresh third-party PR on a watch-subscribed owned repo is classified <code>inbound</code> at 62 (<code>SignalClassifier.swift:127-131</code>)
+      → it's in <code>rows.count</code> — AND the search sweep returns it → it's in <code>inboundActive</code>. The radar side clears on read;
+      the inbound side persists until close. <b>Only designs drawing both counts at once are bitten</b> — and the pill has no
+      set-diff data to dedupe them.
+    </div>
+    <div class="finding hot">
+      <span class="fid">F3 · the upstream decision</span>
+      <h3>The pill's stale clock does not cover the inbound lane</h3>
+      The stale prefix keys off <code>freshness</code>, computed only from the radar+pulse poll clocks; the sweep deliberately
+      never feeds it (<code>PollReducer.swift:184-186</code>), and the adopt rule holds items through failed sweeps
+      (<code>InboundItem.swift:113-116</code>). So any variant showing an inbound <b>count</b> chronically can draw
+      "5 waiting" under fresh chrome while two of them already merged during a failed-sweep window. <b>Close it (per-fact
+      stale clock) or keep the elevated inbound count-free.</b> No designer noticed; this ranks above the vocabulary choice.
+    </div>
+    <div class="finding">
+      <span class="fid">F4 · confirmed</span>
+      <h3>Shield ⊥ gauge — today's colors never co-render</h3>
+      The danger-red critical shield needs <code>rows</code> non-empty; the gauge's Primer badges need <code>rows.isEmpty</code>.
+      Two status-color families are never co-visible on the shipped pill — and the PAID color-doctrine blind-read proof
+      ("lone red security shield, zero yellow") rests on exactly that. Composition is the only family that breaks it.
+    </div>
+    <div class="finding">
+      <span class="fid">F5 · build constraint</span>
+      <h3>The ladder order lives in three files, unpinned</h3>
+      <code>fingerprint()</code>, <code>size(for:)</code>, and <code>bodyValue</code> each independently encode gauge-before-inbound,
+      and no test pins the order (the existing inbound test uses <code>pulse:[]</code>, so it passes under both orders).
+      Any reorder must land with a lockstep edit ×3 plus a new order-pinning test, or the drawn pill, its width, and its
+      spoken value can silently disagree.
+    </div>
+    <div class="finding">
+      <span class="fid">F0 · the shipped baseline, honestly</span>
+      <h3>Today's pill is not the calm baseline it's assumed to be</h3>
+      With radar 0 it shows the green+red gauge badges all day (chronic standing color) and breathes 60↔88pt on every
+      radar zero-crossing. Click through the mocks below with that baseline in mind — one variant reduces both
+      <i>below</i> today; others multiply them.
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════ LADDER ══════════════════════════ -->
+<section class="record" id="ladder">
+  <p class="eyebrow">Direction A — the priority ladder, perfected · designer A vs three refuters</p>
+  <h2>One fact at a time — but the right fact, in the right order</h2>
+  <p class="qsub">Designer A's case: the pill answers one question ("does GitHub need me right now?") with the single truest
+     answer, and EXPAND is the honesty affordance. The load-bearing move both variants share: <b>inbound is promoted above
+     the gauge</b> — acute radar &gt; human queue &gt; CI weather &gt; check. Your own CI you re-encounter on every push; the
+     contributor waiting since December is the fact you forget. The glyph is redesigned too: <code>tray.fill</code> replaces
+     the borrowed <code>tray.and.arrow.down.fill</code> — an arrow depicts a download arriving <i>now</i>, the wrong tense for
+     a standing queue.</p>
+
+  <div class="variants">
+
+    <!-- ladder-strict -->
+    <div class="vcard rec">
+      <div class="stage" id="stA1">
+        <div class="menubar"><span></span><div class="mb-right"><span>⌥</span><span>Wed 09:41</span></div></div>
+        <div class="mock-pill" id="pA1"><div class="pill-c" id="cA1"></div></div>
+        <div class="hint">click states · widths are the real formulas</div>
+        <div class="wtag" id="wA1"></div>
+      </div>
+      <div class="stage-ctl" id="tA1"></div>
+      <div class="vbody">
+        <div class="vhead"><h3>The reordered ladder, pure</h3><span class="vid">ladder-strict</span>
+          <div class="vflags"><span class="chip pick">runner pick</span><span class="chip amend">amend</span></div></div>
+        <div class="lenses"><span class="lens l-keep">calm <b>KEEP · #1</b></span><span class="lens l-amend">honesty <b>AMEND</b></span><span class="lens l-keep">mech <b>KEEP · #1</b></span></div>
+        <p class="essence">Single fact, reordered: loading &gt; radar &gt; <b>inbound</b> &gt; gauge &gt; check. Chronic state becomes
+        ink-only "tray 5" at a <b>pinned 60pt</b> — the reorder kills today's chronic gauge color AND the 60↔88 breathe.
+        Zero new fingerprint fields; the whole change is a branch reorder + one glyph string.</p>
+        <details><summary>Build spec</summary><div class="spec">Reorder inbound above gauge in THREE files in lockstep (F5): PillMorph.fingerprint (:99/:110 swap), CollapsedPillView.size(for:) (:39/:49), PillAccessibilityPresenter.bodyValue (:62/:68). Glyph: "tray.and.arrow.down.fill" → "tray.fill", 13pt medium (chronic tier calmer than acute semibold). Check weight semibold → regular (optional, independently rejectable). Widths unchanged: radar/inbound 18+6+d·10+26 (=60 @1 digit), gauge 24+Σ(16+4+d·9)+6·gaps, check/loading 52, stale +19. Spoken: move the inbound branch above gauge in bodyValue — same ratified strings. NEW TEST: pin gauge-exists ∧ inbound&gt;0 ⇒ inbound draws (no test pins the order today); update main.swift:923 tray symbol assert. F3 CLOSURE REQUIRED (chronic count): per-fact stale clock — the stale prefix covers the inbound-count state iff the SWEEP clock (lastInboundSuccessAt) is degraded, radar/gauge states keep the poll clock. Transitions all ride existing rules: radar→inbound = glyph fade + value tick/fade; inbound→gauge = glyph fade + count→gauge crossfade + width settle 60→88.</div></details>
+        <details><summary>Doctrine fit &amp; risks</summary><div><b>Fit:</b> chronic state is motionless AND colorless — the color-doctrine ideal; color only on a real critical; the reorder <i>removes</i> two live defects of the shipped pill (chronic badge color, radar zero-crossing breathe). Cheapest build in the field: 3 seams, 0 new mechanisms, 1 test assert flips.<br><br><b>Risks:</b> chronically shows "5 waiting" — a standing human-debt figure on an ambient surface (the guilt-list question is yours to feel, not the refuters' to settle); hides your gauge all day (you re-see it on every push — the designed trade); the count is only honest chronic if F3 is closed.</div></details>
+        <div class="verdict"><b>Refuters:</b> calm ranks it #1 — "width pinned at 60 all day, ink-only chronic; beats the shipped baseline." Mechanics ranks it #1 — 3 seams, zero new mechanics. Honesty's attack: the reorder makes "gauge visible ⇒ queue clear" a learnable inference that is FALSE pre-first-sweep (count 0 because never read), and the chronic count amplifies F3.
+        <div class="amendment">close F3 (per-fact stale clock) before the count goes chronic; strike "gauge surfaces = queue clear" from the spec rationale (gauge surfacing proves nothing pre-confirmation); land the order-pinning test (F5).</div></div>
+      </div>
+    </div>
+
+    <!-- ladder-residue -->
+    <div class="vcard">
+      <div class="stage" id="stA2">
+        <div class="menubar"><span></span><div class="mb-right"><span>⌥</span><span>Wed 09:41</span></div></div>
+        <div class="mock-pill" id="pA2"><div class="pill-c" id="cA2"></div></div>
+        <div class="hint">click states</div>
+        <div class="wtag" id="wA2"></div>
+      </div>
+      <div class="stage-ctl" id="tA2"></div>
+      <div class="vbody">
+        <div class="vhead"><h3>The ladder that admits it</h3><span class="vid">ladder-residue</span>
+          <div class="vflags"><span class="chip amend">amend</span></div></div>
+        <div class="lenses"><span class="lens l-amend">calm <b>AMEND — cut pip</b></span><span class="lens l-amend">honesty <b>AMEND</b></span><span class="lens l-keep">mech <b>KEEP</b></span></div>
+        <p class="essence">ladder-strict + a 3pt contentless honesty-pip: present iff a lower tier holds content ("more inside"),
+        absent at gauge/check. +7pt. The pip states no count, no kind — it cannot over-claim; spoken parity via "— more inside".</p>
+        <details><summary>Build spec</summary><div class="spec">Everything in ladder-strict, plus: Cell.residue + Fingerprint.hasResidue: Bool (defaulted — old ctors keep compiling) + one plan() branch (residue flips always fade 120ms, never tick) + size +7 (4 tight gap via setCustomSpacing + 3pt dot) + residue entry appended LAST in the anti-jump reference list (order-sensitive — mechanics refuter) + "— more inside" spoken clause. Derivation: radar shown → gauge∃ ∨ inbound&gt;0; inbound shown → gauge∃; gauge/check/loading → never. The residue cell is the trailing twin of the ratified optional prefix cell — same proven pattern (size term, anchor slot, applyTransition branch, builder).</div></details>
+        <details><summary>Doctrine fit &amp; risks</summary><div><b>Fit:</b> contentless and gray-swap-invariant by construction; drawn/spoken channels honest; mechanics proven by the prefix-cell precedent.<br><br><b>Risks:</b> for YOU something is almost always below the primary, so the pip sits lit ~100% of the day conveying ~0 bits — permanent furniture whose meaningful state (absence) is the rare one. 3pt is 6 device-px on retina — at the perceptual floor; do not alpha-fade it further.</div></details>
+        <div class="verdict"><b>Refuters:</b> calm — "the pip's information value is inverted for this user; delete it → yields ladder-strict" (dominated). Honesty — the pip itself is clean, but the spec frames its ABSENCE as "this is everything," a completeness certificate only the island's <code>inboundConfirmed</code> gate may issue.
+        <div class="amendment">if kept: absence means only "nothing outranked in the ladder," never "confirmed empty" — strike the completeness framing from spec and any downstream copy; anchor-list append-last; keep the dot at full alpha.</div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════ COMPOSED ══════════════════════════ -->
+<section class="record" id="composed">
+  <p class="eyebrow">Direction B — the composed strip · killed 3-for-3, shown struck for the record</p>
+  <h2>All three lanes at once — and why the refuters killed it</h2>
+  <p class="qsub">Designer B's case was real: the gauge already composes segments, absence-means-zero is a stronger claim than
+     the ladder's ambiguous silence, and it heals spoken parity by construction. It died on verified arithmetic and code,
+     not taste: your gauge is <b>two</b> segments and your queue never clears, so the "common 52–92pt" defense is false —
+     the strip <b>floors at 127pt permanently</b>; it puts both red families on screen together for the first time (F4,
+     breaking a PAID proof); it double-counts fresh inbound PRs (F2) with no dedupe data; its "no new primitive" cost claim
+     hid a nested second morph engine plus a rewrite of the ratified Plan shape (WP-3x re-ratification); and its stale-cover
+     claim is refuted by F3. The mocks stay — click them to feel the width.</p>
+
+  <div class="variants">
+
+    <!-- composed-lanes -->
+    <div class="vcard dead">
+      <div class="stage" id="stB1">
+        <div class="menubar"><span></span><div class="mb-right"><span>⌥</span><span>Wed 09:41</span></div></div>
+        <div class="mock-pill" id="pB1"><div class="pill-c" id="cB1"></div></div>
+        <div class="hint">click states — feel the chronic width</div>
+        <div class="wtag" id="wB1"></div>
+      </div>
+      <div class="stage-ctl" id="tB1"></div>
+      <div class="vbody">
+        <div class="vhead"><h3>Lanes as segments</h3><span class="vid">composed-lanes</span>
+          <div class="vflags"><span class="chip kill">kill</span></div></div>
+        <div class="lenses"><span class="lens l-kill">calm <b>KILL</b></span><span class="lens l-amend">honesty <b>AMEND (structural)</b></span><span class="lens l-kill">mech <b>KILL as-specced</b></span></div>
+        <p class="essence">Every non-zero lane contributes glyph+count segments: [radar][✓ready ✗blocked][tray]. Absence means zero.
+        Exclusive ends (loading/check) still ladder. Stable <code>bell.fill</code> radar segment.</p>
+        <details><summary>Why it died (the three kills)</summary><div><b>Calm:</b> chronic state = [✓3][✗4][tray 5] = 127pt permanent dashboard, breathing ~39pt on every radar zero-crossing; Primer green+red become permanent standing color; danger shield + Primer ✗ co-visible for the first time — invalidates the PAID "lone red, zero yellow" blind-read (F4).<br><br><b>Honesty:</b> F2 — "3 + 5" can be as few as 3 distinct PRs; the strip visually asserts obligations that don't exist, and its §8 audit never mentions it. Its stale-cover defense ("last-good count composes beneath the prefix") is refuted by F3 — the prefix never rises for a stale sweep.<br><br><b>Mechanics:</b> fading one segment inside the value cell needs a nested segment-chassis (per-segment ghost + inner anti-jump + second settle) the spec prices at zero; moving isCritical off the glyph cell inverts the ratified rule-c invariant (PillMorph.swift:26-29) — a WP-3x contract change; ~the entire PillMorph test suite rewritten. Its "identical to today" width claim is arithmetically false (radar-only 60→53, gap 6→4).</div></details>
+        <div class="verdict"><b>Session record:</b> the honest respec would be "Plan v2 + nested segment engine + WP-3x re-ratification + F2 dedupe plumbing + F3 closure" — a WP-scale rebuild for a strip that is wider than any pill the chassis has ever rendered (+70% over today's 107pt max). Killed on all three lenses' evidence.</div>
+      </div>
+    </div>
+
+    <!-- composed-reasons -->
+    <div class="vcard dead">
+      <div class="stage" id="stB2">
+        <div class="menubar"><span></span><div class="mb-right"><span>⌥</span><span>Wed 09:41</span></div></div>
+        <div class="mock-pill" id="pB2"><div class="pill-c" id="cB2"></div></div>
+        <div class="hint">click states</div>
+        <div class="wtag" id="wB2"></div>
+      </div>
+      <div class="stage-ctl" id="tB2"></div>
+      <div class="vbody">
+        <div class="vhead"><h3>Lanes + reason glyphs</h3><span class="vid">composed-reasons</span>
+          <div class="vflags"><span class="chip kill">kill</span></div></div>
+        <div class="lenses"><span class="lens l-kill">calm <b>KILL</b></span><span class="lens l-amend">honesty <b>AMEND (most debt)</b></span><span class="lens l-kill">mech <b>KILL</b></span></div>
+        <p class="essence">composed-lanes with the polymorphic top-reason glyph in the radar segment — shows <i>what</i> needs you, not just that something does.</p>
+        <details><summary>Why it died (everything above, plus three of its own)</summary><div>(1) Reason reshuffle at equal count now fades the segment — motion with no changed next-move, on the always-visible surface. (2) See-only reason glyph = a parity break pointed at exactly the user the a11y law protects: the drawn channel names the ask-kind, the spoken channel doesn't. (3) A width bug: the fixed 16pt glyph box is invalid for the wide reason glyphs (<code>arrow.triangle.pull</code>, <code>person.2.fill</code>) — PillCellHost hugs actual content, so 166/202 are lower bounds and size(for:) under-allocates → clip. Designer B itself recommended against V2.</div></details>
+        <div class="verdict"><b>Session record:</b> strictly dominated by composed-lanes, which is itself killed. Highest-risk variant of the six.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════ THIRD WAY ══════════════════════════ -->
+<section class="record" id="residue">
+  <p class="eyebrow">Direction C — the third way · never state a second count</p>
+  <h2>A primary fact plus a count-free acknowledgment of the rest</h2>
+  <p class="qsub">Designer C's structural insight survived every refuter: because radar∩inbound can alias (F2), any second
+     <b>count</b> risks over-asserting — but a count-free mark cannot. Both variants state one number and acknowledge the
+     rest by existence (or kind). The honesty refuter ranked this direction #1: a count-free elevated inbound dodges F3
+     entirely ("there is a queue" survives one item merging; "5 waiting" does not). The calm refuter's counter: for you the
+     marks are chronic furniture. That tension is the real choice in this section.</p>
+
+  <div class="variants">
+
+    <!-- residue-tick -->
+    <div class="vcard">
+      <div class="stage" id="stC1">
+        <div class="menubar"><span></span><div class="mb-right"><span>⌥</span><span>Wed 09:41</span></div></div>
+        <div class="mock-pill" id="pC1"><div class="pill-c" id="cC1"></div></div>
+        <div class="hint">click states</div>
+        <div class="wtag" id="wC1"></div>
+      </div>
+      <div class="stage-ctl" id="tC1"></div>
+      <div class="vbody">
+        <div class="vhead"><h3>Today's ladder + one honest ellipsis</h3><span class="vid">residue-tick</span>
+          <div class="vflags"><span class="chip amend">amend</span></div></div>
+        <div class="lenses"><span class="lens l-amend">calm <b>AMEND — adopt reorder</b></span><span class="lens l-keep">honesty <b>KEEP-ish · #1</b></span><span class="lens l-keep">mech <b>KEEP · #2</b></span></div>
+        <p class="essence">Today's exact ladder (gauge still outranks inbound), plus an 11pt dim <code>ellipsis</code> when any
+        lower lane is populated (+20pt); spoken "; more below." Surgical: all-clear/stale/loading render byte-for-byte as today.</p>
+        <details><summary>Build spec</summary><div class="spec">Same residue-cell machinery as ladder-residue (Cell.residue, defaulted Fingerprint field, one plan() branch, +20 size term, anchor appended last, builder, spoken clause) but NO reorder — strictly fewer seams (~7, no lockstep edit). Residue never ticks (no digits): fades 120ms or no-ops. Derivation: radar → gauge∃ ∨ inbound&gt;0; gauge → inbound&gt;0; inbound/check/loading → never. Honesty note: keeping today's order means the count-bearing inbound state stays RARE — this variant does not amplify F3 (its genuine advantage).</div></details>
+        <details><summary>Doctrine fit &amp; risks</summary><div><b>Fit:</b> count-free mark is double-count-proof and gray-swap-invariant; honesty's ranked #1 — lightest trust debt in the field; second-cheapest build.<br><br><b>Risks:</b> forfeits the reorder's calm win — chronic primary stays the colored gauge, chronic breathe becomes 80↔108, and the ellipsis is lit ~100% of your day; 11pt ellipsis is heavier furniture than A2's 3pt pip.</div></details>
+        <div class="verdict"><b>Refuters:</b> honesty — "keeps the count-bearing inbound rare; does NOT amplify the stale-clock exposure — a real advantage; only debt is §9's 'truly nothing' framing of the check." Calm — "adopt the reorder or forfeit the standing-color/breathe fix for no reason; with it, this converges on ladder-strict-plus-tell."
+        <div class="amendment">strike the "truly nothing / unique zero-residue" completeness framing (the check stays the weak claim); decide the reorder question explicitly — with it, this variant merges into ladder-strict + optional mark.</div></div>
+      </div>
+    </div>
+
+    <!-- kind-markers -->
+    <div class="vcard">
+      <div class="stage" id="stC2">
+        <div class="menubar"><span></span><div class="mb-right"><span>⌥</span><span>Wed 09:41</span></div></div>
+        <div class="mock-pill" id="pC2"><div class="pill-c" id="cC2"></div></div>
+        <div class="hint">click states</div>
+        <div class="wtag" id="wC2"></div>
+      </div>
+      <div class="stage-ctl" id="tC2"></div>
+      <div class="vbody">
+        <div class="vhead"><h3>Typed markers, demand first</h3><span class="vid">kind-markers</span>
+          <div class="vflags"><span class="chip amend">amend — split</span></div></div>
+        <div class="lenses"><span class="lens l-amend">calm <b>keep T2 · cut T1</b></span><span class="lens l-amend">honesty <b>keep T1 · gate T2</b></span><span class="lens l-keep">mech <b>KEEP</b></span></div>
+        <p class="essence">Two separable theses: <b>T1</b> — up to two dim 11pt kind-glyphs (work <code>gauge.medium</code> /
+        queue tray) name WHAT is beneath, count-free (+20/+37pt). <b>T2</b> — the same reorder as ladder-strict.
+        The refuters split exactly on the T1/T2 axis.</p>
+        <details><summary>Build spec</summary><div class="spec">Residue cell hosts a 1–2 glyph cluster that crossfades AS A UNIT (whole-cell fade — the key mechanical separation from composition; no per-segment engine). Fingerprint.residue: [ResidueKind]; cluster changes fade 120ms, never tick. Widths: +20 (one kind) / +37 (two). Edge (a): [shield·danger 3][gauge·dim][tray·dim] = 97pt — inside today's 107 envelope. Spoken names kinds, never counts: "; your open PRs and a waiting queue are below." T2 = the 3-file lockstep reorder (F5's test applies). C self-rejected tinting the work-marker danger (tint-only distinction dies on gray-swap) — doctrine-correct instinct, recorded.</div></details>
+        <details><summary>Doctrine fit &amp; risks</summary><div><b>Fit:</b> strongest spoken parity in the field (names kinds, states no second count); double-count-proof; mechanically clean (whole-cell cluster fade).<br><br><b>Risks:</b> calm — "11pt dim <code>gauge.medium</code> is a smudge, not a word; the spec hedges its own glyph twice"; markers move MORE than strict's bare glyph swap (cluster fade + width breathe 80↔97 on radar crossings); T2's chronic count imports the F3 exposure and the pre-sweep inference — needs the same closure as ladder-strict.</div></details>
+        <div class="verdict"><b>Refuters:</b> calm — "good bones (T2 = the reorder), bad skin (T1 smudges); cut T1 → collapses to ladder-strict." Honesty — "ship T1 (best parity, no counts), HOLD T2 unless it carries the F3 closure + confirmed-gate." Mechanics — buildable either way; T2 is mechanically free.
+        <div class="amendment">rule T1 and T2 separately; if T1 survives, verify <code>gauge.medium</code> legibility at 11pt on a real display before build (or swap to <code>arrow.triangle.pull</code>).</div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════ HYBRID ══════════════════════════ -->
+<section class="record" id="hybrid">
+  <p class="eyebrow">The hybrid — assembled from the ratifier's objection + the refuters' own evidence</p>
+  <h2>Ladder for the transient, composition for the standing pair</h2>
+  <p class="qsub">The objection to A: a ladder tier only works if it is <b>self-clearing</b> — radar earns the top slot because
+     acting on it clears it, but the inbound queue is a standing fact you return to over days; put it on top and it walls off
+     the live gauge for weeks. The resolution was hiding inside F2: the radar∩inbound overlap IS the arrival knock — a new PR
+     at your door already fires the <code>inbound</code> radar reason (81df372), so the pill announces arrivals through the
+     transient tier and the standing debt persists in the lane. So the queue never needed the top slot; it needs
+     <b>persistent subordinate presence beside the gauge</b>. And composition is safe exactly there: inbound ⊥ pulse is proven
+     disjoint (F2 bites only radar co-display), and the standing tier renders only when radar is empty — the shield still never
+     co-renders with the badges (F4 intact). Ladder: loading &gt; radar &gt; <b>standing tier (gauge ⊕ queue)</b> &gt; check.</p>
+
+  <div class="variants">
+
+    <!-- standing-marked -->
+    <div class="vcard">
+      <div class="stage" id="stH1">
+        <div class="menubar"><span></span><div class="mb-right"><span>⌥</span><span>Wed 09:41</span></div></div>
+        <div class="mock-pill" id="pH1"><div class="pill-c" id="cH1"></div></div>
+        <div class="hint">click states</div>
+        <div class="wtag" id="wH1"></div>
+      </div>
+      <div class="stage-ctl" id="tH1"></div>
+      <div class="vbody">
+        <div class="vhead"><h3>Standing pair, marked</h3><span class="vid">standing-marked</span>
+          <div class="vflags"><span class="chip keep">new</span></div></div>
+        <p class="essence">The standing tier draws the gauge plus a dim count-free tray when the queue is non-empty:
+        <code>[✓3][✗4][tray·dim]</code> = 108pt chronic. The queue is acknowledged all day, never dominant, never counted —
+        so the F3 stale-clock closure is <b>optional</b> ("there is a queue" survives an item merging; "5 waiting" does not).
+        Queue-only standing state (PRs all closed) shows the tray full-strength with its count — the F1 dead tier becomes reachable.</p>
+        <details><summary>Build spec</summary><div class="spec">Order unchanged (no reorder, no F5 lockstep risk). Value gains a queue term on the gauge case (or a .standing case): same inner-stack rendering, whole-cell crossfade on structure change (exactly today's gauge behavior — NO per-segment engine; the mechanics kill of composed-lanes does not apply), zip ticks for same-structure number changes. Marker: tray.fill 11pt inkTertiary, +20pt (6 gap + 14). Queue-only standing state: tray.fill 13pt medium + count (width 60, the radar-cell formula). Spoken, strict parity (count-free drawn → count-free spoken): "3 ready, 4 blocked; people waiting at your door." Gray-swap: marker is ink, invariant. ~C1-level cost (~7 seams), no new Cell needed if the marker lives inside the value content.</div></details>
+        <div class="verdict"><b>Refuter carry-over:</b> honesty's count-free advantage applies verbatim (no F3 amplification, double-count impossible); calm's chronic-furniture critique applies to the marker — but here the furniture states a fact you have chosen to keep standing, and its absence (queue cleared) is a real, reachable signal. The absence-framing discipline still binds: no "confirmed empty" reading.</div>
+      </div>
+    </div>
+
+    <!-- standing-counted -->
+    <div class="vcard">
+      <div class="stage" id="stH2">
+        <div class="menubar"><span></span><div class="mb-right"><span>⌥</span><span>Wed 09:41</span></div></div>
+        <div class="mock-pill" id="pH2"><div class="pill-c" id="cH2"></div></div>
+        <div class="hint">click states</div>
+        <div class="wtag" id="wH2"></div>
+      </div>
+      <div class="stage-ctl" id="tH2"></div>
+      <div class="vbody">
+        <div class="vhead"><h3>Standing pair, counted</h3><span class="vid">standing-counted</span>
+          <div class="vflags"><span class="chip keep">new</span></div></div>
+        <p class="essence">Same tier, full strength: the queue rides as a real segment — <code>[✓3][✗4][tray 5]</code> = 123pt
+        chronic. Both standing numbers glanceable; the honest cost is width (123pt all day vs today's 88) and the count is
+        chronic → the <b>F3 closure (D1) becomes required</b>, and the tray count ticking adds one more slow mover to the
+        always-visible surface.</p>
+        <details><summary>Build spec</summary><div class="spec">As standing-marked, but the queue term is a glyph+count segment on the gauge's own atoms (16+4+d·9, gap 6): chronic 24+29+6+29+6+29 = 123. Digit ticks ride the existing same-structure zip (0ms); queue segment arrival/departure fades the value cell whole (today's gauge grammar). Spoken: "3 ready, 4 blocked. 5 waiting at your door." REQUIRES D1 (per-fact stale clock over the standing tier's queue segment). Shield ⊥ badges preserved (standing tier only at radar 0). No reorder.</div></details>
+        <div class="verdict"><b>Refuter carry-over:</b> F2/F4 clean by construction (disjoint pair; radar exclusive). Calm's width critique applies at reduced dose: 123pt is chronic but static — it breathes only when a segment genuinely appears/disappears, not on radar crossings (radar stays exclusive at 60). Mechanics: whole-cell grammar, no Plan rewrite — the composed-lanes kill does not transfer.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════ DECIDE ══════════════════════════ -->
+<section class="record" id="decide">
+  <p class="eyebrow">The decisions — three, separable, in dependency order</p>
+  <h2>Ratify in one line</h2>
+
+  <div class="decide" style="margin-bottom:16px">
+    <h3>Ratified · 2026-07-10 (rev. 3 — the config resolution)</h3>
+    <p>The ratifier held both truths — <i>"maybe when there's an inbound it should just supersede?"</i> (aesthetics: ink over
+    the green/red badges) and the earlier <i>"it blocks the PRs underneath"</i> (utility) — and ruled the tie-breaker:
+    <b>"allow config with actual visual preview… provide a default but user can switch it up."</b> Outcome:
+    <b>PillStyle</b> = queueLeads (default) / standingMarked / standingCounted, chosen in an island chooser card whose previews
+    are the REAL <code>CollapsedPillView</code> fed live data (radar suppressed, captioned — never a fabricated specimen).
+    D1 (per-fact stale clock) builds unconditionally. WP: <code>docs/plans/2026-07-10-001-dpill-config-wp.md</code>.
+    The green/red discomfort is logged as the color-doctrine row's first dogfood flicker — island badges untouched, watched.</p>
+  </div>
+
+  <div class="dgrid">
+    <div class="decide">
+      <h3>D1 · close the stale-clock gap (F3)</h3>
+      <p><b>Per-fact stale clock:</b> the pill's caution prefix covers the inbound-count state iff the <i>sweep</i> clock
+      (<code>lastInboundSuccessAt</code>) is degraded; radar/gauge states keep the poll clock, exactly as today.</p>
+      <p><b>Runner: yes — required before any chronic inbound count; worth doing even without the reorder</b> (the gap is
+      latent in today's rare tier too). Alternative: keep the elevated inbound count-free (C's thesis), which makes D1 optional.</p>
+    </div>
+    <div class="decide">
+      <h3>D2 · where does the queue live? <span style="font-weight:400">(revised after ratifier feedback)</span></h3>
+      <p><b>(a) standing pair</b> — queue beside the gauge in one standing tier (the hybrid; runner pick). Arrivals knock via
+      the radar <code>inbound</code> reason; the standing debt stays visible without walling off your PRs.<br>
+      <b>(b) reorder</b> — inbound above gauge (ladder-strict as originally specced). Rejected by the ratifier: a standing,
+      non-self-clearing fact on top walls off the live gauge for weeks.<br>
+      <b>(c) keep today's order untouched</b> — the queue stays invisible on the pill (F1's dead tier stands).</p>
+      <p><b>Runner: (a).</b></p>
+    </div>
+    <div class="decide">
+      <h3>D3 · the queue's strength in the standing tier</h3>
+      <p><b>(i) marked</b> — dim count-free tray beside the gauge (108pt chronic; F3 closure optional — the safest claim);<br>
+      <b>(ii) counted</b> — full tray+count segment (123pt chronic; both numbers glanceable; requires D1);<br>
+      <b>(iii) pip / typed markers</b> — the A2/C2-T1 add-ons remain available on top of any pick.</p>
+      <p><b>Runner: (i) to start</b> — it answers "am I forgetting anyone?" all day with the smallest honest mark, dodges the
+      stale-count risk entirely, and upgrading to (ii) later is additive (same tier, same grammar).</p>
+    </div>
+  </div>
+
+  <div class="decide" style="margin-top:14px">
+    <h3>The recommended package, in full (rev. 2)</h3>
+    <p><b>standing-marked</b> = D2(a) standing pair + D3(i) count-free tray mark + <code>tray.fill</code> glyph family
+    (+ tests updated) + queue-only standing state (tray+count at 60pt when all your PRs close — needs D1 only if you later
+    take D3(ii); the queue-only count is rare, not chronic) + check weight regular (optional). No reorder → no F5 lockstep
+    risk. D1 (per-fact stale clock) recommended on its own honesty merits, required only for chronic counts.
+    Example one-liners: <i>"runner picks"</i> · <i>"D2 a, D3 ii, D1 yes"</i> · <i>"hybrid marked, hold D1"</i>.</p>
+    <p>Killed for the record: <b>composed-lanes</b>, <b>composed-reasons</b> (F2 + F4 + misrepresented mechanics — the kills
+    apply to composing RADAR into the strip; the standing pair composes only the proven-disjoint gauge⊕queue).
+    Superseded: the <b>D2 reorder</b> (ladder-strict/A2/C2-T2 as originally ranked) — withdrawn on the ratifier's
+    self-clearing objection.</p>
+  </div>
+</section>
+
+<div class="footer">
+  D-pill designer session, 2026-07-09 · three Opus designers (ladder / composed / third-way advocates), three Opus refuters
+  (calm+color · honesty+trust · mechanics), all claims verified against the code at 9012859. Seed:
+  <code>docs/plans/2026-07-09-002-pill-design-seed.md</code>. Mock states use your real shape: radar 0–3 (one critical spike
+  shown), gauge ✓3 ⚠4, inbound 5 human (+3 held back, never counted). <b>Built + landed 2026-07-10</b> (WP 2026-07-10-001,
+  acadf99 + c5226a4, 1153 checks): PillStyle config + gear "Pill style…" chooser with live previews + the D1 per-fact stale
+  clock incl. the panel's F-1 crossing-emission fix. Landing record in the WP doc.
+</div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+  // ——— glyph library (13pt-ish inline SVGs, currentColor) ———
+  function svg(inner, size, vb) {
+    return '<svg width="' + (size||13) + '" height="' + (size||13) + '" viewBox="' + (vb||"0 0 20 20") + '" fill="currentColor" aria-hidden="true">' + inner + '</svg>';
+  }
+  var G = {
+    trayFill: function (s) { return svg('<path d="M2.5 10.6 5 4.8A1.6 1.6 0 0 1 6.5 3.8h7a1.6 1.6 0 0 1 1.5 1l2.5 5.8v4.6a1.6 1.6 0 0 1-1.6 1.6H4.1a1.6 1.6 0 0 1-1.6-1.6v-4.6Zm2-.1h3l1.1 1.9h2.8l1.1-1.9h3L13.4 5.4H6.6L4.5 10.5Z"/>', s); },
+    trayArrow: function (s) { return svg('<path d="M10 .8v4.6M8.2 3.7 10 5.6l1.8-1.9" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/><path d="M2.5 12 4.6 7.4A1.6 1.6 0 0 1 6 6.4h1.4v1.7H6.3L4.7 11.9h2.9l1 1.7h2.8l1-1.7h2.9l-1.6-3.8h-1.1V6.4H14a1.6 1.6 0 0 1 1.4 1l2.1 4.6v3.4a1.6 1.6 0 0 1-1.6 1.6H4.1a1.6 1.6 0 0 1-1.6-1.6V12Z"/>', s); },
+    shield: function (s) { return svg('<path d="M10 1.2 16.8 4v5c0 4.4-2.9 7.3-6.8 8.8C6.1 16.3 3.2 13.4 3.2 9V4L10 1.2Zm-.8 4.3h1.6l-.2 5h-1.2l-.2-5Zm.8 6.4a1 1 0 1 1 0 2 1 1 0 0 1 0-2Z"/>', s); },
+    check: function (s) { return svg('<path d="M3.5 10.8l4.2 4.2 8.8-9.6" stroke="currentColor" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>', s || 12); },
+    clock: function (s) { return svg('<path d="M9 2a7 7 0 1 0 0 14A7 7 0 0 0 9 2Zm.7 3.2v4.1l3 1.8-.7 1.1L8.3 10V5.2h1.4Z"/><path d="M15.5 1.5l.5 2.8m0 0 2.8.5" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linecap="round"/>', s || 12); },
+    radio: function (s) { return svg('<circle cx="10" cy="10" r="2.2"/><path d="M5.8 6.2a5.6 5.6 0 0 0 0 7.6M14.2 6.2a5.6 5.6 0 0 1 0 7.6" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/>', s || 12); },
+    bell: function (s) { return svg('<path d="M10 2a1.2 1.2 0 0 1 1.2 1.2v.5A5 5 0 0 1 15 8.5v3.2l1.4 2.1a.8.8 0 0 1-.7 1.2H4.3a.8.8 0 0 1-.7-1.2L5 11.7V8.5a5 5 0 0 1 3.8-4.8v-.5A1.2 1.2 0 0 1 10 2Zm-1.8 14h3.6a1.8 1.8 0 0 1-3.6 0Z"/>', s); },
+    at: function (s) { return svg('<path d="M10 2a8 8 0 1 0 4.6 14.5l-.9-1.3A6.4 6.4 0 1 1 16.4 10c0 1.8-.8 2.9-1.7 2.9-.7 0-1.1-.5-1.1-1.3V6.8h-1.5v.8a2.9 2.9 0 0 0-2.3-1c-2 0-3.6 1.7-3.6 3.9s1.6 3.9 3.6 3.9c1 0 1.9-.4 2.5-1.2.3.8 1.1 1.3 2.2 1.3 1.9 0 3.5-1.7 3.5-4.5A8 8 0 0 0 10 2Zm-.1 10.9c-1.2 0-2.1-1-2.1-2.4S8.7 8.1 9.9 8.1s2.1 1 2.1 2.4-.9 2.4-2.1 2.4Z"/>', s); },
+    gaugeM: function (s) { return svg('<path d="M3 14.5a7.5 7.5 0 0 1 15 0" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round"/><path d="M10.5 14 14 9.2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="10.2" cy="14.2" r="1.4"/>', s || 11); }
+  };
+  var count = function (n) { return '<span>' + n + '</span>'; };
+  var badge = function (kind, glyph) { return '<span class="badge ' + kind + '">' + glyph + '</span>'; };
+  var seg = function (inner) { return '<span class="seg">' + inner + '</span>'; };
+
+  // shared content fragments
+  var C = {
+    tray5:      '<span class="g-ink2">' + G.trayFill() + '</span>' + count(5),
+    trayArrow5: '<span class="g-ink2">' + G.trayArrow() + '</span>' + count(5),
+    shield3:    '<span class="g-danger">' + G.shield() + '</span>' + count(3),
+    at3:        '<span class="g-ink2">' + G.at() + '</span>' + count(3),
+    gauge34:    seg(badge('ok', '✓') + count(3)) + seg(badge('bad', '✕') + count(4)),
+    checkOnly:  '<span class="g-ink3">' + G.check() + '</span>',
+    loading:    '<span class="g-ink3">' + G.radio() + '</span>',
+    staleClock: '<span class="g-caution">' + G.clock() + '</span>',
+    pip:        '<span class="pip"></span>',
+    ell:        '<span class="ell">…</span>',
+    mkWork:     '<span class="dim11">' + G.gaugeM() + '</span>',
+    mkQueue:    '<span class="dim11">' + G.trayArrow(11) + '</span>'
+  };
+
+  // ——— per-variant state maps: label → { w, html } ———
+  var VARIANTS = {
+    A1: [
+      ["chronic (your day)",   60,  C.tray5],
+      ["radar spike ⚠",        60,  C.shield3],
+      ["queue cleared",        88,  C.gauge34],
+      ["all clear",            52,  C.checkOnly],
+      ["stale + queue",        79,  C.staleClock + C.tray5],
+      ["loading",              52,  C.loading]
+    ],
+    A2: [
+      ["chronic (your day)",   67,  C.tray5 + C.pip],
+      ["radar spike ⚠",        67,  C.shield3 + C.pip],
+      ["queue cleared",        88,  C.gauge34],
+      ["all clear",            52,  C.checkOnly],
+      ["stale + queue",        86,  C.staleClock + C.tray5 + C.pip]
+    ],
+    B1: [
+      ["chronic (your day)",  127,  C.gauge34 + seg('<span class="g-ink2" style="margin-left:4px">' + G.trayArrow() + '</span>' + count(5))],
+      ["radar spike ⚠",       166,  seg('<span class="g-danger">' + G.shield() + '</span>' + count(3)) + '<span style="width:4px"></span>' + C.gauge34 + seg('<span class="g-ink2" style="margin-left:4px">' + G.trayArrow() + '</span>' + count(5))],
+      ["all clear",            52,  C.checkOnly],
+      ["loading",              52,  C.loading]
+    ],
+    B2: [
+      ["chronic (your day)",  127,  C.gauge34 + seg('<span class="g-ink2" style="margin-left:4px">' + G.trayArrow() + '</span>' + count(5))],
+      ["radar spike ⚠ (reason glyph)", 166, seg('<span class="g-danger">' + G.shield() + '</span>' + count(3)) + '<span style="width:4px"></span>' + C.gauge34 + seg('<span class="g-ink2" style="margin-left:4px">' + G.trayArrow() + '</span>' + count(5))],
+      ["mention tops (@)",    166,  seg('<span class="g-ink2">' + G.at() + '</span>' + count(3)) + '<span style="width:4px"></span>' + C.gauge34 + seg('<span class="g-ink2" style="margin-left:4px">' + G.trayArrow() + '</span>' + count(5))],
+      ["all clear",            52,  C.checkOnly]
+    ],
+    C1: [
+      ["chronic (your day)",  108,  C.gauge34 + C.ell],
+      ["radar spike ⚠",        80,  C.shield3 + C.ell],
+      ["all clear",            52,  C.checkOnly],
+      ["stale + queue",        79,  C.staleClock + C.trayArrow5],
+      ["loading",              52,  C.loading]
+    ],
+    C2: [
+      ["chronic (your day)",   80,  C.tray5 + C.mkWork],
+      ["radar spike ⚠",        97,  C.shield3 + C.mkWork + C.mkQueue],
+      ["queue cleared",        88,  C.gauge34],
+      ["all clear",            52,  C.checkOnly]
+    ],
+    H1: [
+      ["chronic (your day)",  108,  C.gauge34 + '<span class="dim11">' + G.trayFill(11) + '</span>'],
+      ["new arrival knocks",   60,  '<span class="g-ink2">' + G.trayArrow() + '</span>' + count(1)],
+      ["queue cleared",        88,  C.gauge34],
+      ["PRs closed, queue stands", 60, C.tray5],
+      ["all clear",            52,  C.checkOnly]
+    ],
+    H2: [
+      ["chronic (your day)",  123,  C.gauge34 + seg('<span class="g-ink2" style="margin-left:2px">' + G.trayFill() + '</span>' + count(5))],
+      ["new arrival knocks",   60,  '<span class="g-ink2">' + G.trayArrow() + '</span>' + count(1)],
+      ["queue cleared",        88,  C.gauge34],
+      ["stale + standing",    142,  C.staleClock + C.gauge34 + seg('<span class="g-ink2" style="margin-left:2px">' + G.trayFill() + '</span>' + count(5))],
+      ["all clear",            52,  C.checkOnly]
+    ]
+  };
+
+  function wire(id) {
+    var pill = document.getElementById("p" + id);
+    var content = document.getElementById("c" + id);
+    var tabs = document.getElementById("t" + id);
+    var wtag = document.getElementById("w" + id);
+    var states = VARIANTS[id];
+    var reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    function apply(i, animate) {
+      var s = states[i];
+      Array.prototype.forEach.call(tabs.children, function (b, j) {
+        b.setAttribute("aria-pressed", j === i ? "true" : "false");
+      });
+      wtag.textContent = s[1] + "pt";
+      if (!animate || reduced) {
+        content.innerHTML = s[2];
+        pill.style.width = s[1] + "px";
+        return;
+      }
+      // the app's own grammar: changed content crossfades 120ms, width settles 150ms
+      content.style.opacity = "0";
+      window.setTimeout(function () {
+        content.innerHTML = s[2];
+        pill.style.width = s[1] + "px";
+        content.style.opacity = "1";
+      }, 120);
+    }
+
+    states.forEach(function (s, i) {
+      var b = document.createElement("button");
+      b.type = "button";
+      b.textContent = s[0];
+      b.setAttribute("aria-pressed", i === 0 ? "true" : "false");
+      b.addEventListener("click", function () { apply(i, true); });
+      tabs.appendChild(b);
+    });
+    apply(0, false);
+  }
+
+  ["A1", "A2", "B1", "B2", "C1", "C2", "H1", "H2"].forEach(wire);
+})();
+</script>

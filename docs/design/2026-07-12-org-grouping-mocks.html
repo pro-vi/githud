@@ -1,0 +1,933 @@
+<title>Org grouping — island design session</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --card: #ffffff; --ink: #1a2129; --ink2: #5a6572; --ink3: #8b95a3;
+    --line: #dde3ea; --accent: #2464c4; --accent-ink: #ffffff; --kill: #b4463c;
+    --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, monospace;
+    --sys: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) { :root {
+    --bg: #0b0e13; --card: #121722; --ink: #e7edf4; --ink2: #98a2b0; --ink3: #6b7683;
+    --line: #232b36; --accent: #4c94f8; --accent-ink: #0b0e13; --kill: #e07a6e;
+  } }
+  :root[data-theme="light"] {
+    --bg: #f6f7f9; --card: #ffffff; --ink: #1a2129; --ink2: #5a6572; --ink3: #8b95a3;
+    --line: #dde3ea; --accent: #2464c4; --accent-ink: #ffffff; --kill: #b4463c;
+  }
+  :root[data-theme="dark"] {
+    --bg: #0b0e13; --card: #121722; --ink: #e7edf4; --ink2: #98a2b0; --ink3: #6b7683;
+    --line: #232b36; --accent: #4c94f8; --accent-ink: #0b0e13; --kill: #e07a6e;
+  }
+  * { box-sizing: border-box; }
+  body { background: var(--bg); color: var(--ink); font: 15px/1.6 var(--sys); margin: 0; }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 0 24px 80px; }
+
+  header.lead { padding: 44px 0 8px; max-width: 76ch; }
+  header.lead h1 { font-size: 27px; font-weight: 750; letter-spacing: -0.022em; margin: 0 0 10px; text-wrap: balance; }
+  header.lead p { color: var(--ink2); margin: 0 0 8px; }
+  .doctrine-note { font: 500 12px/1.5 var(--mono); color: var(--ink3); border-left: 2px solid var(--accent);
+    padding: 2px 0 2px 12px; margin: 16px 0 0; }
+  .doctrine-note em { color: var(--ink2); font-style: normal; }
+
+  section { margin: 44px 0 0; }
+  .eyebrow { font: 600 11px/1 var(--mono); letter-spacing: .09em; text-transform: uppercase; color: var(--accent); margin: 0 0 10px; }
+  section h2 { font-size: 21px; font-weight: 700; letter-spacing: -0.015em; margin: 0 0 6px; max-width: 72ch; text-wrap: balance; }
+  .qsub { color: var(--ink2); max-width: 78ch; margin: 0 0 20px; }
+  code.tok { font: 500 11.5px var(--mono); background: color-mix(in srgb, var(--ink) 7%, transparent); border-radius: 4px; padding: 1px 4px; }
+
+  .today { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px 18px; margin: 0 0 22px; }
+  .today h3 { margin: 0 0 6px; font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--ink3); }
+  .today p { margin: 0 0 4px; color: var(--ink2); font-size: 13.5px; }
+  .ledger { width: 100%; border-collapse: collapse; margin: 10px 0 6px; font-size: 13px; }
+  .ledger th { text-align: left; font: 600 10.5px var(--mono); letter-spacing: .06em; text-transform: uppercase;
+    color: var(--ink3); padding: 4px 14px 6px 0; border-bottom: 1px solid var(--line); }
+  .ledger td { padding: 7px 14px 7px 0; border-bottom: 1px solid color-mix(in srgb, var(--line) 55%, transparent);
+    color: var(--ink2); vertical-align: top; }
+  .ledger td:first-child { color: var(--ink); font-weight: 600; white-space: nowrap; }
+  .ledger tr:last-child td { border-bottom: none; }
+  .ledger .verdict { font: 600 11px var(--mono); }
+  .ledger .keep { color: var(--accent); }
+  .ledger .fold-v { color: var(--ink3); }
+  .ledger .reopen { color: var(--kill); }
+
+  /* ---- variant cards ---- */
+  .vgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 18px; }
+  .vcard { background: var(--card); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; display: flex; flex-direction: column; }
+  .vhead { padding: 13px 16px 11px; border-bottom: 1px solid var(--line); }
+  .vhead .vid { font: 700 10px var(--mono); letter-spacing: .07em; color: var(--accent); text-transform: uppercase; }
+  .vhead h3 { margin: 3px 0 3px; font-size: 15px; font-weight: 700; letter-spacing: -0.008em; }
+  .vhead p { margin: 0; font-size: 12.5px; color: var(--ink2); }
+  .badge-pick { font: 700 9px var(--mono); letter-spacing: .07em; text-transform: uppercase;
+    border-radius: 4px; padding: 2px 6px; margin-left: 8px; vertical-align: 1px;
+    color: var(--accent-ink); background: var(--accent); }
+  .vbody { padding: 16px; display: flex; flex-direction: column; gap: 12px; flex: 1; }
+  .vstrings { font: 500 12px/1.7 var(--mono); color: var(--ink2); border-top: 1px solid var(--line); padding: 11px 16px 13px; }
+  .vstrings b { color: var(--ink); font-weight: 600; }
+  .vstrings .lbl { color: var(--ink3); }
+
+  /* ---- the island mock: deliberately single-theme (the app's dark glass) ---- */
+  .stage { background:
+      radial-gradient(1200px 500px at 70% -10%, #2a3242 0%, transparent 60%),
+      linear-gradient(180deg, #171b22, #10141a);
+    border-radius: 10px; padding: 20px 16px; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+  .machine { font: 600 10px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: rgba(255,255,255,0.4); }
+  .island { width: 100%; max-width: 400px; background: rgba(30, 34, 42, 0.96); border: 1px solid rgba(255,255,255,0.09);
+    border-radius: 14px; box-shadow: 0 18px 44px rgba(0,0,0,0.5); padding: 12px 14px 10px;
+    font-family: var(--sys); color: rgba(255,255,255,0.85); }
+  .island * { font-variant-numeric: tabular-nums; }
+  .isec { font-size: 11px; font-weight: 600; color: rgba(255,255,255,0.55); margin: 10px 0 7px; display: flex; align-items: center; gap: 6px; }
+  .isec:first-child { margin-top: 0; }
+  .isec .cnt { font-weight: 700; font-size: 10px; background: rgba(255,255,255,0.14); border-radius: 8px; padding: 1px 6px; }
+  .isub { font-size: 11px; font-weight: 600; color: rgba(255,255,255,0.42); letter-spacing: .02em; margin: 7px 0 4px;
+    display: flex; align-items: center; gap: 6px; }
+  .irow { display: flex; gap: 8px; align-items: flex-start; padding: 5px 6px; border-radius: 6px; margin: 0 -6px; }
+  .irow:hover { background: rgba(255,255,255,0.07); }
+  .irow .glyph { width: 16px; text-align: center; font-size: 11px; color: rgba(255,255,255,0.55); padding-top: 1px; flex: none; }
+  .irow .t { font-size: 13px; font-weight: 500; color: rgba(255,255,255,0.85); line-height: 1.35; }
+  .irow .s { font-size: 11px; color: rgba(255,255,255,0.55); margin-top: 1px; }
+  .irow .s .org { color: rgba(255,255,255,0.74); font-weight: 590; }
+  .gsb { width: 15px; height: 15px; border-radius: 50%; color: #fff; font-size: 9px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center; flex: none; margin-top: 2px; }
+  .gsb.ok { background: #3FB950; } .gsb.pend { background: #D29922; } .gsb.fail { background: #F85149; }
+
+  /* caption-button + reveal: the app's own (show)/(hide) grammar */
+  .icap { font-size: 11px; color: rgba(255,255,255,0.32); padding: 6px 6px; margin: 0 -6px; border-radius: 6px;
+    background: none; border: none; display: block; width: calc(100% + 12px); text-align: left; cursor: pointer;
+    font-family: var(--sys); }
+  .icap:hover { background: rgba(255,255,255,0.07); color: rgba(255,255,255,0.55); }
+  .icap .fresh { color: rgba(255,255,255,0.55); font-weight: 600; }
+  .icap:focus-visible, .hidelink:focus-visible, .leadlink:focus-visible { outline: 2px solid #4c94f8; outline-offset: 1px; }
+  .icap .verb, .hidelink, .leadlink { text-decoration: underline; text-underline-offset: 2px;
+    text-decoration-color: rgba(255,255,255,0.28); }
+  .icap:hover .verb { text-decoration-color: rgba(255,255,255,0.6); }
+  .hidelink, .leadlink { font-size: 11px; font-weight: 400; color: rgba(255,255,255,0.32); background: none; border: none;
+    cursor: pointer; font-family: var(--sys); padding: 2px 4px; border-radius: 4px; }
+  .hidelink:hover, .leadlink:hover { color: rgba(255,255,255,0.55); background: rgba(255,255,255,0.07); }
+  .isub .hidelink { margin-left: auto; }
+  .reveal { display: grid; grid-template-rows: 0fr; transition: grid-template-rows 150ms ease; }
+  .reveal > div { overflow: hidden; opacity: 0; transition: opacity 120ms ease; }
+  .reveal.open { grid-template-rows: 1fr; }
+  .reveal.open > div { opacity: 1; }
+  @media (prefers-reduced-motion: reduce) { .reveal, .reveal > div { transition: none; } }
+
+  /* the two-laptop demo */
+  .laptops { display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 18px; }
+  .laptops .stage { border-radius: 12px; }
+
+  .isub .fresh { color: rgba(255,255,255,0.55); font-weight: 600; margin-left: 2px; }
+
+  /* user stories */
+  .stories { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 14px; margin: 0 0 22px; }
+  .story { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 13px 16px 14px; }
+  .story .when { font: 600 10px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--accent); margin: 0 0 6px; }
+  .story h3 { margin: 0 0 6px; font-size: 14px; font-weight: 700; letter-spacing: -0.008em; }
+  .story p { margin: 0 0 6px; font-size: 13px; color: var(--ink2); }
+  .story .so { font-size: 12.5px; color: var(--ink); border-top: 1px solid var(--line); padding-top: 8px; margin-top: 8px; }
+  .story .so b { font-weight: 650; }
+
+  /* the eye — lane-header lens control (E3) */
+  .eyebtn { background: none; border: none; cursor: pointer; padding: 2px 4px; border-radius: 4px;
+    color: rgba(255,255,255,0.32); display: inline-flex; align-items: center; }
+  .eyebtn:hover { color: rgba(255,255,255,0.6); background: rgba(255,255,255,0.07); }
+  .eyebtn:focus-visible { outline: 2px solid #4c94f8; outline-offset: 1px; }
+  .eyebtn.lensed { color: rgba(255,255,255,0.5); }
+  .eyebtn svg { display: block; }
+  .lenswrap { position: relative; }
+  .lenspop { position: absolute; top: 22px; left: 52px; z-index: 3; background: rgba(38, 42, 52, 0.99);
+    border: 1px solid rgba(255,255,255,0.14); border-radius: 8px; box-shadow: 0 12px 30px rgba(0,0,0,0.55);
+    padding: 5px; width: 170px; display: none; }
+  .lenspop.open { display: block; }
+  .lenspop .mhead { font-size: 11px; font-weight: 600; color: rgba(255,255,255,0.45); padding: 4px 9px 3px; }
+  .lenspop .prow { font-size: 12.5px; color: rgba(255,255,255,0.88); padding: 4px 9px 4px 24px; border-radius: 5px;
+    position: relative; cursor: pointer; background: none; border: none; display: block; width: 100%;
+    text-align: left; font-family: var(--sys); }
+  .lenspop .prow:hover { background: rgba(255,255,255,0.1); }
+  .lenspop .prow:focus-visible { outline: 2px solid #4c94f8; outline-offset: -2px; }
+  .lenspop .prow.on::before { content: "✓"; position: absolute; left: 8px; font-size: 11px; }
+  .lenspop .msep { height: 1px; background: rgba(255,255,255,0.1); margin: 4px 8px; }
+  .lenspop .dimmed { opacity: 0.45; pointer-events: none; }
+
+  /* round 4 — the composed proposal: eyed sub-headers */
+  .isub .eyebtn { margin-left: auto; }
+  .isub .eyebtn.inline { margin-left: 4px; }
+  /* round 5 amendment: eyes are hover-revealed within their group's region */
+  .grp .eyebtn, .grp .eyemark { opacity: 0; transition: opacity 120ms ease; }
+  .grp:hover .eyebtn, .grp:hover .eyemark, .grp:focus-within .eyebtn, .grp:focus-within .eyemark { opacity: 1; }
+  .eyemark { margin-left: auto; color: rgba(255,255,255,0.5); display: inline-flex; padding: 2px 4px; }
+  .foldline { display: flex; align-items: center; gap: 5px; background: none; border: none; cursor: pointer;
+    font-family: var(--sys); font-size: 11px; font-weight: 600; color: rgba(255,255,255,0.42);
+    letter-spacing: .02em; text-align: left; width: calc(100% + 12px); margin: 7px -6px 4px; padding: 4px 6px;
+    border-radius: 6px; }
+  .foldline:hover { background: rgba(255,255,255,0.07); color: rgba(255,255,255,0.6); }
+  .foldline:focus-visible { outline: 2px solid #4c94f8; outline-offset: 1px; }
+  .foldline .cnt2 { font-weight: 400; color: rgba(255,255,255,0.32); }
+  .foldline .fresh { color: rgba(255,255,255,0.55); font-weight: 600; }
+  .subpeek { background: none; border: none; cursor: pointer; font-family: var(--sys); font-size: 11px;
+    font-weight: 600; color: rgba(255,255,255,0.42); letter-spacing: .02em; padding: 2px 4px; margin: -2px -4px;
+    border-radius: 4px; text-align: left; flex: 1; display: flex; align-items: center; gap: 5px; }
+  .subpeek:hover { background: rgba(255,255,255,0.07); color: rgba(255,255,255,0.6); }
+  .subpeek:focus-visible { outline: 2px solid #4c94f8; outline-offset: 1px; }
+  .subpeek .cnt2 { font-weight: 400; color: rgba(255,255,255,0.32); }
+  .subpeek .fresh { color: rgba(255,255,255,0.55); font-weight: 600; }
+  .subpeek .verb { text-decoration: underline; text-underline-offset: 2px;
+    text-decoration-color: rgba(255,255,255,0.28); font-weight: 400; color: rgba(255,255,255,0.32); }
+  .subpeek:hover .verb { text-decoration-color: rgba(255,255,255,0.6); }
+
+  /* gear submenu mock */
+  .menupanel { background: rgba(38, 42, 52, 0.98); border: 1px solid rgba(255,255,255,0.12); border-radius: 8px;
+    box-shadow: 0 12px 30px rgba(0,0,0,0.5); padding: 5px; width: 190px; font-family: var(--sys);
+    color: rgba(255,255,255,0.88); }
+  .menupanel .mhead { font-size: 11px; font-weight: 600; color: rgba(255,255,255,0.45); padding: 4px 9px 3px; }
+  .menupanel .mitem { font-size: 12.5px; padding: 4px 9px 4px 24px; border-radius: 5px; position: relative; }
+  .menupanel .mitem:hover { background: rgba(255,255,255,0.1); }
+  .menupanel .mitem.on::before { content: "✓"; position: absolute; left: 8px; font-size: 11px; }
+  .menupanel .msep { height: 1px; background: rgba(255,255,255,0.1); margin: 4px 8px; }
+
+  .mech { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px 18px; margin: 18px 0 0;
+    font-size: 13.5px; color: var(--ink2); }
+  .mech h3 { margin: 0 0 6px; font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--ink3); }
+  .mech ul { margin: 0; padding-left: 18px; }
+  .mech li { margin: 3px 0; }
+
+  .decide { border: 1px solid var(--line); border-left: 3px solid var(--accent); background: var(--card);
+    border-radius: 10px; padding: 16px 20px; margin-top: 20px; }
+  .decide h3 { margin: 0 0 8px; font-size: 15px; }
+  .decide p { margin: 0 0 6px; color: var(--ink2); font-size: 13.5px; }
+
+  footer.colophon { margin-top: 56px; border-top: 1px solid var(--line); padding-top: 14px;
+    font: 500 11.5px/1.7 var(--mono); color: var(--ink3); }
+</style>
+
+<div class="wrap">
+  <header class="lead">
+    <h1>The lens — org grouping, round 2</h1>
+    <p>Round 1 killed the scope toggle (D) and picked owner clustering (B). The pushback that reopened it:
+      <i>same GitHub account on both laptops. At work I want the org leading. At home I want my own repos
+      leading. But some evenings I still want to know whether anything new landed at work — without giving
+      the work set my whole island.</i></p>
+    <p><b>That's not one want, it's two</b> — and D failed because it served both with a single mode. A
+      <b>durable lens</b> (which context leads on <i>this machine</i>) and a <b>transient check</b> ("anything
+      new over there?") need different verbs. Round 2: keep the group-by, and let the secondary group
+      <b>fold, not filter</b> — it compresses to one counted caption line in the island's existing
+      (show)/(hide) grammar. Nothing leaves the glass untraced, so the doctrine objection dissolves.</p>
+    <p class="doctrine-note">Why the fold fixes what the filter broke: <em>a filter removes rows and the pill
+      keeps counting them — a lie.</em> A fold prints the count it hides ("4 at acme, 1 new") — compression,
+      not omission. The audit trail stays on the glass. <em>Space is the scarce resource; honesty is the
+      non-negotiable one. The fold spends the first without touching the second.</em></p>
+  </header>
+
+  <section>
+    <p class="eyebrow">Round 1 recap</p>
+    <h2>Where the four shapes landed</h2>
+    <div class="today">
+      <table class="ledger">
+        <tr><th>Shape</th><th>What it was</th><th>Round-2 status</th></tr>
+        <tr><td>A · owner elision</td><td>yours drop the <code class="tok">pro-vi/</code> prefix; foreign orgs read one ink step brighter</td>
+          <td class="verdict keep">substrate — inside every option below</td></tr>
+        <tr><td>B · clustering</td><td>same-owner rows adjacent within a state tier, no headers</td>
+          <td class="verdict keep">the no-lens default — what you see before any lens is set</td></tr>
+        <tr><td>C · partitions</td><td>owner sub-headers inside lanes</td>
+          <td class="verdict fold-v">absorbed — the lens's expanded state <i>is</i> C's header + rows</td></tr>
+        <tr><td>D · scope toggle</td><td>All / acme / yours filter</td>
+          <td class="verdict reopen">reopened — the want was real, the mechanism was wrong; refolded below</td></tr>
+      </table>
+      <p>D's autopsy, precisely: it hid rows <b>without a trace on the glass</b> (omission), and it made a
+        <b>sticky mode out of a passing glance</b> (the evening check would leave the filter set to work all
+        weekend). Aesthetics were never the charge.</p>
+    </div>
+  </section>
+
+  <section id="lens">
+    <p class="eyebrow">The proposal — live, click the captions</p>
+    <h2>One account, two laptops, one pref that never syncs</h2>
+    <p class="qsub">The lens is <code class="tok">UserDefaults</code>, and that's the quiet trick: preferences
+      are per-machine by nature. The work laptop sets <i>lead with acme</i> once; the personal laptop sets
+      <i>lead with yours</i> once; the same app wears the right face on each desk with zero sync machinery.
+      Below, the same account on both machines, same instant. The caption is the evening answer: <b>"3 at
+      acme, 1 new"</b> often ends the check before the click.</p>
+
+    <div class="laptops">
+      <div class="stage">
+        <div class="machine">work laptop · lens: acme</div>
+        <div class="island">
+          <div class="isec">Needs you <span class="cnt">2</span></div>
+          <div class="irow"><div class="glyph">⌲</div><div><div class="t">Report 6: fact-set narrative template</div>
+            <div class="s"><span class="org">acme</span>/core · @alice · review requested · 2h</div></div></div>
+          <div class="irow"><div class="glyph">@</div><div><div class="t">Nord theme: border reads low on glass</div>
+            <div class="s">githud · @tomo · mention · 1d</div></div></div>
+          <div class="isec">Your PRs</div>
+          <div class="irow"><div class="gsb ok">✓</div><div><div class="t">PLAT-118: report view consumes the cached fact set</div>
+            <div class="s">core #620 · checks green · review waiting · 6h</div></div></div>
+          <div class="irow"><div class="gsb pend">·</div><div><div class="t">PLAT-092: per-span transport for the parser</div>
+            <div class="s">core #625 · checks running · 1d</div></div></div>
+          <div class="irow"><div class="gsb fail">✕</div><div><div class="t">PLAT-124: sensitivity pass, transport fixtures</div>
+            <div class="s">core #631 · checks failing · 3h</div></div></div>
+          <div class="reveal" id="w-y"><div>
+            <div class="isub">yours <button class="hidelink" onclick="fold('w-y')">(hide)</button></div>
+            <div class="irow"><div class="gsb ok">✓</div><div><div class="t">pill: crossing repaint on glass</div>
+              <div class="s">githud #214 · checks green · 3h</div></div></div>
+            <div class="irow"><div class="gsb pend">·</div><div><div class="t">docs: contributor map refresh</div>
+              <div class="s">githud #217 · checks running · 5h</div></div></div>
+          </div></div>
+          <button class="icap" data-for="w-y" onclick="peek('w-y')">2 of yours <span class="verb">(show)</span></button>
+        </div>
+      </div>
+
+      <div class="stage">
+        <div class="machine">personal laptop · lens: yours</div>
+        <div class="island">
+          <div class="isec">Needs you <span class="cnt">2</span></div>
+          <div class="irow"><div class="glyph">⌲</div><div><div class="t">Report 6: fact-set narrative template</div>
+            <div class="s"><span class="org">acme</span>/core · @alice · review requested · 2h</div></div></div>
+          <div class="irow"><div class="glyph">@</div><div><div class="t">Nord theme: border reads low on glass</div>
+            <div class="s">githud · @tomo · mention · 1d</div></div></div>
+          <div class="isec">Your PRs</div>
+          <div class="irow"><div class="gsb ok">✓</div><div><div class="t">pill: crossing repaint on glass</div>
+            <div class="s">githud #214 · checks green · 3h</div></div></div>
+          <div class="irow"><div class="gsb pend">·</div><div><div class="t">docs: contributor map refresh</div>
+            <div class="s">githud #217 · checks running · 5h</div></div></div>
+          <div class="reveal" id="p-x"><div>
+            <div class="isub">acme <button class="hidelink" onclick="fold('p-x')">(hide)</button></div>
+            <div class="irow"><div class="gsb ok">✓</div><div><div class="t">PLAT-118: report view consumes the cached fact set</div>
+              <div class="s">core #620 · checks green · review waiting · 6h</div></div></div>
+            <div class="irow"><div class="gsb pend">·</div><div><div class="t">PLAT-092: per-span transport for the parser</div>
+              <div class="s">core #625 · checks running · 1d</div></div></div>
+            <div class="irow"><div class="gsb fail">✕</div><div><div class="t">PLAT-124: sensitivity pass, transport fixtures</div>
+              <div class="s">core #631 · checks failing · 3h</div></div></div>
+          </div></div>
+          <button class="icap" data-for="p-x" onclick="peek('p-x')">3 at acme, <span class="fresh">1 new</span> <span class="verb">(show)</span></button>
+        </div>
+      </div>
+    </div>
+
+    <div class="mech">
+      <h3>Why "Needs you" stays whole on both machines</h3>
+      <ul>
+        <li>The lens folds <b>Your PRs</b> (and Inbound, when org scope lands) — never the radar. A work review
+          request at 9pm still surfaces on the personal laptop because it <i>needs you</i>; the lens governs
+          attention to your own output, not to what others are waiting on. Recorded as an open mic if dogfood
+          disagrees.</li>
+        <li>The folded caption carries freshness: <b>"3 at acme, 1 new"</b> — new since this machine last
+          expanded the group. The evening question is answered in eleven characters of tertiary ink.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section id="manyorgs">
+    <p class="eyebrow">More than one org — told as days, not rules</p>
+    <h2>The lens is a boundary, not an owner</h2>
+    <p class="qsub">Add a third owner and the two-laptop story gets a stress test. Walk the day before writing
+      the rule — because the day shows the single-owner lens getting the boundary <b>wrong</b>.</p>
+
+    <div class="stories">
+      <div class="story">
+        <div class="when">Mon 10:04 · work laptop</div>
+        <h3>Three owners, work desk</h3>
+        <p>You maintain <b>helios-oss</b> on top of the day job. Standup ends; the island opens. acme's
+          three PRs lead — one is failing, that's the morning. githud and helios-oss are both, equally,
+          <i>not now</i>.</p>
+        <p class="so">→ Folding them <b>together</b> is right here: "3 elsewhere" — one line, and neither
+          costs the failing PR any space.</p>
+      </div>
+      <div class="story">
+        <div class="when">Mon 21:40 · personal laptop</div>
+        <h3>Same three owners, evening desk</h3>
+        <p>Evening is githud <b>and</b> helios-oss — a parser fix in the OSS org is tonight's actual work.
+          A lens that can only name one owner would fold your own OSS org under the same line as your
+          employer.</p>
+        <p class="so">→ Wrong boundary. The evening context is a <b>set</b>: lead with
+          <b>yours + helios-oss</b>; only acme folds. The lens is "which owners belong to this desk,"
+          not "which one owner wins."</p>
+      </div>
+      <div class="story">
+        <div class="when">Sun 20:15 · personal laptop</div>
+        <h3>The Sunday question</h3>
+        <p>"Did anything land at work?" The folded caption already says <b>"3 at acme, 1 new"</b> —
+          eleven characters of tertiary ink answer it. If the 1 matters, (show) peeks; the island re-folds
+          on the next summon. Sunday never legislates for Monday.</p>
+        <p class="so">→ Unchanged from round 2 — the caption grammar survives N orgs because the complement
+          still prints as one counted line.</p>
+      </div>
+      <div class="story">
+        <div class="when">Any weekday, twice · one laptop</div>
+        <h3>The desk that flips hourly</h3>
+        <p>A contractor bills <b>client-a</b> mornings and <b>client-b</b> afternoons on one machine. The
+          per-desk trick is gone — this lens flips at lunch, every day. Two trips into the gear per day is
+          real friction.</p>
+        <p class="so">→ The flip-frequency desk. E1's gear costs a menu trip per flip; this person is why the
+          flip wants to live on the glass — the question E3's eye answers below.</p>
+      </div>
+    </div>
+
+    <p class="qsub"><b>So the model generalizes once, cleanly:</b> the lens is the <i>set of owners that lead
+      on this desk</i>; everything outside the set folds to <b>one</b> caption, at any org count. A set of one
+      is exactly round 2 — the two-owner desk never notices the generality. Below, Monday's two desks, live.</p>
+
+    <div class="laptops">
+      <div class="stage">
+        <div class="machine">Mon 10:04 · work laptop · lens: acme</div>
+        <div class="island">
+          <div class="isec">Your PRs</div>
+          <div class="irow"><div class="gsb fail">✕</div><div><div class="t">PLAT-124: sensitivity pass, transport fixtures</div>
+            <div class="s">core #631 · checks failing · 3h</div></div></div>
+          <div class="irow"><div class="gsb ok">✓</div><div><div class="t">PLAT-118: report view consumes the cached fact set</div>
+            <div class="s">core #620 · checks green · review waiting · 6h</div></div></div>
+          <div class="irow"><div class="gsb pend">·</div><div><div class="t">PLAT-092: per-span transport for the parser</div>
+            <div class="s">core #625 · checks running · 1d</div></div></div>
+          <div class="reveal" id="m-work"><div>
+            <div class="isub">yours <button class="hidelink" onclick="fold('m-work')">(hide)</button></div>
+            <div class="irow"><div class="gsb ok">✓</div><div><div class="t">pill: crossing repaint on glass</div>
+              <div class="s">githud #214 · checks green · 3h</div></div></div>
+            <div class="irow"><div class="gsb pend">·</div><div><div class="t">docs: contributor map refresh</div>
+              <div class="s">githud #217 · checks running · 5h</div></div></div>
+            <div class="isub">helios-oss</div>
+            <div class="irow"><div class="gsb ok">✓</div><div><div class="t">fix: streaming parser backpressure</div>
+              <div class="s">hx-parse #88 · checks green · 2d</div></div></div>
+          </div></div>
+          <button class="icap" data-for="m-work" onclick="peek('m-work')">3 elsewhere <span class="verb">(show)</span></button>
+        </div>
+      </div>
+
+      <div class="stage">
+        <div class="machine">Mon 21:40 · personal laptop · lens: yours + helios-oss</div>
+        <div class="island">
+          <div class="isec">Your PRs</div>
+          <div class="irow"><div class="gsb ok">✓</div><div><div class="t">pill: crossing repaint on glass</div>
+            <div class="s">githud #214 · checks green · 3h</div></div></div>
+          <div class="irow"><div class="gsb pend">·</div><div><div class="t">docs: contributor map refresh</div>
+            <div class="s">githud #217 · checks running · 5h</div></div></div>
+          <div class="irow"><div class="gsb ok">✓</div><div><div class="t">fix: streaming parser backpressure</div>
+            <div class="s"><span class="org">helios-oss</span>/hx-parse #88 · checks green · 2d</div></div></div>
+          <div class="reveal" id="m-home"><div>
+            <div class="isub">acme <button class="hidelink" onclick="fold('m-home')">(hide)</button></div>
+            <div class="irow"><div class="gsb fail">✕</div><div><div class="t">PLAT-124: sensitivity pass, transport fixtures</div>
+              <div class="s">core #631 · checks failing · 3h</div></div></div>
+            <div class="irow"><div class="gsb ok">✓</div><div><div class="t">PLAT-118: report view consumes the cached fact set</div>
+              <div class="s">core #620 · checks green · review waiting · 6h</div></div></div>
+            <div class="irow"><div class="gsb pend">·</div><div><div class="t">PLAT-092: per-span transport for the parser</div>
+              <div class="s">core #625 · checks running · 1d</div></div></div>
+          </div></div>
+          <button class="icap" data-for="m-home" onclick="peek('m-home')">3 at acme, <span class="fresh">1 new</span> <span class="verb">(show)</span></button>
+        </div>
+      </div>
+    </div>
+
+    <div class="laptops" style="margin-top: 14px">
+      <div class="stage">
+        <div class="machine">gear → lead with… · personal laptop's checks · owners discovered from your rows</div>
+        <div class="menupanel" role="img" aria-label="Gear submenu mock: Lead with — yours and helios-oss checked, acme unchecked, no lens below">
+          <div class="mhead">Lead with:</div>
+          <div class="mitem on">yours</div>
+          <div class="mitem on">helios-oss</div>
+          <div class="mitem">acme</div>
+          <div class="msep"></div>
+          <div class="mitem">no lens</div>
+        </div>
+      </div>
+      <div class="mech" style="margin: 0">
+        <h3>Rules, each earned by a story moment</h3>
+        <ul>
+          <li><b>Lens = checkable set</b> (Mon 21:40): checked owners lead, unchecked fold — a set of one reads
+            like a radio, so the two-owner desk never meets the checkbox.</li>
+          <li><b>One caption for the whole complement</b> (Mon 10:04): "3 elsewhere" — collapsed cost is one
+            line at any org count; per-org captions rejected for scaling clutter.</li>
+          <li><b>Caption names the org when the complement is one owner</b> ("3 at acme, 1 new") and when
+            one org has the news ("4 elsewhere, 1 new at acme"); several with news → count only, names move
+            to the expansion's sub-headers (Sun 20:15).</li>
+          <li><b>Discovered, not configured</b>: the menu lists owners present in your rows plus "yours",
+            rebuilt live on open (the Surface submenu's <code class="tok">menuNeedsUpdate</code> precedent);
+            an org with no open PRs quietly leaves; a checked owner with zero rows degrades honestly.</li>
+          <li><b>Within the lens set</b>, B's clustering orders owners; A's elision applies only to yours —
+            helios-oss keeps its name on the row (Mon 21:40, third row).</li>
+          <li><b>One (hide)</b> rides the fold's top-right corner — one region, one verb, however many
+            sub-headers inside.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section id="variants">
+    <p class="eyebrow">The one open choice</p>
+    <h2>Where does the lens flip live?</h2>
+    <p class="qsub">All three share everything above — fold grammar, freshness count, per-machine owner set,
+      radar exemption; they differ only on the affordance for the <i>durable</i> swap. The stories cast the
+      first two: E1 serves the once-per-desk flip but buries the two-client desk in menu trips; E2 serves the
+      frequent flip but spends permanent verb ink and is only reachable <i>after</i> expanding the fold. The
+      session's round-3 ask — <b>an eye at the lane header</b> — resolves that tension: always reachable,
+      state-carrying, and it costs nothing while no lens is set. The transient check is settled in all three:
+      the caption's <b>(show)</b> is a peek that folds back on the next summon — deliberately <i>not</i> the
+      sticky pref-flip the stale/bots captions do, because a glance shouldn't legislate.</p>
+
+    <div class="vgrid">
+      <!-- E1 -->
+      <div class="vcard">
+        <div class="vhead">
+          <span class="vid">E1</span>
+          <h3>Lens in the gear</h3>
+          <p>Glass keeps exactly two verbs — (show) and (hide). The durable swap is config:
+             gear → "Lead with…", set once per machine, forgotten.</p>
+        </div>
+        <div class="vbody">
+          <div class="stage"><div class="island">
+            <div class="isec">Your PRs</div>
+            <div class="irow"><div class="gsb ok">✓</div><div><div class="t">pill: crossing repaint on glass</div>
+              <div class="s">githud #214 · checks green · 3h</div></div></div>
+            <div class="reveal" id="e1-x"><div>
+              <div class="isub">acme <button class="hidelink" onclick="fold('e1-x')">(hide)</button></div>
+              <div class="irow"><div class="gsb ok">✓</div><div><div class="t">PLAT-118: report view consumes the cached fact set</div>
+                <div class="s">core #620 · checks green · review waiting · 6h</div></div></div>
+            </div></div>
+            <button class="icap" data-for="e1-x" onclick="peek('e1-x')">3 at acme, <span class="fresh">1 new</span> <span class="verb">(show)</span></button>
+          </div></div>
+        </div>
+        <div class="vstrings">
+          <span class="lbl">gear&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span> <b>Lead with ▸ checkable owners · no lens</b> — discovered from your rows, under "Your PRs:"<br>
+          <span class="lbl">tooltip&nbsp;&nbsp;</span> "the other side folds to a counted line — set per machine"<br>
+          <span class="lbl">no lens&nbsp;&nbsp;</span> falls back to B — clustered, nothing folded<br>
+          <span class="lbl">status&nbsp;&nbsp;&nbsp;</span> ships regardless of the pick — the gear item stays the config twin of whatever lives on the glass (two handles, one truth)
+        </div>
+      </div>
+
+      <!-- E2 -->
+      <div class="vcard">
+        <div class="vhead">
+          <span class="vid">E2</span>
+          <h3>(lead) on the glass</h3>
+          <p>The expanded group's header carries a third verb. One click makes the peek permanent —
+             live below: show acme, then click (lead) and the island re-seats around it.</p>
+        </div>
+        <div class="vbody">
+          <div class="stage"><div class="island" id="e2">
+            <div class="e2-state" id="e2-yours">
+              <div class="isec">Your PRs</div>
+              <div class="irow"><div class="gsb ok">✓</div><div><div class="t">pill: crossing repaint on glass</div>
+                <div class="s">githud #214 · checks green · 3h</div></div></div>
+              <div class="reveal" id="e2-x"><div>
+                <div class="isub">acme <button class="leadlink" onclick="lead('acme')">(lead)</button> <button class="hidelink" style="margin-left:auto" onclick="fold('e2-x')">(hide)</button></div>
+                <div class="irow"><div class="gsb ok">✓</div><div><div class="t">PLAT-118: report view consumes the cached fact set</div>
+                  <div class="s">core #620 · checks green · review waiting · 6h</div></div></div>
+              </div></div>
+              <button class="icap" data-for="e2-x" onclick="peek('e2-x')">3 at acme, <span class="fresh">1 new</span> <span class="verb">(show)</span></button>
+            </div>
+            <div class="e2-state" id="e2-acme" style="display:none">
+              <div class="isec">Your PRs</div>
+              <div class="irow"><div class="gsb ok">✓</div><div><div class="t">PLAT-118: report view consumes the cached fact set</div>
+                <div class="s">core #620 · checks green · review waiting · 6h</div></div></div>
+              <div class="irow"><div class="gsb pend">·</div><div><div class="t">PLAT-092: per-span transport for the parser</div>
+                <div class="s">core #625 · checks running · 1d</div></div></div>
+              <div class="reveal" id="e2-y"><div>
+                <div class="isub">yours <button class="leadlink" onclick="lead('yours')">(lead)</button> <button class="hidelink" style="margin-left:auto" onclick="fold('e2-y')">(hide)</button></div>
+                <div class="irow"><div class="gsb ok">✓</div><div><div class="t">pill: crossing repaint on glass</div>
+                  <div class="s">githud #214 · checks green · 3h</div></div></div>
+              </div></div>
+              <button class="icap" data-for="e2-y" onclick="peek('e2-y')">1 of yours <span class="verb">(show)</span></button>
+            </div>
+          </div></div>
+        </div>
+        <div class="vstrings">
+          <span class="lbl">verbs&nbsp;&nbsp;&nbsp;&nbsp;</span> (show) · (hide) · <b>(lead)</b> — the third is new vocabulary on the glass<br>
+          <span class="lbl">for&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span> one-click durable swap, discoverable exactly where the intent occurs<br>
+          <span class="lbl">against&nbsp;&nbsp;</span> a rare act gets permanent ink; misclick risk beside (hide); three verbs where the family has two<br>
+          <span class="lbl">note&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span> subsumed by E3 — a third <i>word</i> for what the eye says with state, and only reachable after expanding
+        </div>
+      </div>
+
+      <!-- E3 -->
+      <div class="vcard">
+        <div class="vhead">
+          <span class="vid">E3</span><span class="badge-pick">ratified · round 6, with the toggle</span>
+          <h3>The eye on the lane header</h3>
+          <p>Session ask, round 3. A 12px eye at the header's shoulder: <b>slashed when the lens is folding
+             rows</b>, open otherwise. Click it — the "Lead with" card opens at the point of need. Live:
+             check acme and the fold dissolves.</p>
+        </div>
+        <div class="vbody">
+          <div class="stage"><div class="island lenswrap">
+            <div class="isec">Your PRs
+              <button class="eyebtn lensed" id="e3-eye" onclick="e3pop()" aria-haspopup="true" aria-expanded="false"
+                title="Lens — leading with yours + helios-oss">
+                <svg id="e3-slash" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/><line x1="4" y1="20" x2="20" y2="4"/></svg>
+                <svg id="e3-open" style="display:none" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>
+              </button>
+            </div>
+            <div class="lenspop" id="e3-menu" role="menu" aria-label="Lead with">
+              <div class="mhead">Lead with:</div>
+              <button class="prow on" aria-disabled="true">yours</button>
+              <button class="prow on" aria-disabled="true">helios-oss</button>
+              <button class="prow" id="e3-xb" onclick="e3toggle()">acme</button>
+            </div>
+            <div id="e3-lensed">
+              <div class="irow"><div class="gsb ok">✓</div><div><div class="t">pill: crossing repaint on glass</div>
+                <div class="s">githud #214 · checks green · 3h</div></div></div>
+              <div class="irow"><div class="gsb ok">✓</div><div><div class="t">fix: streaming parser backpressure</div>
+                <div class="s"><span class="org">helios-oss</span>/hx-parse #88 · checks green · 2d</div></div></div>
+              <div class="reveal" id="e3-fold"><div>
+                <div class="isub">acme <button class="hidelink" onclick="fold('e3-fold')">(hide)</button></div>
+                <div class="irow"><div class="gsb fail">✕</div><div><div class="t">PLAT-124: sensitivity pass, transport fixtures</div>
+                  <div class="s">core #631 · checks failing · 3h</div></div></div>
+              </div></div>
+              <button class="icap" data-for="e3-fold" onclick="peek('e3-fold')">3 at acme, <span class="fresh">1 new</span> <span class="verb">(show)</span></button>
+            </div>
+            <div id="e3-all" style="display:none">
+              <div class="irow"><div class="gsb ok">✓</div><div><div class="t">pill: crossing repaint on glass</div>
+                <div class="s">githud #214 · checks green · 3h</div></div></div>
+              <div class="irow"><div class="gsb ok">✓</div><div><div class="t">fix: streaming parser backpressure</div>
+                <div class="s"><span class="org">helios-oss</span>/hx-parse #88 · checks green · 2d</div></div></div>
+              <div class="irow"><div class="gsb fail">✕</div><div><div class="t">PLAT-124: sensitivity pass, transport fixtures</div>
+                <div class="s"><span class="org">acme</span>/core #631 · checks failing · 3h</div></div></div>
+              <div class="irow"><div class="gsb ok">✓</div><div><div class="t">PLAT-118: report view consumes the cached fact set</div>
+                <div class="s"><span class="org">acme</span>/core #620 · checks green · review waiting · 6h</div></div></div>
+            </div>
+          </div></div>
+        </div>
+        <div class="vstrings">
+          <span class="lbl">state&nbsp;&nbsp;&nbsp;&nbsp;</span> <b>slashed + half-ink while rows are folded</b> — the header itself admits something's hidden;
+          open + hover-revealed when nothing is (chrome only when it carries information)<br>
+          <span class="lbl">click&nbsp;&nbsp;&nbsp;&nbsp;</span> anchored "Lead with" card — the gear submenu relocated to the point of need; same pref, two handles, one truth<br>
+          <span class="lbl">serves&nbsp;&nbsp;&nbsp;</span> every desk in the stories — set-once desks never notice it; the two-client desk flips in two in-place clicks<br>
+          <span class="lbl">cost&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span> first icon on a lane header in a plain-words app — the tooltip carries the sentence ("Lens — leading with yours + helios-oss")
+        </div>
+      </div>
+    </div>
+
+    <div class="mech">
+      <h3>Mechanics, both variants</h3>
+      <ul>
+        <li>One pref: <code class="tok">githud.lens.owners</code> (a set) in UserDefaults — per-machine by
+          nature, no sync, no schedule, no "work hours" heuristics to get wrong. Empty set = no lens = B.</li>
+        <li>The peek is <code class="tok">PeekReveal</code>'s existing session-scoped machinery, not the sticky
+          gear-pref flip — a deliberate asymmetry with the stale/bots captions, same as the drafts no-caption
+          asymmetry. The lens pref is the only durable truth.</li>
+        <li>Caption strings join <code class="tok">PlainWords.swift</code>:
+          <code class="tok">lensCaption(count:owners:fresh:)</code> → one folded owner: "3 at acme, 1 new (show)" ·
+          "2 of yours (show)"; several: "4 elsewhere, 1 new at acme (show)"; spoken forms mirror the
+          existing pattern.</li>
+        <li>"1 new" = arrivals since this machine last expanded the group — rides the D1 per-fact stale-clock
+          plumbing, no new polling.</li>
+        <li>Space math: each folded row returns ~34px; the lane caps at 240px (~6 rows), so folding a 3-PR work
+          set is the difference between your own queue living above the fold or under a scrollbar.</li>
+        <li>The pill never changes: H1-only, and the lens never touches H1. Folded rows stay counted everywhere
+          counts appear.</li>
+        <li>When Inbound widens to org repos (the <code class="tok">SignalClassifier.swift:122</code> future-config),
+          the same lens governs it for free — the caption grammar is already the lane's native idiom.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section id="proposal">
+    <p class="eyebrow">Round 4 — the actual proposal, everything composed · live</p>
+    <h2>F: titled groups, and the eye lives on the titles</h2>
+    <p class="qsub">The session asked two closing questions: <i>which one is actually proposed?</i> and
+      <i>can the eye coexist with the sub-section titles?</i> One answer serves both. <b>The sub-headers are
+      the structure</b> of any mixed lane — always on, and rows beneath them drop the owner prefix because the
+      title said it. <b>Each title carries its own eye</b> at the right edge: shut an owner's eye and that
+      group folds durably — and here's the join — <b>the folded group's title line <i>is</i> the caption</b>:
+      "acme · 3, 1 new". The lens is no longer a separate control with a card; it's the set of open eyes,
+      edited in place.</p>
+    <p class="qsub"><b>Ratified with two amendments (round 5):</b> the eye made <code class="tok">(show)</code>
+      redundant — the verb is gone, and with it the peek state (opening is durable; the Sunday check is
+      open-look-shut, two clicks on the same spot). And <b>eyes are hover-revealed within their group's
+      region</b> — the control is chrome-silent at rest, because the honesty never lived in the eye: the
+      folded count line is persistent ink, so the lane always admits what's hidden. Reveal is forgiving
+      (the whole folded line opens the group); folding is deliberate (only the eye itself hides rows).
+      Hover a group below to meet its eye. <i>Round 6 revised this composition — the session returned to
+      E3's single eye and added the grouping-vs-now toggle to its card; F's other grammar carries over.
+      See the final round below.</i></p>
+
+    <div class="laptops">
+      <div class="stage">
+        <div class="machine">personal laptop · hover a group to meet its eye · a folded line opens on click</div>
+        <div class="island">
+          <div class="isec">Your PRs</div>
+
+          <div class="grp">
+            <div class="isub" id="yo-open">yours
+              <button class="eyebtn" onclick="eyeg('yo')" title="Fold yours on this desk" aria-label="Fold yours"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button></div>
+            <button class="foldline" id="yo-folded" style="display:none" onclick="eyeg('yo')" title="Open yours on this desk">yours <span class="cnt2">· 2</span>
+              <span class="eyemark"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/><line x1="4" y1="20" x2="20" y2="4"/></svg></span></button>
+            <div class="reveal open" id="yo-rows"><div>
+              <div class="irow"><div class="gsb ok">✓</div><div><div class="t">pill: crossing repaint on glass</div>
+                <div class="s">githud #214 · checks green · 3h</div></div></div>
+              <div class="irow"><div class="gsb pend">·</div><div><div class="t">docs: contributor map refresh</div>
+                <div class="s">githud #217 · checks running · 5h</div></div></div>
+            </div></div>
+          </div>
+
+          <div class="grp">
+            <div class="isub" id="he-open">helios-oss
+              <button class="eyebtn" onclick="eyeg('he')" title="Fold helios-oss on this desk" aria-label="Fold helios-oss"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button></div>
+            <button class="foldline" id="he-folded" style="display:none" onclick="eyeg('he')" title="Open helios-oss on this desk">helios-oss <span class="cnt2">· 1</span>
+              <span class="eyemark"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/><line x1="4" y1="20" x2="20" y2="4"/></svg></span></button>
+            <div class="reveal open" id="he-rows"><div>
+              <div class="irow"><div class="gsb ok">✓</div><div><div class="t">fix: streaming parser backpressure</div>
+                <div class="s">hx-parse #88 · checks green · 2d</div></div></div>
+            </div></div>
+          </div>
+
+          <div class="grp">
+            <div class="isub" id="xb-open" style="display:none">acme
+              <button class="eyebtn" onclick="eyeg('xb')" title="Fold acme on this desk" aria-label="Fold acme"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button></div>
+            <button class="foldline" id="xb-folded" onclick="eyeg('xb')" title="Open acme on this desk">acme <span class="cnt2">· 3,</span> <span class="fresh">1 new</span>
+              <span class="eyemark"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/><line x1="4" y1="20" x2="20" y2="4"/></svg></span></button>
+            <div class="reveal" id="xb-rows"><div>
+              <div class="irow"><div class="gsb fail">✕</div><div><div class="t">PLAT-124: sensitivity pass, transport fixtures</div>
+                <div class="s">core #631 · checks failing · 3h</div></div></div>
+              <div class="irow"><div class="gsb ok">✓</div><div><div class="t">PLAT-118: report view consumes the cached fact set</div>
+                <div class="s">core #620 · checks green · review waiting · 6h</div></div></div>
+              <div class="irow"><div class="gsb pend">·</div><div><div class="t">PLAT-092: per-span transport for the parser</div>
+                <div class="s">core #625 · checks running · 1d</div></div></div>
+            </div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="mech" style="margin: 0">
+        <h3>The spec, in six lines</h3>
+        <ul>
+          <li><b>Mixed lane → owner sub-headers, always.</b> Rows drop the <code class="tok">owner/</code>
+            prefix (the title said it); repo names stay. Single-owner lane → no titles, no eyes (lone-header
+            guard). "Needs you" exempt, as ever.</li>
+          <li><b>The eye rides each title's right edge, hover-revealed within its group's region</b>
+            (and on keyboard focus). Shut = that owner folds on this desk (durable, per-machine). Open =
+            leads. The lens <i>is</i> the set of open eyes — direct manipulation, no picker card, and zero
+            chrome at rest.</li>
+          <li><b>A folded group's title is its ledger line:</b> "acme · 3, 1 new" — persistent ink, so the
+            lane admits what's hidden even while the eye is invisible. No (show), no peek state: the whole
+            folded line opens the group (reveal is forgiving, full-width target); only the eye itself folds
+            one (hiding is deliberate, precise target). The Sunday check is open-look-shut — two clicks on
+            the same spot.</li>
+          <li><b>Two grammars coexist by scope:</b> the eye is org-grouping's control; the stale / bots &amp;
+            drafts / drafts families keep their ratified word-captions. Open mic: converge them later if
+            dogfood wants one grammar.</li>
+          <li><b>Group order:</b> open groups first, by their lead row's rank; folded lines sink to the lane's
+            bottom. Beyond two folded owners they merge into one "elsewhere · N (show)" line — the tail
+            safety valve.</li>
+          <li><b>Gear stays the config twin:</b> "Lead with" checkboxes flip the same eyes (two handles, one
+            truth). Pill untouched; folded rows stay counted everywhere counts appear.</li>
+        </ul>
+        <h3 style="margin-top:12px">What each round contributed — and what dissolved</h3>
+        <ul>
+          <li>A's elision → survives, carried by the titles. B's clustering → survives as group order.
+            C's partitions → survive as the titles themselves, now load-bearing.</li>
+          <li>E1's picker card → dissolved (direct manipulation); its gear item survives as the twin.
+            E2's (lead) verb → dissolved. E3's lane-header eye → moved down one level, onto the titles,
+            where it gained a group to govern.</li>
+          <li>Round 3's lane-bottom combined caption → dissolved into the folded title lines; survives only
+            as the >2-folded-owners merge.</li>
+          <li>Round 5, at ratification: F's own (show)/(hide) and the peek state → dissolved — the eye is the
+            one control, the count line is the honesty, and eyes went hover-quiet.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section id="final">
+    <p class="eyebrow">Round 6 — ratified revision · live</p>
+    <h2>One eye, one card — and the way back to now</h2>
+    <p class="qsub">Working the F mock, the session came back for <b>E3's single eye</b> — and asked for the
+      one thing its card was missing: <b>below a separator, a toggle between grouping and now</b>. That's the
+      escape hatch the whole feature needed. Org grouping is a <i>view</i>, and a view you can try must have
+      a one-click way back: uncheck <b>Group by owner</b> and the lane returns to today's shape — one
+      state-sorted list, no titles. <b>The lens applies in both views</b> (session amendment): unchecked
+      owners stay folded either way — in the grouped view their ledger line sits where the group would; in
+      the flat view it sits at the lane's foot. The toggle changes the shape of what leads, never what's
+      hidden — so it's still a fold, not a filter, in both. (A's quiet typography stays either way — "now"
+      means structure, not ink.) The trade against F, stated plainly: per-group eyes go, so folding an owner
+      happens in the card rather than on its title — in exchange the titles return to pure text, the lane
+      has one control point, and the two-grammar worry closes. F's forgiving reveal survives in both views:
+      clicking a folded ledger line opens that owner. Hover the lane, click the eye, try all four
+      combinations.</p>
+
+    <div class="laptops">
+      <div class="stage">
+        <div class="machine">personal laptop · the eye on the lane header · its card holds the lens and the mode</div>
+        <div class="island lenswrap grp">
+          <div class="isec">Your PRs
+            <button class="eyebtn lensed" id="g6-eye" onclick="g6pop()" aria-haspopup="true" aria-expanded="false" title="Lens — grouped, acme folded">
+              <svg id="g6-slash" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/><line x1="4" y1="20" x2="20" y2="4"/></svg>
+              <svg id="g6-openeye" style="display:none" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>
+          </div>
+          <div class="lenspop" id="g6-card" role="menu" aria-label="Lens">
+            <div id="g6-lead">
+              <div class="mhead">Lead with:</div>
+              <button class="prow on" aria-disabled="true">yours</button>
+              <button class="prow on" aria-disabled="true">helios-oss</button>
+              <button class="prow" id="g6-xbrow" onclick="g6owner()">acme</button>
+            </div>
+            <div class="msep"></div>
+            <button class="prow on" id="g6-mode" onclick="g6mode()" title="Off = one list, as before">Group by owner</button>
+          </div>
+
+          <div id="g6-grouped">
+            <div class="isub">yours</div>
+            <div class="irow"><div class="gsb ok">✓</div><div><div class="t">pill: crossing repaint on glass</div>
+              <div class="s">githud #214 · checks green · 3h</div></div></div>
+            <div class="irow"><div class="gsb pend">·</div><div><div class="t">docs: contributor map refresh</div>
+              <div class="s">githud #217 · checks running · 5h</div></div></div>
+            <div class="isub">helios-oss</div>
+            <div class="irow"><div class="gsb ok">✓</div><div><div class="t">fix: streaming parser backpressure</div>
+              <div class="s">hx-parse #88 · checks green · 2d</div></div></div>
+            <div id="g6-xb-openview" style="display:none">
+              <div class="isub">acme</div>
+              <div class="irow"><div class="gsb fail">✕</div><div><div class="t">PLAT-124: sensitivity pass, transport fixtures</div>
+                <div class="s">core #631 · checks failing · 3h</div></div></div>
+              <div class="irow"><div class="gsb ok">✓</div><div><div class="t">PLAT-118: report view consumes the cached fact set</div>
+                <div class="s">core #620 · checks green · review waiting · 6h</div></div></div>
+              <div class="irow"><div class="gsb pend">·</div><div><div class="t">PLAT-092: per-span transport for the parser</div>
+                <div class="s">core #625 · checks running · 1d</div></div></div>
+            </div>
+            <button class="foldline" id="g6-xb-fold" onclick="g6owner()" title="Open acme on this desk">acme <span class="cnt2">· 3,</span> <span class="fresh">1 new</span></button>
+          </div>
+
+          <div id="g6-flat" style="display:none">
+            <div class="irow" data-owner="xb" style="display:none"><div class="gsb fail">✕</div><div><div class="t">PLAT-124: sensitivity pass, transport fixtures</div>
+              <div class="s"><span class="org">acme</span>/core #631 · checks failing · 3h</div></div></div>
+            <div class="irow"><div class="gsb ok">✓</div><div><div class="t">pill: crossing repaint on glass</div>
+              <div class="s">githud #214 · checks green · 3h</div></div></div>
+            <div class="irow" data-owner="xb" style="display:none"><div class="gsb ok">✓</div><div><div class="t">PLAT-118: report view consumes the cached fact set</div>
+              <div class="s"><span class="org">acme</span>/core #620 · checks green · review waiting · 6h</div></div></div>
+            <div class="irow"><div class="gsb ok">✓</div><div><div class="t">fix: streaming parser backpressure</div>
+              <div class="s"><span class="org">helios-oss</span>/hx-parse #88 · checks green · 2d</div></div></div>
+            <div class="irow"><div class="gsb pend">·</div><div><div class="t">docs: contributor map refresh</div>
+              <div class="s">githud #217 · checks running · 5h</div></div></div>
+            <div class="irow" data-owner="xb" style="display:none"><div class="gsb pend">·</div><div><div class="t">PLAT-092: per-span transport for the parser</div>
+              <div class="s"><span class="org">acme</span>/core #625 · checks running · 1d</div></div></div>
+            <button class="foldline" id="g6-flat-fold" onclick="g6owner()" title="Open acme on this desk">acme <span class="cnt2">· 3,</span> <span class="fresh">1 new</span></button>
+          </div>
+        </div>
+      </div>
+
+      <div class="mech" style="margin: 0">
+        <h3>The final spec — what round 6 changes, what carries</h3>
+        <ul>
+          <li><b>The eye lives on the lane header</b>, hover-revealed within the lane (and on keyboard focus):
+            slashed while grouped-and-folding, open otherwise. One eye per foldable lane (Your PRs; Inbound
+            when org scope lands).</li>
+          <li><b>Its card is the whole lens:</b> "Lead with:" checkable owners, then a separator, then
+            <b>Group by owner</b>. The two are orthogonal: the toggle changes <i>shape</i> (titled groups vs
+            one flat state-sorted list with prefixes back on rows), the checkboxes change <i>who leads</i> —
+            and they apply in both shapes. Folded owners keep their ledger line either way; in the flat view
+            it sits at the lane's foot (where folded lines sink in the grouped view too — same rule). Two
+            prefs: <code class="tok">githud.lens.groupByOwner</code> +
+            <code class="tok">githud.lens.owners</code>; the gear mirrors both (two handles, one truth).</li>
+          <li><b>Sub-headers return to pure text</b> — no per-title eyes. Folding an owner happens in the
+            card; <b>opening stays forgiving</b>: the folded ledger line ("acme · 3, 1 new") is still a
+            full-width click target.</li>
+          <li><b>Everything else carries from F:</b> folded lines as persistent honesty ink, no (show)/peek,
+            open-groups-first order, >2-folded merge valve, owner elision under titles, radar and pill
+            untouched, word-captions stay with the stale/bots families.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section id="decide">
+    <p class="eyebrow">Decide</p>
+    <div class="decide">
+      <h3>Ratified — round 6</h3>
+      <p><b>Ratified 2026-07-14, round 6:</b> E3's single lane-header eye, its card carrying the lens
+        ("Lead with:" checkable owners) and, below a separator, the <b>Group by owner</b> toggle — the
+        one-click switch between the grouped view and the lane as it is now. Amended same day: <b>the lens
+        is view-independent</b> — the toggle changes shape, never visibility; folded owners keep their
+        ledger line at the flat lane's foot too. F's per-group eyes traded for the one control point; all
+        other F grammar carries (folded ledger lines as honesty ink, no (show), hover-quiet chrome,
+        forgiving open on folded lines, order rules, radar and pill untouched).
+        Rounds 4–5 stay in this page as the road. Next: the usual gauntlet — builder in worktree,
+        three-lens panel, re-verify, land.</p>
+      <p>Considered and rejected, recorded: compressed half-height rows for the secondary group (half-attention
+        rendering is chrome pretending to be a decision — the caption's count says as much in one line);
+        time-of-day auto-lens (a schedule guessing at attention is a mode you didn't set); per-org accent
+        tinting (color stays CI vocabulary).</p>
+    </div>
+  </section>
+
+  <footer class="colophon">githud · org-grouping session · rounds 2–6 · 2026-07-12/14 · <b>ratified round 6: E3's one
+    eye + card with "Lead with" owners ─── "Group by owner" toggle — the way back to now; lens is view-independent
+    (the toggle changes shape, never visibility)</b> · round 5 = F amendments
+    (no (show), hover-quiet eyes, the folded count line is the persistent honesty) · round 4 = F, the composition:
+    the eye moved onto the sub-section titles (session liked both; they turned out to be one mechanism — the folded
+    title <b>is</b> the caption) · round 3: the eye · D reopened: killed for omission,
+    not aesthetics — refolded as the lens (fold, not filter; peek ≠ pref) · N orgs walked as four story moments,
+    which promoted the lens from one owner to the desk's owner set — the complement still folds to one caption
+    at any org count · mocks ink-faithful: 520pt island, 13px/11px
+    rows, captions 11px tertiary with underlined verb, reveal 150ms/120ms, GitHub status badges #3FB950 / #D29922 /
+    #F85149 · grounded: UserDefaults per-machine (PillStyleStore precedent), PeekReveal session scope,
+    SignalClassifier.swift:122 inbound-org future-config, lane cap 240px (IslandGeometry.swift:19)</footer>
+</div>
+
+<script>
+  function peek(id) {
+    var r = document.getElementById(id);
+    var cap = document.querySelector('.icap[data-for="' + id + '"]');
+    r.classList.add('open');
+    if (cap) cap.style.display = 'none';
+  }
+  function fold(id) {
+    var r = document.getElementById(id);
+    var cap = document.querySelector('.icap[data-for="' + id + '"]');
+    r.classList.remove('open');
+    if (cap) cap.style.display = 'block';
+  }
+  function lead(owner) {
+    document.getElementById('e2-yours').style.display = owner === 'yours' ? 'block' : 'none';
+    document.getElementById('e2-acme').style.display = owner === 'acme' ? 'block' : 'none';
+    fold('e2-x'); fold('e2-y');
+  }
+  var e3Lensed = true;
+  function e3pop() {
+    var menu = document.getElementById('e3-menu');
+    var open = menu.classList.toggle('open');
+    document.getElementById('e3-eye').setAttribute('aria-expanded', open ? 'true' : 'false');
+  }
+  function e3toggle() {
+    e3Lensed = !e3Lensed;
+    document.getElementById('e3-xb').classList.toggle('on', !e3Lensed);
+    document.getElementById('e3-lensed').style.display = e3Lensed ? 'block' : 'none';
+    document.getElementById('e3-all').style.display = e3Lensed ? 'none' : 'block';
+    document.getElementById('e3-slash').style.display = e3Lensed ? 'block' : 'none';
+    document.getElementById('e3-open').style.display = e3Lensed ? 'none' : 'block';
+    var eye = document.getElementById('e3-eye');
+    eye.classList.toggle('lensed', e3Lensed);
+    eye.title = e3Lensed ? 'Lens — leading with yours + helios-oss' : 'No lens — everything leads';
+    if (e3Lensed) fold('e3-fold');
+    document.getElementById('e3-menu').classList.remove('open');
+    eye.setAttribute('aria-expanded', 'false');
+  }
+  /* round 5 — per-group eye, two states: open | folded */
+  var G = { yo: true, he: true, xb: false };
+  function eyeg(k) {
+    G[k] = !G[k];
+    document.getElementById(k + '-open').style.display = G[k] ? 'flex' : 'none';
+    document.getElementById(k + '-folded').style.display = G[k] ? 'none' : 'flex';
+    document.getElementById(k + '-rows').classList.toggle('open', G[k]);
+  }
+  /* round 6 — one eye, one card: lens owners + grouping-vs-now toggle */
+  var g6 = { grouped: true, xb: false };
+  function g6pop() {
+    var card = document.getElementById('g6-card');
+    var open = card.classList.toggle('open');
+    document.getElementById('g6-eye').setAttribute('aria-expanded', open ? 'true' : 'false');
+  }
+  function g6owner() { g6.xb = !g6.xb; g6render(); }
+  function g6mode() { g6.grouped = !g6.grouped; g6render(); }
+  function g6render() {
+    document.getElementById('g6-grouped').style.display = g6.grouped ? 'block' : 'none';
+    document.getElementById('g6-flat').style.display = g6.grouped ? 'none' : 'block';
+    document.getElementById('g6-xb-openview').style.display = g6.xb ? 'block' : 'none';
+    document.getElementById('g6-xb-fold').style.display = g6.xb ? 'none' : 'flex';
+    document.querySelectorAll('#g6-flat .irow[data-owner="xb"]').forEach(function (r) {
+      r.style.display = g6.xb ? 'flex' : 'none';
+    });
+    document.getElementById('g6-flat-fold').style.display = g6.xb ? 'none' : 'flex';
+    document.getElementById('g6-xbrow').classList.toggle('on', g6.xb);
+    document.getElementById('g6-mode').classList.toggle('on', g6.grouped);
+    var folding = !g6.xb;
+    document.getElementById('g6-slash').style.display = folding ? 'block' : 'none';
+    document.getElementById('g6-openeye').style.display = folding ? 'none' : 'block';
+    var eye = document.getElementById('g6-eye');
+    eye.classList.toggle('lensed', folding);
+    eye.title = (folding ? 'Lens — acme folded' : 'Everything leads') +
+      (g6.grouped ? ' · grouped' : ' · one list');
+  }
+</script>

@@ -1,0 +1,131 @@
+{
+  "data": {
+    "viewer": {
+      "pullRequests": {
+        "nodes": [
+          {
+            "number": 412,
+            "title": "Add request retry with exponential backoff",
+            "url": "https://github.com/acme/api/pull/412",
+            "isDraft": false,
+            "updatedAt": "2026-06-16T09:50:00Z",
+            "reviewDecision": "APPROVED",
+            "mergeable": "MERGEABLE",
+            "repository": { "nameWithOwner": "acme/api" },
+            "commits": { "nodes": [ { "commit": { "statusCheckRollup": { "state": "SUCCESS" } } } ] }
+          },
+          {
+            "number": 389,
+            "title": "Migrate auth tokens to rotating keys",
+            "url": "https://github.com/acme/api/pull/389",
+            "isDraft": false,
+            "updatedAt": "2026-06-16T09:30:00Z",
+            "reviewDecision": "APPROVED",
+            "mergeable": "MERGEABLE",
+            "repository": { "nameWithOwner": "acme/api" },
+            "commits": { "nodes": [ { "commit": { "statusCheckRollup": { "state": "FAILURE" } } } ] }
+          },
+          {
+            "number": 77,
+            "title": "Refactor the rendering pipeline",
+            "url": "https://github.com/acme/web/pull/77",
+            "isDraft": false,
+            "updatedAt": "2026-06-16T09:10:00Z",
+            "reviewDecision": "CHANGES_REQUESTED",
+            "mergeable": "MERGEABLE",
+            "repository": { "nameWithOwner": "acme/web" },
+            "commits": { "nodes": [ { "commit": { "statusCheckRollup": { "state": "SUCCESS" } } } ] }
+          },
+          {
+            "number": 78,
+            "title": "Upgrade to the new design tokens",
+            "url": "https://github.com/acme/web/pull/78",
+            "isDraft": false,
+            "updatedAt": "2026-06-16T08:40:00Z",
+            "reviewDecision": "APPROVED",
+            "mergeable": "CONFLICTING",
+            "repository": { "nameWithOwner": "acme/web" },
+            "commits": { "nodes": [ { "commit": { "statusCheckRollup": { "state": "SUCCESS" } } } ] }
+          },
+          {
+            "number": 1203,
+            "title": "Introduce the billing reconciliation job",
+            "url": "https://github.com/acme/platform/pull/1203",
+            "isDraft": false,
+            "updatedAt": "2026-06-16T08:20:00Z",
+            "reviewDecision": "REVIEW_REQUIRED",
+            "mergeable": "MERGEABLE",
+            "repository": { "nameWithOwner": "acme/platform" },
+            "commits": { "nodes": [ { "commit": { "statusCheckRollup": { "state": "SUCCESS" } } } ] }
+          },
+          {
+            "number": 1204,
+            "title": "Add a feature flag for the new dashboard",
+            "url": "https://github.com/acme/platform/pull/1204",
+            "isDraft": false,
+            "updatedAt": "2026-06-16T08:00:00Z",
+            "reviewDecision": "APPROVED",
+            "mergeable": "MERGEABLE",
+            "repository": { "nameWithOwner": "acme/platform" },
+            "commits": { "nodes": [ { "commit": { "statusCheckRollup": { "state": "PENDING" } } } ] }
+          },
+          {
+            "number": 1205,
+            "title": "Tighten the rate-limiter defaults",
+            "url": "https://github.com/acme/platform/pull/1205",
+            "isDraft": false,
+            "updatedAt": "2026-06-16T07:30:00Z",
+            "reviewDecision": "APPROVED",
+            "mergeable": "UNKNOWN",
+            "repository": { "nameWithOwner": "acme/platform" },
+            "commits": { "nodes": [ { "commit": { "statusCheckRollup": { "state": "SUCCESS" } } } ] }
+          },
+          {
+            "number": 33,
+            "title": "Document the deployment runbook",
+            "url": "https://github.com/acme/docs/pull/33",
+            "isDraft": false,
+            "updatedAt": "2026-06-16T07:00:00Z",
+            "reviewDecision": "APPROVED",
+            "mergeable": "MERGEABLE",
+            "repository": { "nameWithOwner": "acme/docs" },
+            "commits": { "nodes": [ { "commit": { "statusCheckRollup": null } } ] }
+          },
+          {
+            "number": 34,
+            "title": "Fix a typo in the contributing guide",
+            "url": "https://github.com/acme/docs/pull/34",
+            "isDraft": false,
+            "updatedAt": "2026-06-16T06:30:00Z",
+            "reviewDecision": null,
+            "mergeable": "MERGEABLE",
+            "repository": { "nameWithOwner": "acme/docs" },
+            "commits": { "nodes": [ { "commit": { "statusCheckRollup": { "state": "SUCCESS" } } } ] }
+          },
+          {
+            "number": 902,
+            "title": "WIP: sketch the streaming ingest path",
+            "url": "https://github.com/acme/platform/pull/902",
+            "isDraft": true,
+            "updatedAt": "2026-06-16T06:00:00Z",
+            "reviewDecision": null,
+            "mergeable": "MERGEABLE",
+            "repository": { "nameWithOwner": "acme/platform" },
+            "commits": { "nodes": [ { "commit": { "statusCheckRollup": { "state": "SUCCESS" } } } ] }
+          },
+          {
+            "number": 903,
+            "title": "WIP: explore a metrics aggregation layer",
+            "url": "https://github.com/acme/api/pull/903",
+            "isDraft": true,
+            "updatedAt": "2026-06-16T05:30:00Z",
+            "reviewDecision": "REVIEW_REQUIRED",
+            "mergeable": "MERGEABLE",
+            "repository": { "nameWithOwner": "acme/api" },
+            "commits": { "nodes": [ { "commit": { "statusCheckRollup": { "state": "PENDING" } } } ] }
+          }
+        ]
+      }
+    }
+  }
+}

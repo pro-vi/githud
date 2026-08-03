@@ -1,0 +1,348 @@
+<title>Plain words — island copy session</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --card: #ffffff; --ink: #1a2129; --ink2: #5a6572; --ink3: #8b95a3;
+    --line: #dde3ea; --accent: #2464c4; --accent-ink: #ffffff;
+    --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, monospace;
+    --sys: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) { :root {
+    --bg: #0b0e13; --card: #121722; --ink: #e7edf4; --ink2: #98a2b0; --ink3: #6b7683;
+    --line: #232b36; --accent: #4c94f8; --accent-ink: #0b0e13;
+  } }
+  :root[data-theme="light"] {
+    --bg: #f6f7f9; --card: #ffffff; --ink: #1a2129; --ink2: #5a6572; --ink3: #8b95a3;
+    --line: #dde3ea; --accent: #2464c4; --accent-ink: #ffffff;
+  }
+  :root[data-theme="dark"] {
+    --bg: #0b0e13; --card: #121722; --ink: #e7edf4; --ink2: #98a2b0; --ink3: #6b7683;
+    --line: #232b36; --accent: #4c94f8; --accent-ink: #0b0e13;
+  }
+  * { box-sizing: border-box; }
+  body { background: var(--bg); color: var(--ink); font: 15px/1.6 var(--sys); margin: 0; }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 0 24px 80px; }
+
+  header.lead { padding: 44px 0 8px; max-width: 76ch; }
+  header.lead h1 { font-size: 27px; font-weight: 750; letter-spacing: -0.022em; margin: 0 0 10px; text-wrap: balance; }
+  header.lead p { color: var(--ink2); margin: 0 0 8px; }
+  .doctrine-note { font: 500 12px/1.5 var(--mono); color: var(--ink3); border-left: 2px solid var(--accent);
+    padding: 2px 0 2px 12px; margin: 16px 0 0; }
+  .doctrine-note em { color: var(--ink2); font-style: normal; }
+
+  section { margin: 44px 0 0; }
+  .eyebrow { font: 600 11px/1 var(--mono); letter-spacing: .09em; text-transform: uppercase; color: var(--accent); margin: 0 0 10px; }
+  section h2 { font-size: 21px; font-weight: 700; letter-spacing: -0.015em; margin: 0 0 6px; max-width: 72ch; text-wrap: balance; }
+  .qsub { color: var(--ink2); max-width: 78ch; margin: 0 0 20px; }
+  code.tok { font: 500 11.5px var(--mono); background: color-mix(in srgb, var(--ink) 7%, transparent); border-radius: 4px; padding: 1px 4px; }
+
+  .today { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px 18px; margin: 0 0 22px; }
+  .today h3 { margin: 0 0 6px; font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--ink3); }
+  .today p { margin: 0 0 4px; color: var(--ink2); font-size: 13.5px; }
+  .today .cur { font: 500 12px var(--mono); color: var(--ink); }
+  .today .strike { text-decoration: line-through; text-decoration-color: color-mix(in srgb, var(--ink3) 60%, transparent); }
+
+  /* ---- variant cards ---- */
+  .vgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 18px; }
+  .vcard { background: var(--card); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; display: flex; flex-direction: column; }
+  .vhead { padding: 13px 16px 11px; border-bottom: 1px solid var(--line); }
+  .vhead .vid { font: 700 10px var(--mono); letter-spacing: .07em; color: var(--accent); text-transform: uppercase; }
+  .vhead h3 { margin: 3px 0 3px; font-size: 15px; font-weight: 700; letter-spacing: -0.008em; }
+  .vhead p { margin: 0; font-size: 12.5px; color: var(--ink2); }
+  .vbody { padding: 16px; display: flex; flex-direction: column; gap: 12px; flex: 1; }
+  .vstrings { font: 500 12px/1.7 var(--mono); color: var(--ink2); border-top: 1px solid var(--line); padding: 11px 16px 13px; }
+  .vstrings b { color: var(--ink); font-weight: 600; }
+  .vstrings .lbl { color: var(--ink3); }
+
+  /* ---- the island mock: deliberately single-theme (the app's dark glass) ---- */
+  .stage { background:
+      radial-gradient(1200px 500px at 70% -10%, #2a3242 0%, transparent 60%),
+      linear-gradient(180deg, #171b22, #10141a);
+    border-radius: 10px; padding: 22px 16px; display: flex; justify-content: center; }
+  .island { width: 100%; max-width: 400px; background: rgba(30, 34, 42, 0.96); border: 1px solid rgba(255,255,255,0.09);
+    border-radius: 14px; box-shadow: 0 18px 44px rgba(0,0,0,0.5); padding: 12px 14px 8px;
+    font-family: var(--sys); color: rgba(255,255,255,0.85); }
+  .island * { font-variant-numeric: tabular-nums; }
+  .isec { font-size: 11px; font-weight: 600; color: rgba(255,255,255,0.55); margin: 10px 0 7px; display: flex; align-items: center; gap: 6px; }
+  .isec:first-child { margin-top: 0; }
+  .isec .hidelink { margin-left: auto; }
+  .irow { display: flex; gap: 8px; align-items: flex-start; padding: 5px 6px; border-radius: 6px; margin: 0 -6px; }
+  .irow:hover { background: rgba(255,255,255,0.07); }
+  .irow .glyph { width: 14px; text-align: center; font-size: 11px; color: rgba(255,255,255,0.55); padding-top: 1px; flex: none; }
+  .irow .t { font-size: 13px; font-weight: 500; color: rgba(255,255,255,0.85); line-height: 1.35; }
+  .irow .s { font-size: 11px; color: rgba(255,255,255,0.55); margin-top: 1px; }
+  .irow.dim .t { color: rgba(255,255,255,0.55); }
+  .irow.dim .glyph { color: rgba(255,255,255,0.3); }
+
+  /* the caption-button: 11px tertiary ink, the "show" verb is the link */
+  .icap { font-size: 11px; color: rgba(255,255,255,0.32); padding: 6px 6px; margin: 0 -6px; border-radius: 6px;
+    background: none; border: none; display: block; width: calc(100% + 12px); text-align: left; cursor: pointer;
+    font-family: var(--sys); }
+  .icap:hover { background: rgba(255,255,255,0.07); color: rgba(255,255,255,0.55); }
+  .icap:focus-visible, .hidelink:focus-visible, .ifooter:focus-visible { outline: 2px solid #4c94f8; outline-offset: 1px; }
+  .icap .verb, .hidelink { text-decoration: underline; text-underline-offset: 2px;
+    text-decoration-color: rgba(255,255,255,0.28); }
+  .icap:hover .verb { text-decoration-color: rgba(255,255,255,0.6); }
+  .hidelink { font-size: 11px; font-weight: 400; color: rgba(255,255,255,0.32); background: none; border: none;
+    cursor: pointer; font-family: var(--sys); padding: 2px 4px; border-radius: 4px; }
+  .hidelink:hover { color: rgba(255,255,255,0.55); background: rgba(255,255,255,0.07); }
+
+  /* reveal machinery — height 150ms, ink 120ms, the app's own grammar */
+  .reveal { display: grid; grid-template-rows: 0fr; transition: grid-template-rows 150ms ease; }
+  .reveal > div { overflow: hidden; opacity: 0; transition: opacity 120ms ease; }
+  .reveal.open { grid-template-rows: 1fr; }
+  .reveal.open > div { opacity: 1; }
+  .reveal .isec { margin-top: 4px; }
+  @media (prefers-reduced-motion: reduce) {
+    .reveal, .reveal > div { transition: none; }
+  }
+
+  /* footer mocks */
+  .ifooter { display: block; width: calc(100% + 12px); margin: 6px -6px 0; border: none; background: none; text-align: left;
+    font-family: var(--sys); font-size: 11px; color: rgba(255,255,255,0.32); border-radius: 6px; cursor: pointer; }
+  .ifooter:hover { background: rgba(255,255,255,0.07); color: rgba(255,255,255,0.55); }
+  .ifooter.before { padding: 2px 6px; }
+  .ifooter.after { padding: 9px 6px; }
+  .hitband { position: relative; }
+  .hitband::after { content: attr(data-h); position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+    font: 600 9px var(--mono); letter-spacing: .05em; color: #e8b14a; border: 1px dashed rgba(232,177,74,0.55);
+    border-radius: 4px; padding: 1px 5px; pointer-events: none; }
+
+  .fgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 18px; }
+  .fcard { background: var(--card); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+  .fcard .vhead h3 { font-size: 14px; }
+  .fcard .stage { border-radius: 0; padding: 18px 16px; }
+
+  .mech { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px 18px; margin: 18px 0 0;
+    font-size: 13.5px; color: var(--ink2); }
+  .mech h3 { margin: 0 0 6px; font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--ink3); }
+  .mech ul { margin: 0; padding-left: 18px; }
+  .mech li { margin: 3px 0; }
+
+  .decide { border: 1px solid var(--line); border-left: 3px solid var(--accent); background: var(--card);
+    border-radius: 10px; padding: 16px 20px; margin-top: 20px; }
+  .decide h3 { margin: 0 0 8px; font-size: 15px; }
+  .decide p { margin: 0 0 6px; color: var(--ink2); font-size: 13.5px; }
+
+  footer.colophon { margin-top: 56px; border-top: 1px solid var(--line); padding-top: 14px;
+    font: 500 11.5px var(--mono); color: var(--ink3); }
+</style>
+
+<div class="wrap">
+  <header class="lead">
+    <h1>Plain words — the island learns to talk like a person</h1>
+    <p>Dogfood feedback, 2026-07-12: the collapsed captions (<code class="tok">3 stale · untouched 14d+</code>,
+       <code class="tok">2 held back · bots/drafts</code>) read machine-made — interpunct-glued fragments,
+       <code class="tok">14d+</code> jargon. The ask: human wording in the earlier-web register, the captions become
+       buttons that expand the hidden rows in place, the footer keeps only the GitHub-inbox link, and its
+       click target gets taller.</p>
+    <p class="doctrine-note">Doctrine holds throughout: <em>ink, not chrome</em> — the caption stays 11px tertiary ink;
+      the only new affordance is an underlined verb. Motion maps 1:1 to the click (150ms height, 120ms ink —
+      the island's existing grammar). Nothing here fabricates a state: expanding shows real rows or nothing.</p>
+  </header>
+
+  <section>
+    <p class="eyebrow">Today</p>
+    <h2>What's on screen now, and why it reads AI</h2>
+    <div class="today">
+      <h3>Current strings</h3>
+      <p><span class="cur">3 stale · untouched 14d+</span> &nbsp;·&nbsp; <span class="cur">2 held back · bots/drafts</span>
+         &nbsp;·&nbsp; <span class="cur"><span class="strike">Check for yourself — </span>GitHub inbox ↗</span></p>
+      <p>The tell is the syntax, not the facts: middots welding noun fragments, an abbreviation a person wouldn't
+         say out loud (<code class="tok">14d+</code>), category labels (<code class="tok">bots/drafts</code>) where a person
+         would name things. And the captions are dead ink — seeing the rows requires a trip to the gear menu.
+         Earlier-web pages did this simply: a plain sentence with an underlined verb at the end.</p>
+    </div>
+  </section>
+
+  <section id="variants">
+    <p class="eyebrow">The three flavors — click the captions, they work</p>
+    <h2>Same mechanics, three voices</h2>
+    <p class="qsub">Each island below is live: click a caption to expand its hidden rows (and <i>hide</i> to fold them
+      back). All three flavors drive the <b>same preference the gear menu drives</b> — two handles, one truth.
+      Rows are real shapes from your data: the December PR waiting 28 weeks, dependabot held back, a stale branch
+      quiet since May. Mocks stay in the island's dark glass on purpose; the page follows your theme.</p>
+
+    <div class="vgrid">
+      <!-- A -->
+      <div class="vcard">
+        <div class="vhead">
+          <span class="vid">A</span>
+          <h3>Plain sentence + show</h3>
+          <p>Full words, comma pacing, one underlined verb. The quietest of the three.</p>
+        </div>
+        <div class="vbody"><div class="stage"><div class="island">
+          <div class="isec">Inbound</div>
+          <div class="irow"><div class="glyph">⌲</div><div><div class="t">Fix typo in setup instructions</div><div class="s">githud · PR · waiting 28w</div></div></div>
+          <div class="reveal" id="a-in"><div>
+            <div class="isec">From bots and drafts <button class="hidelink" onclick="fold('a-in')">hide</button></div>
+            <div class="irow dim"><div class="glyph">⌲</div><div><div class="t">Bump actions/checkout from 4 to 5</div><div class="s">githud · dependabot · waiting 6w</div></div></div>
+            <div class="irow dim"><div class="glyph">⌲</div><div><div class="t">WIP: sketch a filters panel</div><div class="s">mcp-filter · draft · waiting 2w</div></div></div>
+          </div></div>
+          <button class="icap" data-for="a-in" onclick="toggle('a-in')">2 more from bots and drafts, <span class="verb">show</span></button>
+          <div class="isec">Your PRs</div>
+          <div class="irow"><div class="glyph">✓</div><div><div class="t">pill: crossing repaint on glass</div><div class="s">checks green · review waiting</div></div></div>
+          <div class="reveal" id="a-st"><div>
+            <div class="isec">Quiet a while <button class="hidelink" onclick="fold('a-st')">hide</button></div>
+            <div class="irow dim"><div class="glyph">◦</div><div><div class="t">legacy import shim cleanup</div><div class="s">quiet since May 28</div></div></div>
+            <div class="irow dim"><div class="glyph">◦</div><div><div class="t">spike: offline snapshot diff</div><div class="s">quiet since Jun 12</div></div></div>
+            <div class="irow dim"><div class="glyph">◦</div><div><div class="t">docs: contributor map</div><div class="s">quiet since Jun 20</div></div></div>
+          </div></div>
+          <button class="icap" data-for="a-st" onclick="toggle('a-st')">3 more, quiet for a couple weeks, <span class="verb">show</span></button>
+        </div></div></div>
+        <div class="vstrings">
+          <span class="lbl">stale&nbsp;&nbsp;&nbsp;&nbsp;</span> <b>3 more, quiet for a couple weeks, <u>show</u></b><br>
+          <span class="lbl">held&nbsp;back</span> <b>2 more from bots and drafts, <u>show</u></b><br>
+          <span class="lbl">revealed&nbsp;</span> header gains <b><u>hide</u></b> on its right edge<br>
+          <span class="lbl">gear&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span> "Show quiet PRs" · "Show bots and drafts"
+        </div>
+      </div>
+
+      <!-- B -->
+      <div class="vcard">
+        <div class="vhead">
+          <span class="vid">B</span>
+          <h3>Trailing "…and"</h3>
+          <p>Reads as the tail of the list above it — the list admits it isn't finished.</p>
+        </div>
+        <div class="vbody"><div class="stage"><div class="island">
+          <div class="isec">Inbound</div>
+          <div class="irow"><div class="glyph">⌲</div><div><div class="t">Fix typo in setup instructions</div><div class="s">githud · PR · waiting 28w</div></div></div>
+          <div class="reveal" id="b-in"><div>
+            <div class="isec">Bots and drafts <button class="hidelink" onclick="fold('b-in')">hide them</button></div>
+            <div class="irow dim"><div class="glyph">⌲</div><div><div class="t">Bump actions/checkout from 4 to 5</div><div class="s">githud · dependabot · waiting 6w</div></div></div>
+            <div class="irow dim"><div class="glyph">⌲</div><div><div class="t">WIP: sketch a filters panel</div><div class="s">mcp-filter · draft · waiting 2w</div></div></div>
+          </div></div>
+          <button class="icap" data-for="b-in" onclick="toggle('b-in')">…and 2 from bots and drafts — <span class="verb">show them</span></button>
+          <div class="isec">Your PRs</div>
+          <div class="irow"><div class="glyph">✓</div><div><div class="t">pill: crossing repaint on glass</div><div class="s">checks green · review waiting</div></div></div>
+          <div class="reveal" id="b-st"><div>
+            <div class="isec">Went quiet <button class="hidelink" onclick="fold('b-st')">hide them</button></div>
+            <div class="irow dim"><div class="glyph">◦</div><div><div class="t">legacy import shim cleanup</div><div class="s">quiet since May 28</div></div></div>
+            <div class="irow dim"><div class="glyph">◦</div><div><div class="t">spike: offline snapshot diff</div><div class="s">quiet since Jun 12</div></div></div>
+            <div class="irow dim"><div class="glyph">◦</div><div><div class="t">docs: contributor map</div><div class="s">quiet since Jun 20</div></div></div>
+          </div></div>
+          <button class="icap" data-for="b-st" onclick="toggle('b-st')">…and 3 that went quiet — <span class="verb">show them</span></button>
+        </div></div></div>
+        <div class="vstrings">
+          <span class="lbl">stale&nbsp;&nbsp;&nbsp;&nbsp;</span> <b>…and 3 that went quiet — <u>show them</u></b><br>
+          <span class="lbl">held&nbsp;back</span> <b>…and 2 from bots and drafts — <u>show them</u></b><br>
+          <span class="lbl">revealed&nbsp;</span> header gains <b><u>hide them</u></b> on its right edge<br>
+          <span class="lbl">gear&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span> "Show PRs that went quiet" · "Show bots and drafts"
+        </div>
+      </div>
+
+      <!-- C -->
+      <div class="vcard">
+        <div class="vhead">
+          <span class="vid">C</span>
+          <h3>Old-web parenthetical</h3>
+          <p>The 1999 idiom: a count and a parenthesized verb, nothing else. Tersest.</p>
+        </div>
+        <div class="vbody"><div class="stage"><div class="island">
+          <div class="isec">Inbound</div>
+          <div class="irow"><div class="glyph">⌲</div><div><div class="t">Fix typo in setup instructions</div><div class="s">githud · PR · waiting 28w</div></div></div>
+          <div class="reveal" id="c-in"><div>
+            <div class="isec">Bots &amp; drafts <button class="hidelink" onclick="fold('c-in')">(hide)</button></div>
+            <div class="irow dim"><div class="glyph">⌲</div><div><div class="t">Bump actions/checkout from 4 to 5</div><div class="s">githud · dependabot · waiting 6w</div></div></div>
+            <div class="irow dim"><div class="glyph">⌲</div><div><div class="t">WIP: sketch a filters panel</div><div class="s">mcp-filter · draft · waiting 2w</div></div></div>
+          </div></div>
+          <button class="icap" data-for="c-in" onclick="toggle('c-in')">2 from bots &amp; drafts <span class="verb">(show)</span></button>
+          <div class="isec">Your PRs</div>
+          <div class="irow"><div class="glyph">✓</div><div><div class="t">pill: crossing repaint on glass</div><div class="s">checks green · review waiting</div></div></div>
+          <div class="reveal" id="c-st"><div>
+            <div class="isec">Gone quiet <button class="hidelink" onclick="fold('c-st')">(hide)</button></div>
+            <div class="irow dim"><div class="glyph">◦</div><div><div class="t">legacy import shim cleanup</div><div class="s">quiet since May 28</div></div></div>
+            <div class="irow dim"><div class="glyph">◦</div><div><div class="t">spike: offline snapshot diff</div><div class="s">quiet since Jun 12</div></div></div>
+            <div class="irow dim"><div class="glyph">◦</div><div><div class="t">docs: contributor map</div><div class="s">quiet since Jun 20</div></div></div>
+          </div></div>
+          <button class="icap" data-for="c-st" onclick="toggle('c-st')">3 gone quiet <span class="verb">(show)</span></button>
+        </div></div></div>
+        <div class="vstrings">
+          <span class="lbl">stale&nbsp;&nbsp;&nbsp;&nbsp;</span> <b>3 gone quiet <u>(show)</u></b><br>
+          <span class="lbl">held&nbsp;back</span> <b>2 from bots &amp; drafts <u>(show)</u></b><br>
+          <span class="lbl">revealed&nbsp;</span> header gains <b><u>(hide)</u></b> on its right edge<br>
+          <span class="lbl">gear&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span> "Show PRs gone quiet" · "Show bots &amp; drafts"
+        </div>
+      </div>
+    </div>
+
+    <div class="mech">
+      <h3>Mechanics, all flavors</h3>
+      <ul>
+        <li>The caption is one full-width click target (like every island row) — not just the underlined verb.</li>
+        <li>Clicking flips the <b>same preference</b> the gear items flip; the revealed header's <i>hide</i> flips it back. No second state to drift.</li>
+        <li>The 14-day threshold leaves the glass but not the app: it moves to the gear item's tooltip, where a curious user finds it.</li>
+        <li>Reveal rides the island's existing grammar — 150ms height, 120ms ink, 0ms under Reduce Motion. No new animation vocabulary.</li>
+        <li>VoiceOver: the caption is a button ("2 more from bots and drafts, show"); the revealed header's hide control speaks likewise.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section id="footer-fix">
+    <p class="eyebrow">The footer link</p>
+    <h2>Drop the preamble, raise the target</h2>
+    <p class="qsub">"Check for yourself —" goes; the link alone remains. And the click band grows from text-height
+      (~15px) to a comfortable ~30px by padding <b>inside</b> the existing full-width target — the footer already
+      flattens to one hit area, it was just too short. Hover each to feel the difference.</p>
+    <div class="fgrid">
+      <div class="fcard">
+        <div class="vhead"><span class="vid">Before</span><h3>Preamble + thin band</h3></div>
+        <div class="stage"><div class="island">
+          <div class="isec">Your PRs</div>
+          <div class="irow"><div class="glyph">✓</div><div><div class="t">pill: crossing repaint on glass</div><div class="s">checks green · review waiting</div></div></div>
+          <div class="hitband" data-h="≈15px"><button class="ifooter before">Check for yourself — GitHub inbox ↗</button></div>
+        </div></div>
+      </div>
+      <div class="fcard">
+        <div class="vhead"><span class="vid">After</span><h3>Link only, comfortable band</h3></div>
+        <div class="stage"><div class="island">
+          <div class="isec">Your PRs</div>
+          <div class="irow"><div class="glyph">✓</div><div><div class="t">pill: crossing repaint on glass</div><div class="s">checks green · review waiting</div></div></div>
+          <div class="hitband" data-h="≈30px"><button class="ifooter after">GitHub inbox ↗</button></div>
+        </div></div>
+      </div>
+    </div>
+    <div class="mech">
+      <h3>One thing the old copy was carrying</h3>
+      <ul>
+        <li>"Check for yourself" was the audit invitation — the trust experiment's "go verify what githud hid."
+            The link keeps that job by existing; the words were explaining the button to the reader. The
+            VoiceOver label keeps the full sentence ("Audit the full GitHub inbox"), so the intent survives
+            where it's spoken, not printed.</li>
+        <li>The ⌃⌥G key-session hint still rides the same line's right edge, unchanged.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section id="decide">
+    <p class="eyebrow">Decide</p>
+    <div class="decide">
+      <h3>One line ratifies this</h3>
+      <p>Say <b>A</b>, <b>B</b>, or <b>C</b> — or mix ("A, but B's gear wording"). Footer fix and taller band ship
+        regardless; they're not flavor-dependent. Then it runs the usual gauntlet: builder in worktree, three-lens
+        panel, re-verify, land.</p>
+      <p>Not in scope, recorded: the row subtitles ("waiting 28w") keep their current compressed form — a separate
+        pass if they read AI to you too. Say the word and it joins the package.</p>
+    </div>
+  </section>
+
+  <footer class="colophon">githud · plain-words session · 2026-07-12 · <b>ratified C + After footer — built and landed
+    at 8f2019a (1172 checks, panel MERGE ×3, zero mandatory fixes)</b> · mocks are ink-faithful: 520pt island, 11px captions
+    in tertiary ink, 13px/11px rows, hover fill at 7% white · the reveal you clicked is the exact grammar the app ships
+    (150ms height / 120ms ink)</footer>
+</div>
+
+<script>
+  function toggle(id) {
+    var r = document.getElementById(id);
+    var cap = document.querySelector('.icap[data-for="' + id + '"]');
+    var open = r.classList.toggle('open');
+    if (cap) cap.style.display = open ? 'none' : 'block';
+  }
+  function fold(id) {
+    var r = document.getElementById(id);
+    var cap = document.querySelector('.icap[data-for="' + id + '"]');
+    r.classList.remove('open');
+    if (cap) cap.style.display = 'block';
+  }
+</script>

@@ -1,7 +1,9 @@
 #!/bin/sh
-# githud installer — https://githud.sh
+# githud installer — https://github.com/pro-vi/githud
 #
-#   curl -fsSL https://githud.sh/install | sh
+#   curl -fsSL https://raw.githubusercontent.com/pro-vi/githud/main/docs/install | sh
+#
+# Served from wherever the site lives, so this is also <that site>/install.
 #
 # Builds githud from source and installs the app bundle. Building locally is not a
 # fallback here, it is the point: macOS attaches the quarantine flag at DOWNLOAD time,

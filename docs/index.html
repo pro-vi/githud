@@ -144,7 +144,7 @@
   <section id="install">
     <h2>Install</h2>
     <h3>One line. It builds from source.</h3>
-    <code class="cmd"><span class="p">$</span> curl -fsSL https://githud.sh/install | sh</code>
+    <code class="cmd"><span class="p">$</span> curl -fsSL <span id="installurl">https://raw.githubusercontent.com/pro-vi/githud/main/docs/install</span> | sh</code>
     <p class="muted" style="font-size:14.5px">Needs a Swift toolchain, which
     <code>xcode-select --install</code> provides. Full Xcode is not used. Takes a minute or two.</p>
 
@@ -258,6 +258,16 @@
 </div>
 
 <script>
+// The install URL is whatever address this page is being served from, so it is right
+// on pro-vi.github.io today and right on a custom domain later without an edit. The
+// markup ships the raw GitHub URL, which works everywhere including with JS off.
+(function () {
+  if (!/^https?:$/.test(location.protocol)) return;   // file:// has no usable base
+  var el = document.getElementById('installurl');
+  if (!el) return;
+  el.textContent = location.href.replace(/[?#].*$/, '').replace(/[^/]*$/, '') + 'install';
+})();
+
 (function () {
   var svg = document.getElementById('eye');
   var iris = document.getElementById('iris');

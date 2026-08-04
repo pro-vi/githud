@@ -1,0 +1,109 @@
+#!/bin/sh
+# githud installer — https://githud.sh
+#
+#   curl -fsSL https://githud.sh/install.sh | sh
+#
+# Builds githud from source and installs the app bundle. Building locally is not a
+# fallback here, it is the point: macOS attaches the quarantine flag at DOWNLOAD time,
+# so an app you compiled yourself carries no flag and simply opens. A downloaded build
+# of an unsigned app is blocked by Gatekeeper, and since macOS 15 the old
+# right-click-Open shortcut is gone — you have to walk through System Settings.
+# Compiling skips all of that.
+#
+# It needs a Swift toolchain, which Command Line Tools provides. Full Xcode is not used.
+#
+# Environment:
+#   GITHUD_REF     tag or branch to build (default: the newest v* tag)
+#   GITHUD_PREFIX  install directory (default: /Applications, else ~/Applications)
+#
+# Read before you run it. Piping a script into a shell is worth being suspicious of;
+# this one is served from the same repository it installs, and you are looking at it.
+set -eu
+
+REPO="https://github.com/pro-vi/githud.git"
+PREFIX="${GITHUD_PREFIX:-}"
+WORK=""
+
+say()  { printf '\033[1m▸\033[0m %s\n' "$1"; }
+ok()   { printf '\033[32m✓\033[0m %s\n' "$1"; }
+die()  { printf '\033[31m✗\033[0m %s\n' "$1" >&2; exit 1; }
+
+cleanup() { [ -n "$WORK" ] && [ -d "$WORK" ] && rm -rf "$WORK"; }
+trap cleanup EXIT INT TERM
+
+# ---- what this machine can do -------------------------------------------------
+
+[ "$(uname -s)" = "Darwin" ] || die "githud is macOS only (this is $(uname -s))."
+
+OS_MAJOR=$(sw_vers -productVersion | cut -d. -f1)
+[ "$OS_MAJOR" -ge 13 ] 2>/dev/null \
+  || die "githud needs macOS 13 or newer (this is $(sw_vers -productVersion))."
+
+command -v git >/dev/null 2>&1 || die "git not found. Install the Command Line Tools: xcode-select --install"
+
+if ! command -v swift >/dev/null 2>&1; then
+  die "No Swift toolchain found. Install the Command Line Tools, then re-run:
+    xcode-select --install"
+fi
+
+# ---- where it goes ------------------------------------------------------------
+
+if [ -z "$PREFIX" ]; then
+  if [ -w /Applications ]; then
+    PREFIX=/Applications
+  else
+    PREFIX="$HOME/Applications"
+    mkdir -p "$PREFIX"
+    say "/Applications is not writable — installing to $PREFIX instead."
+  fi
+fi
+[ -d "$PREFIX" ] || die "install directory does not exist: $PREFIX"
+[ -w "$PREFIX" ] || die "install directory is not writable: $PREFIX"
+
+# ---- which version ------------------------------------------------------------
+
+REF="${GITHUD_REF:-}"
+if [ -z "$REF" ]; then
+  # Newest v* tag, resolved without the API so this never hits a rate limit.
+  REF=$(git ls-remote --tags --refs "$REPO" 'v*' 2>/dev/null \
+        | awk -F/ '{print $NF}' | sort -V | tail -1)
+  [ -n "$REF" ] || die "could not resolve a release tag. Set GITHUD_REF=main to build the tip."
+fi
+
+say "Building githud $REF from source. This takes a minute or two."
+
+# ---- build --------------------------------------------------------------------
+
+WORK=$(mktemp -d)
+git clone --quiet --depth 1 --branch "$REF" "$REPO" "$WORK/githud" 2>/dev/null \
+  || die "could not clone $REPO at $REF"
+
+cd "$WORK/githud"
+VERSION="$REF" ./scripts/build-app.sh >/dev/null 2>&1 \
+  || die "build failed. Run it directly to see why:
+    git clone $REPO && cd githud && ./scripts/build-app.sh"
+
+[ -d build/githud.app ] || die "build reported success but produced no app bundle."
+
+# ---- install ------------------------------------------------------------------
+
+TARGET="$PREFIX/githud.app"
+if [ -d "$TARGET" ]; then
+  say "Replacing the existing install at $TARGET"
+  # A running copy holds its bundle open; quitting first avoids a half-replaced app.
+  if pgrep -x githud >/dev/null 2>&1; then
+    pkill -x githud 2>/dev/null || true
+    sleep 1
+  fi
+  rm -rf "$TARGET"
+fi
+cp -R build/githud.app "$TARGET"
+
+ok "installed $TARGET"
+echo
+echo "  Launch it:   open '$TARGET'"
+echo "  Then paste a classic GitHub token into the Connect card that appears."
+echo "  Make one at https://github.com/settings/tokens with the 'notifications' scope"
+echo "  (add 'repo' as well, for private PRs)."
+echo
+echo "  githud lives under the menu bar, not the Dock. Summon it with ⌃⌥G."

@@ -1,0 +1,287 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>githud — does GitHub need me right now?</title>
+<meta name="description" content="A calm macOS menu-bar HUD that cuts your GitHub notifications down to the threads that actually need you.">
+<meta property="og:title" content="githud">
+<meta property="og:description" content="A calm macOS menu-bar HUD that answers one question: does GitHub need me right now?">
+<meta property="og:type" content="website">
+<link rel="icon" href="images/pill.png">
+<style>
+  /* Committed to a single dark world on purpose: githud IS a dark glass island, and
+     every screenshot on this page was captured on that ground. A light variant would
+     frame dark artwork in white and misrepresent the product. */
+  :root{
+    --ground:#0c0e12; --raise:#14171d; --island:#1d2026;
+    --ink:#f0f2f5; --ink2:#98a2b0; --ink3:#6b7683;
+    --line:#232830; --accent:#7fb2ff; --good:#3fb950;
+    --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",system-ui,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+  body{margin:0;background:var(--ground);color:var(--ink);font:16px/1.6 var(--sans);
+    -webkit-font-smoothing:antialiased}
+  .wrap{max-width:960px;margin:0 auto;padding:0 24px}
+  a{color:var(--accent)}
+
+  /* hero */
+  .hero{padding:80px 0 64px;display:grid;grid-template-columns:150px 1fr;gap:36px;align-items:center}
+  #eye{width:150px;height:150px;color:var(--ink);display:block}
+  h1{font:700 46px/1 var(--mono);letter-spacing:-.03em;margin:0 0 14px}
+  .tag{font-size:21px;line-height:1.4;color:var(--ink2);margin:0 0 26px;max-width:30ch}
+  .tag b{color:var(--ink);font-weight:600}
+  .cta{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+  .btn{display:inline-block;padding:11px 20px;border-radius:8px;font:600 14px var(--sans);
+    text-decoration:none;border:1px solid transparent}
+  .btn.primary{background:var(--ink);color:var(--ground)}
+  .btn.ghost{border-color:var(--line);color:var(--ink)}
+  .btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  .req{font:500 12.5px var(--mono);color:var(--ink3)}
+
+  section{padding:56px 0;border-top:1px solid var(--line)}
+  h2{font:600 15px/1.3 var(--mono);letter-spacing:.04em;text-transform:uppercase;
+    color:var(--ink3);margin:0 0 10px}
+  h3{font:600 24px/1.3 var(--sans);letter-spacing:-.01em;margin:0 0 10px;text-wrap:balance}
+  p{max-width:66ch}
+  .muted{color:var(--ink2)}
+
+  /* the quiet state */
+  .calm{display:flex;align-items:center;gap:22px;flex-wrap:wrap;
+    background:var(--raise);border:1px solid var(--line);border-radius:12px;padding:20px 24px}
+  .calm img{width:60px;height:auto;display:block;border-radius:8px}
+
+  /* install */
+  .cmd{display:block;background:#000;border:1px solid var(--line);border-radius:10px;
+    padding:16px 18px;font:500 13.5px/1.5 var(--mono);color:var(--ink);
+    overflow-x:auto;white-space:pre;margin:0 0 14px}
+  .cmd .p{color:var(--ink3)}
+  .why{background:var(--raise);border-left:2px solid var(--good);border-radius:0 8px 8px 0;
+    padding:14px 18px;margin:18px 0 0}
+  .why p{margin:0;font-size:14.5px;color:var(--ink2)}
+  details{border:1px solid var(--line);border-radius:10px;padding:0;margin:16px 0 0;background:var(--raise)}
+  summary{cursor:pointer;padding:13px 18px;font:600 14px var(--sans);list-style:none}
+  summary::-webkit-details-marker{display:none}
+  summary::before{content:"›";display:inline-block;width:14px;color:var(--ink3);
+    transition:transform .15s}
+  details[open] summary::before{transform:rotate(90deg)}
+  summary:focus-visible{outline:2px solid var(--accent);outline-offset:-2px;border-radius:10px}
+  .dbody{padding:0 18px 16px;font-size:14.5px;color:var(--ink2)}
+  .dbody ol{padding-left:20px;margin:0}
+  .dbody li{margin:6px 0}
+  code{font:500 12.5px var(--mono);background:#00000066;padding:1px 5px;border-radius:4px}
+
+  /* lanes */
+  .lane{display:grid;grid-template-columns:1fr 1fr;gap:32px;align-items:center;margin:0 0 44px}
+  .lane:last-child{margin-bottom:0}
+  .lane img{width:100%;height:auto;display:block;border-radius:12px;border:1px solid var(--line)}
+  .lane p{margin:0;color:var(--ink2);font-size:15px}
+  .lane .n{font:600 11px var(--mono);letter-spacing:.09em;text-transform:uppercase;
+    color:var(--ink3);display:block;margin:0 0 6px}
+
+  /* promises */
+  .vows{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:20px;margin:22px 0 0}
+  .vow{background:var(--raise);border:1px solid var(--line);border-radius:12px;padding:18px 20px}
+  .vow h4{margin:0 0 7px;font-size:15px;font-weight:650}
+  .vow p{margin:0;font-size:14px;color:var(--ink2)}
+
+  footer{border-top:1px solid var(--line);padding:28px 0 56px;
+    font:500 13px var(--mono);color:var(--ink3);display:flex;gap:18px;flex-wrap:wrap}
+  footer a{color:var(--ink3)}
+
+  @media (max-width:720px){
+    .hero{grid-template-columns:1fr;gap:24px;padding:56px 0 44px}
+    #eye{width:110px;height:110px}
+    h1{font-size:38px}
+    .lane{grid-template-columns:1fr;gap:16px}
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <header class="hero">
+    <svg id="eye" viewBox="0 0 24 24" aria-label="The githud mark: an eye that follows your cursor" role="img">
+      <path fill="currentColor" fill-rule="evenodd" d="M12 3.6a6.4 6.4 0 1 0 0 12.8 6.4 6.4 0 0 0 0-12.8Zm0 2.7a3.7 3.7 0 1 1 0 7.4 3.7 3.7 0 0 1 0-7.4Z"/>
+      <g id="iris">
+        <circle cx="12" cy="10" r="2.1" fill="currentColor"/>
+        <circle id="dot" cx="11.15" cy="9.1" r=".65" fill="#0c0e12"/>
+      </g>
+      <path stroke="currentColor" stroke-width="2.8" stroke-linecap="round" fill="none" d="M16.4 14.0C17.9 16.6 17.3 19.6 14.3 20.5 13 20.9 11.8 20.6 11 19.9"/>
+    </svg>
+    <div>
+      <h1>githud</h1>
+      <p class="tag">A calm macOS menu-bar HUD that answers one question:
+        <b>does GitHub need me right now?</b></p>
+      <div class="cta">
+        <a class="btn primary" href="#install">Install</a>
+        <a class="btn ghost" href="https://github.com/pro-vi/githud">Source on GitHub</a>
+        <span class="req">macOS 13+ · MIT</span>
+      </div>
+    </div>
+  </header>
+
+  <section>
+    <h2>The problem</h2>
+    <h3>GitHub sends you everything. So you stop reading it.</h3>
+    <p class="muted">A repo you starred once. A bot commenting on CI. A thread you already
+    replied to. By Wednesday there are fifty unread and you have stopped looking — which is
+    when the one that mattered arrives.</p>
+    <p class="muted">githud does not mirror that inbox. It asks a smaller question, all day, in
+    the corner of your eye. Most of the time the answer is no, and it looks like this:</p>
+    <div class="calm">
+      <img src="images/pill.png" alt="The collapsed githud pill: a red shield and the count 6">
+      <p class="muted" style="margin:0;font-size:15px">One small pill under the menu bar. Click
+      it and you get the whole picture — on a real account, about fifty notifications down to a
+      handful.</p>
+    </div>
+  </section>
+
+  <section id="install">
+    <h2>Install</h2>
+    <h3>One line. It builds from source.</h3>
+    <code class="cmd"><span class="p">$</span> curl -fsSL https://raw.githubusercontent.com/pro-vi/githud/main/docs/install.sh | sh</code>
+    <p class="muted" style="font-size:14.5px">Needs a Swift toolchain, which
+    <code>xcode-select --install</code> provides. Full Xcode is not used. Takes a minute or two.</p>
+
+    <div class="why">
+      <p><b style="color:var(--ink)">Why build instead of download?</b> Because it is the only
+      route that just works. macOS attaches the quarantine flag when a file is
+      <em>downloaded</em>, so an app you compiled yourself carries no flag and opens normally.
+      A downloaded build of an unsigned app is blocked by Gatekeeper — and since macOS 15 the
+      old right-click&nbsp;→&nbsp;Open shortcut no longer exists, so you have to walk through
+      System Settings to allow it. Compiling skips all of that.</p>
+    </div>
+
+    <details>
+      <summary>Rather download a prebuilt app?</summary>
+      <div class="dbody">
+        <p style="margin:0 0 10px">Grab the universal <code>.zip</code> from
+        <a href="https://github.com/pro-vi/githud/releases">Releases</a>. It is not signed —
+        there is no Apple Developer ID on this project yet — so Gatekeeper will stop it once.
+        To let it through:</p>
+        <ol>
+          <li><b>macOS 15 Sequoia and newer</b> — open it, let it be refused, then
+            <b>System Settings → Privacy &amp; Security</b>, scroll to <b>Security</b>, and
+            click <b>Open Anyway</b>.</li>
+          <li><b>macOS 13 and 14</b> — right-click the app → <b>Open</b>, then confirm.</li>
+          <li><b>Terminal, any version</b> —
+            <code>xattr -d com.apple.quarantine /Applications/githud.app</code></li>
+        </ol>
+      </div>
+    </details>
+
+    <details>
+      <summary>What it does with your GitHub token</summary>
+      <div class="dbody">
+        <p style="margin:0 0 10px">On first run githud shows a <b>Connect GitHub</b> card. Paste
+        a <b>classic</b> personal access token with the <code>notifications</code> scope — add
+        <code>repo</code> too, so it can tell a human reply from a bot on your private PRs. The
+        token goes into your login Keychain and nowhere else.</p>
+        <p style="margin:0">Classic is not a preference, it is a wall: GitHub's Notifications API
+        rejects fine-grained and App tokens whatever scopes you give them. githud checks the
+        shape of what you paste and refuses the wrong kind <em>before</em> storing anything,
+        rather than leaving you with a silently empty inbox.</p>
+      </div>
+    </details>
+  </section>
+
+  <section>
+    <h2>Three lanes</h2>
+    <div class="lane">
+      <img src="images/needs-you.png" alt="The Needs you lane, listing threads that require action">
+      <div>
+        <span class="n">Needs you</span>
+        <p>Review requests, mentions, assignments, human replies on your own PRs. Bots, CI and
+        threads where you already had the last word are suppressed. It also runs a standing
+        search for reviews you owe — because a review request stays owed after you read the
+        notification, and a read notification is gone from the inbox forever.</p>
+      </div>
+    </div>
+    <div class="lane">
+      <div>
+        <span class="n">Inbound</span>
+        <p>Everything someone <em>else</em> opened on repos you own, longest wait first. A triage
+        queue, so the contributor who has been waiting since December leads. Bot and draft items
+        hold back to a quiet count.</p>
+      </div>
+      <img src="images/inbound.png" alt="The Inbound lane, ordered by longest wait">
+    </div>
+    <div class="lane">
+      <img src="images/your-prs.png" alt="The Your PRs lane, grouped by organisation">
+      <div>
+        <span class="n">Your PRs</span>
+        <p>Every open PR rolled up to one state — blocked, ready, waiting or draft. It never
+        invents a state it cannot back: no checks is not passing, and “checking…” is not ready.
+        Across several orgs the lane wears titles, and folding one keeps its count visible.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>What it will not do</h2>
+    <div class="vows">
+      <div class="vow">
+        <h4>Never writes</h4>
+        <p>It never marks read, replies, merges or closes. It opens things on github.com and you
+        decide. Marking read on your behalf can bury something you needed.</p>
+      </div>
+      <div class="vow">
+        <h4>Never fakes an all-clear</h4>
+        <p>If a source did not confirm this tick, the pill says “clear so far”, not “clear”. A
+        checkmark means every lane came back clean — never that a request failed quietly.</p>
+      </div>
+      <div class="vow">
+        <h4>Never takes focus</h4>
+        <p>A non-activating panel. It will not steal the keyboard from what you are doing, and it
+        shows over full-screen Spaces.</p>
+      </div>
+      <div class="vow">
+        <h4>Costs almost nothing</h4>
+        <p>Polling is conditional on GitHub's own interval, so an unchanged inbox costs a
+        <code>304</code> and nothing else. Around 0% CPU between polls.</p>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <a href="https://github.com/pro-vi/githud">GitHub</a>
+    <a href="https://github.com/pro-vi/githud/releases">Releases</a>
+    <a href="https://github.com/pro-vi/githud/blob/main/LICENSE">MIT</a>
+    <span>Built by an AI loop composed with <a href="https://github.com/pro-vi/loopgen">loopgen</a>.</span>
+  </footer>
+
+</div>
+
+<script>
+(function () {
+  var svg = document.getElementById('eye');
+  var iris = document.getElementById('iris');
+  var dot = document.getElementById('dot');
+  if (!svg || !iris || !dot) return;
+  if (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  document.addEventListener('mousemove', function (e) {
+    var r = svg.getBoundingClientRect();
+    if (!r.width) return;
+    var cx = r.left + r.width * 0.5;
+    var cy = r.top + r.height * (10 / 24);
+    var scale = 24 / r.width;
+    var ux = (e.clientX - cx) * scale;
+    var uy = (e.clientY - cy) * scale;
+    var m = Math.hypot(ux, uy);
+    if (!m) return;
+    // The iris shifts toward the cursor; the dot slides further across it in the same
+    // direction, so the dot LEADS the gaze — the dot is the seeing part.
+    var c = Math.min(1.5, m);
+    iris.setAttribute('transform', 'translate(' + (ux / m * c).toFixed(2) + ' ' + (uy / m * c).toFixed(2) + ')');
+    dot.setAttribute('cx', (12 + ux / m * 0.9).toFixed(2));
+    dot.setAttribute('cy', (10 + uy / m * 0.9).toFixed(2));
+  });
+})();
+</script>
+</body>
+</html>

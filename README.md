@@ -85,7 +85,23 @@ blank.
 
 **Requires macOS 13 or newer.** Universal (Apple silicon and Intel).
 
-### Download
+### One line
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/pro-vi/githud/main/docs/install | sh
+```
+
+This builds from source and installs the app. That is deliberate, not a fallback:
+macOS attaches the quarantine flag when a file is **downloaded**, so an app you
+compiled yourself carries no flag and opens normally, while a downloaded copy of an
+unsigned app gets stopped by Gatekeeper. Building skips the whole problem.
+
+You need a Swift 5.9+ toolchain, which `xcode-select --install` provides. Full Xcode is
+not used. The script checks that first, resolves the newest release tag, and installs to
+`/Applications` — or `~/Applications` if the first is not writable, rather than asking
+for `sudo`.
+
+### Download instead
 
 Grab the latest `.zip` from [**Releases**](https://github.com/pro-vi/githud/releases),
 unzip, and drag `githud.app` to `/Applications`.
@@ -101,13 +117,10 @@ unzip, and drag `githud.app` to `/Applications`.
 >   the only route through the UI.
 > - **macOS 13 and 14** — **right-click the app → Open**, then confirm.
 > - **Any version, from the terminal** — `xattr -d com.apple.quarantine /Applications/githud.app`
->
-> Building it yourself avoids all of this. Quarantine is attached by whatever downloads a
-> file, so an app you compiled locally does not carry the flag and simply runs.
 
-### Build it yourself
+### Build it by hand
 
-You need a Swift 5.9+ toolchain. Command Line Tools is enough; full Xcode is not needed.
+What the one-liner does, if you would rather run the steps yourself.
 
 ```sh
 git clone https://github.com/pro-vi/githud.git

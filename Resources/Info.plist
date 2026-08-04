@@ -10,6 +10,10 @@
 	<string>me.provi.githud</string>
 	<key>CFBundleExecutable</key>
 	<string>githud</string>
+	<!-- The Glyphling g, night-pupil cut. Not a Dock icon (LSUIElement) — this is
+	     what Finder, Get Info, and the Gatekeeper dialog show. -->
+	<key>CFBundleIconFile</key>
+	<string>githud</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>

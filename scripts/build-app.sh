@@ -41,6 +41,15 @@ mkdir -p "$APP_BUNDLE/Contents/MacOS" "$APP_BUNDLE/Contents/Resources"
 cp "$BIN" "$APP_BUNDLE/Contents/MacOS/$APP_NAME"
 cp "$ROOT/Resources/Info.plist" "$APP_BUNDLE/Contents/Info.plist"
 
+# The app icon. githud is an LSUIElement agent so this never reaches the Dock, but it
+# is what Finder, Get Info, the download, and the Gatekeeper dialog show — the first
+# thing anyone installing it sees. Regenerate with scripts/make-icon.swift.
+if [ -f "$ROOT/Resources/githud.icns" ]; then
+  cp "$ROOT/Resources/githud.icns" "$APP_BUNDLE/Contents/Resources/githud.icns"
+else
+  echo "⚠ Resources/githud.icns missing — bundle will fall back to the generic app icon" >&2
+fi
+
 # Version stamping (release WP Phase 0, U1): VERSION env (e.g. a release tag)
 # overrides the checked-in dev placeholder; CFBundleVersion gets a monotonic
 # build number (commit count) so update logic can compare builds.

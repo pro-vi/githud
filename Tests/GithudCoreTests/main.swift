@@ -555,6 +555,37 @@ suite("SignalClassifier v2 — urgency recalibration + direct-mention + unknown 
     }
 }
 
+suite("NotificationThread — an UNRECOGNIZED subject_state degrades to nil, and never fails the page ⚠") {
+    // The hand-written init(from:) exists ONLY for this: `subject_state` is a normalized
+    // enrichment (RadarReading writes it from fetchSubjectState, and the recorded fixture
+    // carries it), so a producer that widens the vocabulary must cost at most one row's
+    // state — never the whole response. The obvious simplification
+    // (`decodeIfPresent(SubjectLifecycle.self …)`) throws instead, and a throw out of
+    // list(from:) adopts ZERO threads on the continuation pages that swallow it.
+    func page(_ state: String) -> String {
+        "[{\"id\":\"a\",\"unread\":true,\"reason\":\"review_requested\",\"updated_at\":\"t\","
+            + "\"subject\":{\"title\":\"x\",\"type\":\"PullRequest\",\"url\":\"https://api.github.com/repos/o/r/pulls/1\"},"
+            + "\"subject_state\":\"\(state)\","
+            + "\"repository\":{\"full_name\":\"o/r\",\"private\":false,\"owner\":{\"login\":\"o\",\"type\":\"Organization\"}}},"
+            + "{\"id\":\"b\",\"unread\":true,\"reason\":\"mention\",\"updated_at\":\"t\","
+            + "\"subject\":{\"title\":\"y\",\"type\":\"Issue\",\"url\":\"https://api.github.com/repos/o/r/issues/2\"},"
+            + "\"repository\":{\"full_name\":\"o/r\",\"private\":false,\"owner\":{\"login\":\"o\",\"type\":\"Organization\"}}}]"
+    }
+    // Control: a recognized value still decodes to its case.
+    let known = try? NotificationThread.list(from: Data(page("merged").utf8))
+    expectEqual(known?.first?.subjectState, SubjectLifecycle.merged, "control — a recognized subject_state decodes to its case")
+
+    for novel in ["Merged", "draft", "locked", ""] {
+        let threads = try? NotificationThread.list(from: Data(page(novel).utf8))
+        expectEqual(threads?.count ?? -1, 2, "an unrecognized subject_state \"\(novel)\" does NOT throw — every thread on the page still decodes")
+        expect(threads?.first?.subjectState == nil, "…the unknown value becomes nil (the never-miss path), not a wrong case")
+        if let row = threads?.first {
+            expect(SurfacePreferences.auto.surfaces(row, selfLogin: nil),
+                   "…so the row still SURFACES — a widened vocabulary costs nothing, never a whole lane")
+        }
+    }
+}
+
 suite("SignalClassifier — a merged/closed subject drops off 'Needs you' (stale-notification fix, iter 43)") {
     func mk(_ id: String, _ state: String?) -> NotificationThread {
         let s = state.map { ",\"subject_state\":\"\($0)\"" } ?? ""
@@ -1750,6 +1781,43 @@ suite("PollReducer — live ages: the pulse lane flips independently, gated the 
     expect(!hasRenderPulse(e2), "collapsed → no pulse age re-render")
 }
 
+suite("PollReducer — live ages: the radar and pulse lanes keep SEPARATE baselines and SEPARATE fresh-render gates ⚠ [WP-1c]") {
+    // The two lanes run the same age-flip rule with their own baseline signature and their
+    // own "did this lane already render this tick" gate. Every other live-ages test moves
+    // both lanes together, so a call site that reads the OTHER lane's baseline, or the
+    // OTHER lane's fresh-render flag, passes them all. This tick splits the lanes: the
+    // radar renders fresh (its content changed) while the pulse does not, and only the
+    // pulse's age bucket flips.
+    let t0 = reducerAt("2026-06-16T10:00:00Z")
+    let radar0 = makeRadar(id: "a", updated: "2026-06-16T08:00:00Z")          // 2h old at t0
+    let pulses = [pulse(created: "2026-06-16T08:00:00Z", updated: "2026-06-16T08:00:00Z")]  // 2h old at t0
+    let (rendered, e0) = PollReducer.reduce(.polled(radar: radarOK(radar0), pulse: .success(pulses)),
+                                            state: PollReducer.PollState(expanded: true), now: t0)
+    expect(hasRenderRadar(e0) && hasRenderPulse(e0), "both lanes render once at t0")
+    expectEqual(rendered.lastRadarAgeSig, ["2h"], "the radar baseline is its own bucket at t0")
+    expectEqual(rendered.lastPulseAgeSig, ["2h"], "the pulse baseline is its own bucket at t0")
+
+    // t1 = t0 + 61m. The radar's CONTENT changed (a different, 30s-old thread) → it renders
+    // fresh, so its own age flip is skipped. The pulse is byte-identical → no fresh render,
+    // but its bucket crossed 2h→3h → exactly one age re-render, off its OWN baseline.
+    let t1 = t0.addingTimeInterval(61 * 60)
+    let radar1 = makeRadar(id: "b", updated: "2026-06-16T11:00:30Z", title: "Fix retry")   // 30s old at t1
+    let (afterSplit, e1) = PollReducer.reduce(.polled(radar: radarOK(radar1), pulse: .success(pulses)),
+                                              state: rendered, now: t1)
+    expect(hasRenderRadar(e1), "the radar renders fresh (its content changed)")
+    expectEqual(e1.filter { if case .renderPulse = $0 { return true }; return false }.count, 1,
+                "the pulse emits EXACTLY ONE age re-render — its gate reads the PULSE's fresh-render flag, not the radar's (a radar render must not suppress or duplicate it)")
+    expectEqual(afterSplit.lastPulseAgeSig, ["3h"], "the PULSE baseline advanced to the pulse's new bucket")
+    expectEqual(afterSplit.lastRadarAgeSig, ["now"], "the RADAR baseline holds the radar's own fresh bucket — the pulse flip never wrote into it")
+
+    // t2 = t1 + 20s: nothing flips in either lane and neither refreshes → a silent tick.
+    // With the baselines crossed, both lanes would repaint here, every tick, forever.
+    let (_, e2) = PollReducer.reduce(.polled(radar: radarOK([], notModified: true), pulse: .success(pulses)),
+                                     state: afterSplit, now: t1.addingTimeInterval(20))
+    expect(!hasRenderRadar(e2) && !hasRenderPulse(e2),
+           "the next quiet tick repaints NEITHER lane (redraw-on-change-only: crossed baselines would make both lanes repaint on every poll)")
+}
+
 suite("PollReducer — .expandChanged records visibility, emits nothing, re-baselines the age signature ⚠ [WP-1c]") {
     let t0 = reducerAt("2026-06-16T10:00:00Z")
     let radar = makeRadar(id: "a", updated: "2026-06-16T09:59:30Z")
@@ -1938,12 +2006,23 @@ final class StubURLProtocol: URLProtocol {
     struct Stub { let status: Int; let headers: [String: String]; let body: Data }
     static var stubs: [Stub] = []
     static var requestCount = 0
-    static func reset() { stubs = []; requestCount = 0 }
+    /// Every URL the client actually asked for, in order. The composed query string is
+    /// the ONLY place several load-bearing clauses live (`-author:` on the inbound sweep,
+    /// `all=false` on /notifications), so the tests read it here rather than trusting the
+    /// canned body they get back.
+    static var requestedURLs: [URL] = []
+    /// Every request the client actually built, in order — the ONLY place the auth header
+    /// and the HTTP method are observable. A canned response comes back whatever is asked,
+    /// so without this an un-authenticated (or POSTed) request looks exactly like a good one.
+    static var requests: [URLRequest] = []
+    static func reset() { stubs = []; requestCount = 0; requestedURLs = []; requests = [] }
 
     override class func canInit(with request: URLRequest) -> Bool { true }
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
     override func startLoading() {
         StubURLProtocol.requestCount += 1
+        if let url = request.url { StubURLProtocol.requestedURLs.append(url) }
+        StubURLProtocol.requests.append(request)
         let stub = StubURLProtocol.stubs.isEmpty
             ? Stub(status: 200, headers: [:], body: Data("[]".utf8))
             : StubURLProtocol.stubs.removeFirst()
@@ -1988,13 +2067,133 @@ func callAuthor(_ c: GitHubClient) -> Result<(login: String, type: String, body:
     let sem = DispatchSemaphore(value: 0); var out: Result<(login: String, type: String, body: String?), GitHubClientError>!
     c.fetchLatestCommentAuthor(urlString: "https://api.github.com/repos/o/r/issues/comments/1") { out = $0; sem.signal() }; sem.wait(); return out
 }
-func callSubjectState(_ c: GitHubClient) -> Result<String, GitHubClientError> {
-    let sem = DispatchSemaphore(value: 0); var out: Result<String, GitHubClientError>!
+func callSubjectState(_ c: GitHubClient) -> Result<SubjectLifecycle, GitHubClientError> {
+    let sem = DispatchSemaphore(value: 0); var out: Result<SubjectLifecycle, GitHubClientError>!
     c.fetchSubjectState(urlString: "https://api.github.com/repos/o/r/pulls/1") { out = $0; sem.signal() }; sem.wait(); return out
 }
 func callSelfLogin(_ c: GitHubClient) -> Result<String, GitHubClientError> {
     let sem = DispatchSemaphore(value: 0); var out: Result<String, GitHubClientError>!
     c.fetchAuthenticatedUserLogin { out = $0; sem.signal() }; sem.wait(); return out
+}
+
+func callInboundSearch(_ c: GitHubClient, login: String) -> Result<InboundReading, GitHubClientError> {
+    let sem = DispatchSemaphore(value: 0); var out: Result<InboundReading, GitHubClientError>!
+    c.fetchInboundSearch(login: login) { out = $0; sem.signal() }; sem.wait(); return out
+}
+func callReviewRequestedSearch(_ c: GitHubClient, login: String) -> Result<InboundReading, GitHubClientError> {
+    let sem = DispatchSemaphore(value: 0); var out: Result<InboundReading, GitHubClientError>!
+    c.fetchReviewRequestedSearch(login: login) { out = $0; sem.signal() }; sem.wait(); return out
+}
+
+suite("GitHubClient — the composed REQUEST URLs carry the load-bearing query clauses ⚠") {
+    // The query string is the only home of several invariants, and no canned response can
+    // reveal a wrong one: a stub answers whatever is asked. So read the URL the client
+    // actually built.
+    func query(_ url: URL, _ name: String) -> String? {
+        URLComponents(url: url, resolvingAgainstBaseURL: false)?
+            .queryItems?.first(where: { $0.name == name })?.value
+    }
+
+    // 1. The inbound sweep. `-author:{login}` is what keeps inbound row ids
+    //    ("owner/repo#n") disjoint from the pulse lane's identically-formatted ids;
+    //    dropping it would let the sweep return the viewer's OWN open PRs and collide the
+    //    island's keyRows map and the peek stash.
+    StubURLProtocol.reset()
+    let client = stubClient()
+    let emptySearch = jsonStub(#"{"total_count":0,"incomplete_results":false,"items":[]}"#)
+    StubURLProtocol.stubs = [emptySearch]
+    _ = callInboundSearch(client, login: "provi")
+    let inbound = StubURLProtocol.requestedURLs.last
+    expectEqual(inbound?.path ?? "", "/search/issues", "the inbound sweep hits /search/issues")
+    expectEqual(query(inbound!, "q") ?? "", "user:provi is:open -author:provi",
+                "the inbound q keeps `-author:` — without it the sweep returns the viewer's own PRs and the two lanes' ids collide")
+    expectEqual(query(inbound!, "sort") ?? "", "created", "sorted by creation")
+    expectEqual(query(inbound!, "order") ?? "", "asc", "OLDEST-first: the truncated end is the new arrivals, never the long-waiting head")
+    expectEqual(query(inbound!, "per_page") ?? "", "50", "capped at 50")
+
+    // 2. The reviews-owed sweep. Deliberately NO `-author:` clause (a request may come
+    //    from anyone, bots included), and it must be a DIFFERENT query from the inbound
+    //    one — swapping the two would silently empty one lane and duplicate the other.
+    StubURLProtocol.stubs = [emptySearch]
+    _ = callReviewRequestedSearch(client, login: "provi")
+    let owed = StubURLProtocol.requestedURLs.last
+    expectEqual(query(owed!, "q") ?? "", "is:open is:pr review-requested:provi",
+                "the reviews-owed q asks for review-requested PRs")
+    expect(!(query(owed!, "q") ?? "").contains("-author:"),
+           "…and carries NO -author: clause — a review request is never author-filtered")
+    expect(query(owed!, "q") != query(inbound!, "q"),
+           "the two sweeps send DIFFERENT queries (a swapped pair would not be caught by the response bodies)")
+
+    // 3. /notifications: `all=false` is what keeps READ notifications out of the radar.
+    StubURLProtocol.stubs = [notifStub("[]")]
+    _ = callNotifications(client)
+    let notifs = StubURLProtocol.requestedURLs.last
+    expectEqual(notifs?.path ?? "", "/notifications", "the poll hits /notifications")
+    expectEqual(query(notifs!, "all") ?? "", "false", "all=false — read notifications never fold into the radar")
+    expectEqual(query(notifs!, "per_page") ?? "", "50", "50 per page")
+    StubURLProtocol.stubs = [notifStub("[]")]
+    _ = { (c: GitHubClient) in
+        let sem = DispatchSemaphore(value: 0)
+        c.fetchNotifications(includeRead: true) { _ in sem.signal() }; sem.wait()
+    }(client)
+    expectEqual(query(StubURLProtocol.requestedURLs.last!, "all") ?? "", "true",
+                "…and includeRead: true is the only way it flips (control: the parameter is wired, not dead)")
+
+    // 4. `GET /user` — the ONLY resolver of the viewer's own login. A wrong path fails
+    //    closed and silently: `selfLogin` stays nil, so BOTH standing sweeps skip, the
+    //    Inbound and reviews-owed lanes stay empty forever, self-comment demotion stops,
+    //    and the owner lens loses its "yours" title. The stub answers any URL, so the
+    //    built path is the only place a typo can be caught.
+    StubURLProtocol.stubs = [jsonStub(#"{"login":"pro-vi"}"#)]
+    _ = callSelfLogin(client)
+    expectEqual(StubURLProtocol.requestedURLs.last?.path ?? "", "/user",
+                "the self-login fetch hits /user")
+
+    // 5. `GET /notifications/threads/{id}` — the 304-honesty read pass. A wrong path
+    //    returns nil forever, so a thread already read on GitHub never leaves the glass:
+    //    the exact dogfood bug that pass was built to fix.
+    StubURLProtocol.stubs = [jsonStub(#"{"unread":false}"#)]
+    let threadWait = DispatchSemaphore(value: 0)
+    client.fetchThreadUnread(threadID: "n1") { _ in threadWait.signal() }
+    threadWait.wait()
+    expectEqual(StubURLProtocol.requestedURLs.last?.path ?? "", "/notifications/threads/n1",
+                "the read-transition check hits /notifications/threads/{id} — `threads` plural, the id appended")
+}
+
+suite("GitHubClient — every REST call carries the Bearer token and is a GET ⚠") {
+    // Every endpoint now builds its request through ONE helper (`authedRequest`), so a single
+    // edit there un-authenticates the whole app: /notifications answers 401 (auth-stop, dead
+    // radar) and /search/issues drops to anonymous rate limits. The canned stub answers any
+    // request regardless of headers, so nothing else in the suite can see that — these checks
+    // read the request the client actually built.
+    func lastRequest() -> URLRequest? { StubURLProtocol.requests.last }
+    func provesAuth(_ label: String, stub: StubURLProtocol.Stub, _ call: (GitHubClient) -> Void) {
+        StubURLProtocol.reset()
+        let client = stubClient()
+        StubURLProtocol.stubs = [stub]
+        call(client)
+        guard let req = lastRequest() else {
+            expect(false, "\(label): a request was actually made"); return
+        }
+        expectEqual(req.value(forHTTPHeaderField: "Authorization") ?? "", "Bearer ghp_test_token",
+                    "\(label): carries the Bearer token — without it GitHub answers 401 and the lane dies")
+        expectEqual(req.httpMethod ?? "", "GET",
+                    "\(label): is a GET — a POST to a read endpoint is a 404/405, silently empty")
+        expectEqual(req.value(forHTTPHeaderField: "Accept") ?? "", "application/vnd.github+json",
+                    "\(label): asks for the v3 JSON media type")
+        expectEqual(req.value(forHTTPHeaderField: "X-GitHub-Api-Version") ?? "", "2022-11-28",
+                    "\(label): pins the API version")
+    }
+
+    // The radar's own poll — its own request builder (conditional validators ride here).
+    provesAuth("/notifications", stub: notifStub("[]")) { _ = callNotifications($0) }
+    // A `decodingGET` endpoint — the single builder the refactor routed the other five
+    // REST calls through; one broken header here breaks all of them at once.
+    provesAuth("/user (decodingGET)", stub: jsonStub(#"{"login":"pro-vi"}"#)) { _ = callSelfLogin($0) }
+    provesAuth("/search/issues (decodingGET)",
+               stub: jsonStub(#"{"total_count":0,"incomplete_results":false,"items":[]}"#)) {
+        _ = callInboundSearch($0, login: "provi")
+    }
 }
 
 suite("GitHubClient — the default session config stays cache-free (conditional-polling-no-cache) [WP-1b] ⚠") {
@@ -2139,7 +2338,7 @@ suite("RadarReading × reviews — synthesis, dedup, adopt, and the merged radar
     var reopened = RadarReading()
     reopened.adopt200(threads: (try? NotificationThread.list(from: Data(threadJSON.utf8))) ?? [], scopes: "repo")
     if let idx = reopened.threads.firstIndex(where: { $0.id == "real1" }) {
-        reopened.applySubjectVerdict(at: idx, state: "merged")
+        reopened.applySubjectVerdict(at: idx, state: .merged)
     } else { expect(false, "real1 adopted") }
     _ = reopened.adoptReviews(reading([item("acme/core", 551)]))
     expectEqual(reopened.radar().map { $0.thread.id }, ["review-owed:acme/core#551"],
@@ -2405,8 +2604,8 @@ suite("Just cleared — the departure buffer captures every knowable door (plan 
     // Verdict door: only asks that DIE with the subject depart on a verdict.
     var v = RadarReading()
     v.adopt200(threads: [mk("rr", reason: "review_requested"), mk("cm", reason: "comment")], scopes: "repo")
-    v.applySubjectVerdict(at: 0, state: "merged")
-    v.applySubjectVerdict(at: 1, state: "merged")
+    v.applySubjectVerdict(at: 0, state: .merged)
+    v.applySubjectVerdict(at: 1, state: .merged)
     expectEqual(v.clearedRows().map { $0.whyText }, ["merged"], "a merged review request captures; the read-me comment does NOT (it never departed)")
     // Suppressed departures never capture (not "cleared from Needs you").
     var sup = RadarReading()
@@ -4367,10 +4566,10 @@ suite("RadarReading — terminal-only verdict caching (the 304 re-verify rule)")
     """
     var reading = RadarReading()
     reading.adopt200(threads: (try? NotificationThread.list(from: Data(json.utf8))) ?? [], scopes: "repo")
-    expect(!reading.applySubjectVerdict(at: 0, state: "open"), "\"open\" is perishable — never stored")
+    expect(!reading.applySubjectVerdict(at: 0, state: .open), "\"open\" is perishable — never stored")
     expectEqual(reading.threads[0].subjectState, nil, "…state stays nil so the next 200 re-checks")
-    expect(reading.applySubjectVerdict(at: 0, state: "merged"), "terminal verdict stores")
-    expectEqual(reading.threads[0].subjectState, "merged", "…and can't un-happen")
+    expect(reading.applySubjectVerdict(at: 0, state: .merged), "terminal verdict stores")
+    expectEqual(reading.threads[0].subjectState, .merged, "…and can't un-happen")
 }
 
 suite("RadarReading — latches: consolidated, per-call clear, decline-on-empty") {
@@ -5662,6 +5861,231 @@ suite("SettingsCard — one descriptor holds what the dropdown held") {
 
     expectEqual(PlainWords.settingsMenuItem, "Settings…", "the verbs-only menu's one door")
     expectEqual(PlainWords.settingsGearTooltip, "Settings", "gear tooltip")
+}
+
+// MARK: - Never-miss sentinels and lane baselines (the branches the refactor centralized)
+
+suite("PulsePresenter — an UNPARSEABLE stamp is conservatively OLD: always stale, never just-raised ⚠") {
+    // The module's ONE formatter is [.withInternetDateTime], which refuses fractional
+    // seconds — the stamp a recorded fixture or a widened GraphQL response can carry.
+    // `ageSeconds` answers `.infinity` there, and that single sentinel feeds BOTH
+    // predicates, so a `0` sentinel would invert both at once: the row would leave the
+    // rotting group and float to the TOP of the live "Your PRs" lane as fresh work.
+    let now = ISO8601DateFormatter().date(from: "2026-08-04T12:00:00Z")!
+    let unparseable = "2026-08-04T10:00:00.000Z"
+    expectEqual(RadarPresenter.age(fromISO8601: unparseable, now: now), "",
+                "premise: the shared formatter really does refuse a fractional-seconds stamp")
+    let bad = pulse(created: unparseable, updated: unparseable)
+    expect(PulsePresenter.isStale(bad, now: now),
+           "an unparseable updatedAt reads as STALE (the .infinity sentinel) — a 0 sentinel would call it live")
+    expect(!PulsePresenter.isFresh(bad, now: now),
+           "…and NEVER just-raised — an unknown age can never win the top of the live lane")
+    // A draft keeps its own group even with an unparseable stamp (staleness is non-draft only).
+    expect(!PulsePresenter.isStale(pulse(draft: true, created: unparseable, updated: unparseable), now: now),
+           "a draft is still never stale")
+    // Contrast: a parseable, minutes-old stamp is live and fresh.
+    let good = pulse(created: "2026-08-04T11:00:00Z", updated: "2026-08-04T11:00:00Z")
+    expect(!PulsePresenter.isStale(good, now: now) && PulsePresenter.isFresh(good, now: now),
+           "a parseable hour-old PR is live and just-raised (the sentinel is not swallowing everything)")
+}
+
+suite("RadarPresenter.displayLine — empty parts are DROPPED, never a dangling separator ⚠") {
+    // One assembly for all three lanes (radar, pulse, inbound) and the owner-lens variant.
+    // `age` answers "" for any stamp the shared formatter refuses, so losing the
+    // empty-part handling would render "o/r · review requested · " on every lane at once.
+    let now = ISO8601DateFormatter().date(from: "2026-08-04T12:00:00Z")!
+    expectEqual(RadarPresenter.displayLine(repo: "o/r", subtitle: "review requested",
+                                           timestamp: "not-a-date", now: now),
+                "o/r · review requested",
+                "an unparseable timestamp leaves NO trailing separator")
+    expectEqual(RadarPresenter.displayLine(repo: "o/r", subtitle: "",
+                                           timestamp: "2026-08-04T11:00:00Z", now: now),
+                "o/r · 1h", "an empty subtitle drops out of the middle, not into a double separator")
+    expectEqual(RadarPresenter.displayLine(repo: "o/r", subtitle: "", timestamp: "not-a-date", now: now),
+                "o/r", "both parts empty → the leading token alone")
+    expectEqual(RadarPresenter.displayLine(repo: "o/r", subtitle: "mentioned",
+                                           timestamp: "2026-08-04T11:00:00Z", now: now),
+                "o/r · mentioned · 1h", "the ordinary three-part line is unchanged")
+}
+
+suite("PollReducer — the INBOUND lane's age baseline is its own: a flip never writes the radar's ⚠") {
+    // The shared `ageFlip` helper takes `baseline: inout [String]?`, and all three lanes'
+    // baselines are the same type — a crossed argument compiles. Radar/pulse separation is
+    // pinned elsewhere; this pins the inbound call site. Radar sits at a stamp whose bucket
+    // does NOT move across the window, so any repaint of it can only come from a crossed write.
+    // The inbound row's age rides `createdAt` — the waiting-since fact.
+    func inItem(_ n: Int, created: String) -> InboundItem {
+        InboundItem(repo: "pro-vi/x", number: n, title: "T\(n)", url: "u", authorLogin: "a",
+                    authorType: "User", isPR: true, isDraft: false,
+                    createdAt: created, updatedAt: "2026-07-09T00:00:00Z")
+    }
+    let t0 = reducerAt("2026-07-09T12:00:00Z")
+    // Radar: 2 hours old — its bucket ("2h") is immovable over the 40s below.
+    let radar = makeRadar(id: "r1", updated: "2026-07-09T10:00:00Z")
+    let (afterPoll, _) = PollReducer.reduce(.polled(radar: radarOK(radar), pulse: deadPulseFetch),
+                                            state: PollReducer.PollState(expanded: true), now: t0)
+    expectEqual(afterPoll.lastRadarAgeSig, ["2h"], "the radar baseline is its own bucket at t0")
+    // Inbound: 30s old at t0 → "now"; at t0+40s it crosses to "1m".
+    let queued = [inItem(1, created: "2026-07-09T11:59:30Z")]
+    let (seeded, _) = PollReducer.reduce(.sweptInbound(.success(InboundReading(items: queued, incomplete: false, totalCount: 1))),
+                                         state: afterPoll, now: t0)
+    expectEqual(seeded.lastInboundAgeSig, ["now"], "the inbound baseline is its own bucket at t0")
+
+    let t1 = t0.addingTimeInterval(40)
+    let (flipped, e1) = PollReducer.reduce(.sweptInbound(.success(InboundReading(items: queued, incomplete: false, totalCount: 1))),
+                                           state: seeded, now: t1)
+    expectEqual(e1.count, 1, "identical facts + a crossed inbound bucket → exactly one inbound re-render")
+    expectEqual(flipped.lastInboundAgeSig, ["1m"],
+                "the flip advanced the INBOUND baseline — a crossed argument would leave it at [\"now\"] forever")
+    expectEqual(flipped.lastRadarAgeSig, ["2h"],
+                "…and never touched the RADAR baseline")
+    // The tick after: nothing has moved in either lane, so both stay silent. With the
+    // baselines crossed, the radar would repaint here off the inbound lane's buckets.
+    let (_, e2) = PollReducer.reduce(.sweptInbound(.success(InboundReading(items: queued, incomplete: false, totalCount: 1))),
+                                     state: flipped, now: t1)
+    expect(e2.isEmpty, "an immediately repeated sweep is silent")
+    let (_, e3) = PollReducer.reduce(.polled(radar: radarOK([], notModified: true), pulse: deadPulseFetch),
+                                     state: flipped, now: t1)
+    expect(!hasRenderRadar(e3), "the quiet poll after an inbound flip does NOT repaint the radar (no ping-pong)")
+}
+
+/// A failed GET — transport-level failure the pipeline's blocking wrappers must answer `nil` to.
+func errorStub(status: Int = 500) -> StubURLProtocol.Stub {
+    StubURLProtocol.Stub(status: status, headers: [:], body: Data(#"{"message":"boom"}"#.utf8))
+}
+
+suite("RadarPipeline e2e — a FAILED re-verify fetch never removes a row (never-miss, both wrappers) ⚠") {
+    // Both re-verify GETs default to nil on failure/timeout, and nil means "learned
+    // nothing". Every other e2e case queues a 200 for these, so the defaults themselves
+    // (`?? false` on the read check would read a failure as "already read"; `?? .closed`
+    // on the subject check would land a terminal resolved verdict) are otherwise unpinned.
+
+    // A — the READ check fails: the row survives.
+    StubURLProtocol.reset()
+    let readPipeline = RadarPipeline(client: stubClient())
+    let releaseMention = """
+    [{"id":"n7","unread":true,"reason":"mention","updated_at":"2026-07-18T00:00:00Z",\
+    "subject":{"title":"v0.46.0","type":"Release",\
+    "url":"https://api.github.com/repos/facebook/lexical/releases/123","latest_comment_url":null},\
+    "repository":{"full_name":"facebook/lexical","private":false,"owner":{"login":"facebook","type":"Organization"}}}]
+    """
+    StubURLProtocol.stubs = [jsonStub(loginJSON), notifStub(releaseMention), jsonStub(emptyReviews)]
+    _ = offMain { readPipeline.refresh() }
+    _ = readPipeline.consumeResolutions()
+    expectEqual(offMain { readPipeline.recomputeRadar() }.map { $0.thread.id }, ["n7"], "seeded: the release mention surfaces")
+    // 304 tick, and the thread read-check GET fails (a 500 stands in for any
+    // transport error, rate-limit or 6s timeout).
+    StubURLProtocol.stubs = [notifStub("", status: 304), jsonStub(emptyReviews), errorStub()]
+    _ = offMain { readPipeline.refresh() }
+    expectEqual(offMain { readPipeline.recomputeRadar() }.map { $0.thread.id }, ["n7"],
+                "a FAILED read check never reads as read — only a positive unread:false removes")
+    expect(!readPipeline.consumeResolutions(), "…and nothing arms off a failure")
+
+    // B — the SUBJECT-state check fails: the row survives, unsuppressed.
+    StubURLProtocol.reset()
+    let subjectPipeline = RadarPipeline(client: stubClient())
+    StubURLProtocol.stubs = [jsonStub(loginJSON), notifStub(openRRThread),
+                             jsonStub(emptyReviews), jsonStub(#"{"state":"open"}"#)]
+    _ = offMain { subjectPipeline.refresh() }
+    _ = subjectPipeline.consumeResolutions()
+    expectEqual(offMain { subjectPipeline.recomputeRadar() }.count, 1, "seeded: one open review request")
+    // 304 tick: the subject GET fails; the read check that follows says still-unread.
+    StubURLProtocol.stubs = [notifStub("", status: 304), jsonStub(emptyReviews),
+                             errorStub(), jsonStub(#"{"unread":true}"#)]
+    let outage = offMain { subjectPipeline.refresh() }
+    expectEqual(offMain { subjectPipeline.recomputeRadar() }.map { $0.thread.id }, ["n1"],
+                "a FAILED subject check lands NO verdict — an API outage never silently empties the radar")
+    if case .success(let res) = outage {
+        expect(res.suppressed.isEmpty, "…and nothing entered the suppressed set")
+    } else { expect(false, "the 304 outage tick failed outright: \(outage)") }
+    StubURLProtocol.reset()
+}
+
+// The owner key is the lens's whole identity: `ownerBuckets` folds the display casing to
+// lowercase, and every preference (`lastOpened`, `ownerOrder`, `foldedOwners`) is stored
+// lowercased by its own writer. Every other lens fixture in this file uses all-lowercase
+// owners ("acme", "pro-vi", "facebook"), so dropping the fold left the whole suite green
+// while silently breaking counts and drag order for any org whose login carries a capital
+// letter — "Netflix", "JakeWharton". These cases feed MIXED-CASE DATA, which is the only
+// shape that can tell the two rules apart.
+suite("PulsePresenter — owner lens: mixed-case logins (the key fold)") {
+    let iso = ISO8601DateFormatter(); iso.formatOptions = [.withInternetDateTime]
+    let now = iso.date(from: "2026-08-04T12:00:00Z")!
+    func at(hoursAgo h: Double) -> String { iso.string(from: now.addingTimeInterval(-h * 3_600)) }
+    func mk(_ repo: String, _ n: Int, updatedHoursAgo: Double, updatedAt: String? = nil) -> PullRequestPulse {
+        PullRequestPulse(repo: repo, number: n, title: "PR\(n)", url: "u\(n)", isDraft: false,
+                         createdAt: at(hoursAgo: 400),
+                         updatedAt: updatedAt ?? at(hoursAgo: updatedHoursAgo),
+                         ci: .passing, review: ReviewState.none, merge: .mergeable)
+    }
+
+    // 1 — one org, two casings in the data, ONE bucket. GitHub's own rule; without the fold
+    // the lane would print the same org twice under two titles.
+    let mixed = PulsePresenter.sections(for: [mk("Acme/core", 1, updatedHoursAgo: 2),
+                                              mk("acme/tools", 2, updatedHoursAgo: 3)], now: now).active
+    let buckets = PulsePresenter.ownerBuckets(live: mixed, drafts: [], quiet: [])
+    expectEqual(buckets.count, 1, "\"Acme/core\" and \"acme/tools\" are ONE owner bucket")
+    expectEqual(buckets.first?.key, "acme", "the bucket key is lowercased — every lens pref is stored that way")
+    expectEqual(buckets.first?.owner, "Acme", "…while the display casing keeps what the data first said")
+    expectEqual(buckets.first?.live.count, 2, "both rows land in the one bucket")
+
+    // 2 — "N new" on a folded owner reads `lastOpened`, whose keys AppModel writes lowercased.
+    // A mixed-case owner must still find its stamp, or the ledger line reports 0 forever.
+    let opened = ["acme": now.addingTimeInterval(-4 * 3_600)]   // opened 4h ago
+    let foldedMixed = PulsePresenter.lensLayout(
+        live: mixed, drafts: [], quiet: [],
+        prefs: LensPreferences(groupByOwner: true, foldedOwners: ["acme"]),
+        selfLogin: nil, lastOpened: opened)
+    expectEqual(foldedMixed.entries,
+                [LensEntry.ledger(owner: "Acme", title: "Acme", count: 2, draftCount: 0,
+                                  quietCount: 0, fresh: 2)],
+                "both rows are newer than the stamp → \"2 new\" for the mixed-case org")
+
+    // 3 — an unparseable timestamp counts as OLD, never "new". Today the field is a required
+    // GraphQL string, but the fallback is the documented rule and the shared ISO8601 parser is
+    // one edit away from refusing stamps it accepts now; flipped the wrong way, a folded org's
+    // badge would permanently equal its whole row count.
+    let badRow = PulsePresenter.row(for: mk("Acme/core", 3, updatedHoursAgo: 0, updatedAt: "not-a-date"),
+                                    now: now)
+    let withBad = PulsePresenter.lensLayout(
+        live: [badRow], drafts: [], quiet: [],
+        prefs: LensPreferences(groupByOwner: true, foldedOwners: ["acme"]),
+        selfLogin: nil, lastOpened: opened)
+    expectEqual(withBad.entries,
+                [LensEntry.ledger(owner: "Acme", title: "Acme", count: 1, draftCount: 0,
+                                  quietCount: 0, fresh: 0)],
+                "an unparseable timestamp is old — it can never count as \"new\"")
+
+    // 4 — the drag order is stored lowercased, so a placed mixed-case owner must be lifted.
+    // The fixture puts the mixed-case owner LAST by lead-row rank, so only the key fold can
+    // move it to the front.
+    let twoOrgs = PulsePresenter.sections(for: [mk("acme/core", 4, updatedHoursAgo: 1),
+                                                mk("Netflix/pollyjs", 5, updatedHoursAgo: 9)],
+                                          now: now).active
+    expectEqual(twoOrgs.map { $0.id }, ["acme/core#4", "Netflix/pollyjs#5"],
+                "discovery order pins acme first (newer)")
+    let dragged = PulsePresenter.lensLayout(
+        live: twoOrgs, drafts: [], quiet: [],
+        prefs: LensPreferences(groupByOwner: true, ownerOrder: ["netflix"]),
+        selfLogin: nil, lastOpened: [:])
+    if case let .group(o, _, _, _, _) = dragged.entries.first {
+        expectEqual(o, "Netflix", "the user's drag placement lifts \"Netflix\" despite the capital")
+    } else { expect(false, "entry 0 should be a group") }
+
+    // 5 — the "yours" title compares BOTH sides case-insensitively. The existing coverage
+    // varies only the owner's casing; the login side comes raw from GET /user, so a login
+    // like "JakeWharton" arrives capitalised on both sides of the comparison.
+    expectEqual(PulsePresenter.lensTitle(owner: "JakeWharton", selfLogin: "JakeWharton"), "yours",
+                "the viewer's own org reads \"yours\" even when the LOGIN carries capitals")
+    // (two leading owners, or the grouped shape degrades to the flat one — the lone-header guard)
+    let mine = PulsePresenter.sections(for: [mk("JakeWharton/timber", 6, updatedHoursAgo: 1),
+                                             mk("acme/core", 7, updatedHoursAgo: 8)], now: now).active
+    let mineLayout = PulsePresenter.lensLayout(live: mine, drafts: [], quiet: [],
+                                               prefs: LensPreferences(groupByOwner: true),
+                                               selfLogin: "JakeWharton", lastOpened: [:])
+    if case let .group(_, title, _, _, _) = mineLayout.entries.first {
+        expectEqual(title, "yours", "…and the lane's group header says it too")
+    } else { expect(false, "entry 0 should be a group") }
 }
 
 // MARK: - Report

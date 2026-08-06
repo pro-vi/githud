@@ -202,13 +202,7 @@ public final class RadarPipeline: RadarSource {
     /// completeness. Login unresolved → skipped (false); failure → baseline kept, false.
     private func sweepReviews() -> Bool {
         guard let login = reading.selfLogin else { return false }
-        let semaphore = DispatchSemaphore(value: 0)
-        var outcome: Swift.Result<InboundReading, GitHubClientError>?
-        client.fetchReviewRequestedSearch(login: login) { result in
-            outcome = result
-            semaphore.signal()
-        }
-        if semaphore.wait(timeout: .now() + 20) == .timedOut { return false }
+        let outcome = blocking(timeout: 20) { client.fetchReviewRequestedSearch(login: login, completion: $0) }
         guard case .success(let new) = outcome ?? .failure(.transport("no result")) else { return false }
         _ = reading.adoptReviews(new)
         // Completeness withheld on the 50-cap too (no silent caps): a truncated page
@@ -225,17 +219,11 @@ public final class RadarPipeline: RadarSource {
 
     private func resolveSelfIfNeeded() {
         guard !reading.selfResolved else { return }
-        let semaphore = DispatchSemaphore(value: 0)
-        var login: String?
-        client.fetchAuthenticatedUserLogin { result in
-            if case .success(let value) = result { login = value }   // local; read only after a successful wait
-            semaphore.signal()
-        }
         // Only a login actually OBTAINED marks resolved (review F9) — the rule itself
         // lives in `RadarReading.resolvedSelf` (nil is a no-op → retry next refresh).
-        if semaphore.wait(timeout: .now() + 15) == .success {
-            reading.resolvedSelf(login)
-        }
+        guard let outcome = blocking(timeout: 15, { client.fetchAuthenticatedUserLogin(completion: $0) })
+        else { return }
+        reading.resolvedSelf(try? outcome.get())
     }
 
     /// One-shot read of the re-projection latches (see the protocol doc). Queue-confined:
@@ -249,16 +237,28 @@ public final class RadarPipeline: RadarSource {
     // session's own background queue, never this poll queue. So waiting here never
     // blocks the thread that must deliver the completion.
 
-    private func blockingFetch(validators: PollValidators) -> Swift.Result<NotificationsResponse, GitHubClientError>? {
-        dispatchPrecondition(condition: .notOnQueue(.main))
+    /// Run one of the client's callback APIs to completion on THIS thread, with a
+    /// wall-clock cap: the result, or `nil` when the wait timed out. The one home of the
+    /// semaphore pattern the six wrappers below used to spell out one by one — each site
+    /// keeps its OWN timeout and its own handling of the result. The semaphore is created
+    /// fresh per call, so no signal can leak across calls, and waiting here is still safe
+    /// (see the deadlock note above): completions land on the session's queue, not this one.
+    private func blocking<T>(timeout: TimeInterval,
+                             _ call: (@escaping (Swift.Result<T, GitHubClientError>) -> Void) -> Void)
+        -> Swift.Result<T, GitHubClientError>? {
         let semaphore = DispatchSemaphore(value: 0)
-        var outcome: Swift.Result<NotificationsResponse, GitHubClientError>?
-        client.fetchNotifications(validators: validators) { result in
+        var outcome: Swift.Result<T, GitHubClientError>?
+        call { result in
             outcome = result
             semaphore.signal()
         }
-        if semaphore.wait(timeout: .now() + 30) == .timedOut { return nil }
+        if semaphore.wait(timeout: .now() + timeout) == .timedOut { return nil }
         return outcome
+    }
+
+    private func blockingFetch(validators: PollValidators) -> Swift.Result<NotificationsResponse, GitHubClientError>? {
+        dispatchPrecondition(condition: .notOnQueue(.main))
+        return blocking(timeout: 30) { client.fetchNotifications(validators: validators, completion: $0) }
     }
 
     /// Fetch the H2 pulse (open-PR CI/review/merge state) via one GraphQL query.
@@ -267,16 +267,8 @@ public final class RadarPipeline: RadarSource {
     /// Independent of the notifications validators — GraphQL has no 304.
     public func fetchPulse() -> Swift.Result<[PullRequestPulse], GitHubClientError> {
         dispatchPrecondition(condition: .notOnQueue(.main))
-        let semaphore = DispatchSemaphore(value: 0)
-        var outcome: Swift.Result<[PullRequestPulse], GitHubClientError>?
-        client.fetchOpenPullRequests { result in
-            outcome = result
-            semaphore.signal()
-        }
-        if semaphore.wait(timeout: .now() + 20) == .timedOut {
-            return .failure(.transport("pulse request timed out"))
-        }
-        return outcome ?? .failure(.transport("pulse request returned no result"))
+        return blocking(timeout: 20) { client.fetchOpenPullRequests(completion: $0) }
+            ?? .failure(.transport("pulse request timed out"))
     }
 
     /// The standing inbound sweep (WP 2026-07-09-001). The search query needs the LITERAL
@@ -288,16 +280,8 @@ public final class RadarPipeline: RadarSource {
         guard let selfLogin = reading.selfLogin else {
             return .failure(.transport("self login unresolved — sweep skipped"))
         }
-        let semaphore = DispatchSemaphore(value: 0)
-        var outcome: Swift.Result<InboundReading, GitHubClientError>?
-        client.fetchInboundSearch(login: selfLogin) { result in
-            outcome = result
-            semaphore.signal()
-        }
-        if semaphore.wait(timeout: .now() + 20) == .timedOut {
-            return .failure(.transport("inbound sweep timed out"))
-        }
-        switch outcome ?? .failure(.transport("inbound sweep returned no result")) {
+        let outcome = blocking(timeout: 20) { client.fetchInboundSearch(login: selfLogin, completion: $0) }
+        switch outcome ?? .failure(.transport("inbound sweep timed out")) {
         case .success(let new):
             return .success(reading.adoptInbound(new))
         case .failure(let error):
@@ -306,14 +290,10 @@ public final class RadarPipeline: RadarSource {
     }
 
     private func blockingAuthor(_ urlString: String) -> (login: String, body: String?)? {
-        let semaphore = DispatchSemaphore(value: 0)
-        var outcome: (login: String, body: String?)?
-        client.fetchLatestCommentAuthor(urlString: urlString) { result in
-            if case .success(let value) = result { outcome = (value.login, value.body) }
-            semaphore.signal()
-        }
-        _ = semaphore.wait(timeout: .now() + 6)   // tight per-fetch cap so the enrichment budget holds
-        return outcome
+        // 6s: tight per-fetch cap so the enrichment budget holds. Failure/timeout → nil.
+        let outcome = blocking(timeout: 6) { client.fetchLatestCommentAuthor(urlString: urlString, completion: $0) }
+        guard let value = try? outcome?.get() else { return nil }
+        return (value.login, value.body)
     }
 
     /// Re-check the SURFACED action set's subject states against the live API — the
@@ -347,27 +327,14 @@ public final class RadarPipeline: RadarSource {
         if flipped { reading.markSubjectResolution() }
     }
 
-    private func blockingSubjectState(_ urlString: String) -> String? {
-        let semaphore = DispatchSemaphore(value: 0)
-        var outcome: String?
-        client.fetchSubjectState(urlString: urlString) { result in
-            if case .success(let value) = result { outcome = value }
-            semaphore.signal()
-        }
-        _ = semaphore.wait(timeout: .now() + 6)   // same tight per-fetch cap as the author enrichment
-        return outcome
+    private func blockingSubjectState(_ urlString: String) -> SubjectLifecycle? {
+        // Same tight per-fetch cap as the author enrichment. Failure/timeout → nil.
+        try? blocking(timeout: 6) { client.fetchSubjectState(urlString: urlString, completion: $0) }?.get()
     }
 
     /// nil on failure/timeout — a failed check NEVER reads as "read" (never-miss:
     /// only a positive `unread: false` from GitHub removes a row).
     private func blockingThreadUnread(_ threadID: String) -> Bool? {
-        let semaphore = DispatchSemaphore(value: 0)
-        var outcome: Bool?
-        client.fetchThreadUnread(threadID: threadID) { result in
-            if case .success(let value) = result { outcome = value }
-            semaphore.signal()
-        }
-        _ = semaphore.wait(timeout: .now() + 6)
-        return outcome
+        try? blocking(timeout: 6) { client.fetchThreadUnread(threadID: threadID, completion: $0) }?.get()
     }
 }

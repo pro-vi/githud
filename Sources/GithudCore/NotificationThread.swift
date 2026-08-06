@@ -1,5 +1,13 @@
 import Foundation
 
+/// The subject PR/Issue's lifecycle, as `GitHubClient.fetchSubjectState` normalizes it.
+/// A closed set with one home, so a mistyped comparison is a compile error instead of a
+/// silently-flipped suppression rule. The raw values are the strings the fixture format
+/// and the probe histogram already use, so persisted/recorded data reads unchanged.
+public enum SubjectLifecycle: String, Sendable, Equatable {
+    case open, closed, merged
+}
+
 /// A GitHub notification *thread* — the unit the REST Notifications API returns
 /// (`GET /notifications`). Threads, not granular events: one row per
 /// subscribed-and-active subject (PR/Issue/…), with a `reason` telling you *why*
@@ -32,13 +40,13 @@ public struct NotificationThread: Decodable, Sendable, Equatable {
     public var latestCommentExcerpt: String? = nil
 
     /// **Enrichment — NOT in the base `/notifications` response.** The subject PR/Issue's
-    /// lifecycle state: `"open"` | `"closed"` | `"merged"`, fetched from `subject.url`.
+    /// lifecycle state (`SubjectLifecycle`), fetched from `subject.url`.
     /// `nil` when unenriched (or not a PR/Issue). A GitHub notification stays UNREAD after
     /// its PR is merged/closed, so a stale "review requested" lingers on a long-done PR;
     /// this lets the radar demote a RESOLVED subject (→ suppressed, auditable — never a
     /// silent drop). `nil` (unknown) always still surfaces (never-miss). The fixture
     /// supplies it via `subject_state`; the live client fills it during enrichment.
-    public var subjectState: String? = nil
+    public var subjectState: SubjectLifecycle? = nil
 
     enum CodingKeys: String, CodingKey {
         case id, unread, reason, subject, repository
@@ -82,6 +90,28 @@ public struct NotificationThread: Decodable, Sendable, Equatable {
 }
 
 public extension NotificationThread {
+    /// Hand-written because `subject_state` decodes LENIENTLY: an unrecognized value maps
+    /// to `nil` rather than failing the whole page. `nil` is already the never-miss path
+    /// ("unknown state never suppresses"), so a novel value degrades to surfacing the row
+    /// instead of losing every thread in the response. Every other field decodes exactly
+    /// as the synthesized initializer did. (In an extension so the memberwise initializer
+    /// `reviewOwed` uses stays synthesized.)
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(
+            id: try c.decode(String.self, forKey: .id),
+            unread: try c.decode(Bool.self, forKey: .unread),
+            reason: try c.decode(String.self, forKey: .reason),
+            updatedAt: try c.decode(String.self, forKey: .updatedAt),
+            lastReadAt: try c.decodeIfPresent(String.self, forKey: .lastReadAt),
+            subject: try c.decode(Subject.self, forKey: .subject),
+            repository: try c.decode(Repository.self, forKey: .repository),
+            latestCommentAuthorLogin: try c.decodeIfPresent(String.self, forKey: .latestCommentAuthorLogin),
+            latestCommentExcerpt: try c.decodeIfPresent(String.self, forKey: .latestCommentExcerpt),
+            subjectState: try c.decodeIfPresent(String.self, forKey: .subjectState)
+                .flatMap(SubjectLifecycle.init(rawValue:)))
+    }
+
     /// Decode a `GET /notifications` array (or the recorded fixture).
     static func list(from data: Data) throws -> [NotificationThread] {
         try JSONDecoder().decode([NotificationThread].self, from: data)

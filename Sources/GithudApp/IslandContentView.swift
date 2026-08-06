@@ -1445,6 +1445,135 @@ final class PeekChevronView: IslandClickableView {
     @objc private func tapped() { onToggle() }
 }
 
+/// The WP-3d′ peek mechanics the three lane rows share — the hitTest carve-out, the
+/// chevron hover relay, the line caps, the option-click power path, Open-on-GitHub, and
+/// the WP-6k key-session actions. All three lanes had a byte-identical copy of this block
+/// (the third one disclosed itself in `InboundRowView`'s comment as a refactor candidate);
+/// this is that extraction, behavior unchanged.
+///
+/// A subclass's init calls `super.init(url:onPeekToggle:)`, builds its own icon/badge,
+/// labels, chevron and constraints, then assigns `titleLabel`, `subtitleLabel`, the
+/// optional third `extraLabel` (only `RadarRowView`'s excerpt) and `chevron` — everything
+/// below reads those. `setPeeked` applies the excerpt cap only when `extraLabel` exists,
+/// so the excerpt-less rows behave exactly as their own copies did.
+class PeekableRowView: IslandClickableView, KeySessionActionable {
+    fileprivate let url: URL?
+    private let onPeekToggle: ((Bool) -> Void)?
+    fileprivate var chevron: PeekChevronView?
+    fileprivate var titleLabel: NSTextField!
+    fileprivate var subtitleLabel: NSTextField!
+    /// The optional third line (today: the radar row's excerpt). nil on the other lanes.
+    fileprivate var extraLabel: NSTextField?
+    private(set) var peeked = false
+
+    fileprivate init(url: URL?, onPeekToggle: ((Bool) -> Void)?) {
+        self.url = url
+        self.onPeekToggle = onPeekToggle
+        super.init(frame: .zero)
+    }
+
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+    // MARK: peek mechanics
+
+    /// The D-reveal carve-out (blocking amendment 1): `IslandClickableView.hitTest`
+    /// flattens the row to ONE target so child labels never swallow first-mouse clicks —
+    /// but the chevron is a REAL second target (a peek attempt must never navigate). The
+    /// decision is the pure `PeekReveal.hitTarget`, tested headlessly in Core.
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        switch PeekReveal.hitTarget(point: convert(point, from: superview),
+                                    rowBounds: bounds, chevronFrame: chevron?.frame) {
+        case .chevron: return chevron
+        case .row: return self
+        case .none: return nil
+        }
+    }
+
+    override func mouseEntered(with event: NSEvent) {
+        super.mouseEntered(with: event)
+        chevron?.setRowHovered(true)
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        super.mouseExited(with: event)
+        chevron?.setRowHovered(false)
+    }
+
+    fileprivate func togglePeek() {
+        guard chevron != nil else { return }
+        setPeeked(!peeked, animatedChevron: true)
+        onPeekToggle?(peeked)
+    }
+
+    /// Apply the peek state to the labels (ratified caps: title ≤3 · subtitle ≤2 ·
+    /// excerpt ≤4 lines; single-line truncation otherwise).
+    fileprivate func setPeeked(_ open: Bool, animatedChevron: Bool) {
+        peeked = open
+        applyLineCap(titleLabel, open ? PeekReveal.titleLineCap : 1)
+        applyLineCap(subtitleLabel, open ? PeekReveal.subtitleLineCap : 1)
+        if let extraLabel { applyLineCap(extraLabel, open ? PeekReveal.excerptLineCap : 1) }
+        chevron?.setPointingUp(open, animated: animatedChevron)
+        refreshPeekAction()
+    }
+
+    private func applyLineCap(_ label: NSTextField, _ cap: Int) {
+        label.maximumNumberOfLines = cap
+        label.lineBreakMode = cap == 1 ? .byTruncatingTail : .byWordWrapping
+        label.cell?.truncatesLastVisibleLine = cap > 1   // an over-cap peek still shows its ellipsis honestly
+    }
+
+    /// VoiceOver: ONE custom action on the row ("Show full text"/"Hide full text")
+    /// toggling the same state. The row's label already speaks the full text, so spoken
+    /// parity holds either way — the action keeps the sighted and spoken affordances equal.
+    fileprivate func refreshPeekAction() {
+        guard chevron != nil else { return }
+        let name = peeked ? "Hide full text" : "Show full text"
+        setAccessibilityCustomActions([NSAccessibilityCustomAction(name: name) { [weak self] in
+            self?.togglePeek()
+            return true
+        }])
+    }
+
+    @objc fileprivate func rowClicked() {
+        // Option-click anywhere on the row toggles the peek (the ratified power path);
+        // a plain click is Open-on-GitHub, byte-for-byte today's behavior.
+        if chevron != nil, NSApp.currentEvent?.modifierFlags.contains(.option) == true {
+            togglePeek()
+            return
+        }
+        openInBrowser()
+    }
+
+    override func accessibilityPerformPress() -> Bool {
+        guard url != nil else { return false }
+        openInBrowser(); return true
+    }
+
+    // MARK: WP-6k key-session actions (the EXISTING paths, keyboard-driven)
+
+    /// ⏎ — the same Open-on-GitHub path a plain click runs, incl. its nil-url no-op
+    /// guard. Returns whether an open actually fired.
+    @discardableResult func performOpen() -> Bool {
+        guard url != nil else { return false }
+        openInBrowser()
+        return true
+    }
+
+    /// Space — the chevron's own toggle (motion sanction identical to a chevron click:
+    /// the 140ms reflow rides the same onPeekToggle seam). No-op without a chevron.
+    @discardableResult func performPeekToggle() -> Bool {
+        guard chevron != nil else { return false }
+        togglePeek()
+        return true
+    }
+
+    /// Open-on-GitHub — opens the thread in the browser without activating the HUD
+    /// (focus-non-theft). We open, we don't act from the HUD (the H3 guardrail).
+    @objc private func openInBrowser() {
+        if let url { NSWorkspace.shared.open(url) }
+    }
+}
+
 /// One action-required row: a leading SF Symbol (ink by default; `danger` only for a
 /// critical emergency — color doctrine) + title + "repo · actor · reason · age".
 ///
@@ -1455,19 +1584,9 @@ final class PeekChevronView: IslandClickableView {
 /// `PeekReveal.hitTarget`, tested) makes the two targets structurally unmixable.
 /// Option-click anywhere on the row also toggles. The OS tooltip is REMOVED: truncated
 /// rows reveal via the chevron (one channel), un-truncated rows have nothing to restate.
-final class RadarRowView: IslandClickableView, KeySessionActionable {
-    private let url: URL?
-    private let onPeekToggle: ((Bool) -> Void)?
-    private var chevron: PeekChevronView?
-    private var titleLabel: NSTextField!
-    private var subtitleLabel: NSTextField!
-    private var excerptLabel: NSTextField?
-    private(set) var peeked = false
-
+final class RadarRowView: PeekableRowView {
     init(row: RadarRow, theme: Theme, peeked: Bool = false, onPeekToggle: ((Bool) -> Void)? = nil) {
-        self.url = row.url.flatMap(URL.init(string:))
-        self.onPeekToggle = onPeekToggle
-        super.init(frame: .zero)
+        super.init(url: row.url.flatMap(URL.init(string:)), onPeekToggle: onPeekToggle)
 
         // WP-6k ink-bar focus tokens (base class executes): hoverFill + inkPrimary bar.
         // Set unconditionally — a nil-url row is still selectable (⏎ just no-ops on it).
@@ -1504,7 +1623,7 @@ final class RadarRowView: IslandClickableView, KeySessionActionable {
             preview.textColor = theme.inkTertiary
             preview.lineBreakMode = .byTruncatingTail
             preview.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
-            excerptLabel = preview
+            extraLabel = preview
             textViews.append(preview)
         }
 
@@ -1513,7 +1632,7 @@ final class RadarRowView: IslandClickableView, KeySessionActionable {
         let needsChevron = PeekReveal.needsChevron(
             titleFits: title.intrinsicContentSize.width <= RowMetrics.textWidth,
             subtitleFits: subtitle.intrinsicContentSize.width <= RowMetrics.textWidth,
-            excerptFits: (excerptLabel?.intrinsicContentSize.width ?? 0) <= RowMetrics.textWidth)
+            excerptFits: (extraLabel?.intrinsicContentSize.width ?? 0) <= RowMetrics.textWidth)
 
         if url != nil || needsChevron {
             addGestureRecognizer(NSClickGestureRecognizer(target: self, action: #selector(rowClicked)))
@@ -1578,7 +1697,7 @@ final class RadarRowView: IslandClickableView, KeySessionActionable {
         if needsChevron {
             // Wrap math for the peeked state: the labels' preferred wrap width is the
             // chevroned column, so multi-line intrinsic heights are deterministic.
-            for label in [titleLabel, subtitleLabel, excerptLabel].compactMap({ $0 }) {
+            for label in [titleLabel, subtitleLabel, extraLabel].compactMap({ $0 }) {
                 label.preferredMaxLayoutWidth = RowMetrics.peekedTextWidth
             }
             let chev = PeekChevronView(theme: theme) { [weak self] in self?.togglePeek() }
@@ -1602,119 +1721,13 @@ final class RadarRowView: IslandClickableView, KeySessionActionable {
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
-
-    // MARK: peek mechanics
-
-    /// The D-reveal carve-out (blocking amendment 1): `IslandClickableView.hitTest`
-    /// flattens the row to ONE target so child labels never swallow first-mouse clicks —
-    /// but the chevron is a REAL second target (a peek attempt must never navigate). The
-    /// decision is the pure `PeekReveal.hitTarget`, tested headlessly in Core.
-    override func hitTest(_ point: NSPoint) -> NSView? {
-        switch PeekReveal.hitTarget(point: convert(point, from: superview),
-                                    rowBounds: bounds, chevronFrame: chevron?.frame) {
-        case .chevron: return chevron
-        case .row: return self
-        case .none: return nil
-        }
-    }
-
-    override func mouseEntered(with event: NSEvent) {
-        super.mouseEntered(with: event)
-        chevron?.setRowHovered(true)
-    }
-
-    override func mouseExited(with event: NSEvent) {
-        super.mouseExited(with: event)
-        chevron?.setRowHovered(false)
-    }
-
-    private func togglePeek() {
-        guard chevron != nil else { return }
-        setPeeked(!peeked, animatedChevron: true)
-        onPeekToggle?(peeked)
-    }
-
-    /// Apply the peek state to the labels (ratified caps: title ≤3 · subtitle ≤2 ·
-    /// excerpt ≤4 lines; single-line truncation otherwise).
-    private func setPeeked(_ open: Bool, animatedChevron: Bool) {
-        peeked = open
-        applyLineCap(titleLabel, open ? PeekReveal.titleLineCap : 1)
-        applyLineCap(subtitleLabel, open ? PeekReveal.subtitleLineCap : 1)
-        if let excerptLabel { applyLineCap(excerptLabel, open ? PeekReveal.excerptLineCap : 1) }
-        chevron?.setPointingUp(open, animated: animatedChevron)
-        refreshPeekAction()
-    }
-
-    private func applyLineCap(_ label: NSTextField, _ cap: Int) {
-        label.maximumNumberOfLines = cap
-        label.lineBreakMode = cap == 1 ? .byTruncatingTail : .byWordWrapping
-        label.cell?.truncatesLastVisibleLine = cap > 1   // an over-cap peek still shows its ellipsis honestly
-    }
-
-    /// VoiceOver: ONE custom action on the row ("Show full text"/"Hide full text")
-    /// toggling the same state. The row's label already speaks the full text, so spoken
-    /// parity holds either way — the action keeps the sighted and spoken affordances equal.
-    private func refreshPeekAction() {
-        guard chevron != nil else { return }
-        let name = peeked ? "Hide full text" : "Show full text"
-        setAccessibilityCustomActions([NSAccessibilityCustomAction(name: name) { [weak self] in
-            self?.togglePeek()
-            return true
-        }])
-    }
-
-    @objc private func rowClicked() {
-        // Option-click anywhere on the row toggles the peek (the ratified power path);
-        // a plain click is Open-on-GitHub, byte-for-byte today's behavior.
-        if chevron != nil, NSApp.currentEvent?.modifierFlags.contains(.option) == true {
-            togglePeek()
-            return
-        }
-        openInBrowser()
-    }
-
-    override func accessibilityPerformPress() -> Bool {
-        guard url != nil else { return false }
-        openInBrowser(); return true
-    }
-
-    // MARK: WP-6k key-session actions (the EXISTING paths, keyboard-driven)
-
-    /// ⏎ — the same Open-on-GitHub path a plain click runs, incl. its nil-url no-op
-    /// guard. Returns whether an open actually fired.
-    @discardableResult func performOpen() -> Bool {
-        guard url != nil else { return false }
-        openInBrowser()
-        return true
-    }
-
-    /// Space — the chevron's own toggle (motion sanction identical to a chevron click:
-    /// the 140ms reflow rides the same onPeekToggle seam). No-op without a chevron.
-    @discardableResult func performPeekToggle() -> Bool {
-        guard chevron != nil else { return false }
-        togglePeek()
-        return true
-    }
-
-    /// Open-on-GitHub — opens the thread in the browser without activating the HUD
-    /// (focus-non-theft). We open, we don't act from the HUD (the H3 guardrail).
-    @objc private func openInBrowser() {
-        if let url { NSWorkspace.shared.open(url) }
-    }
 }
 
 /// One H2 pulse row: a state-tinted leading glyph (theme decides hue + fill/outline) +
 /// PR title + "repo #n · CI · review · merge · age". Clickable → Open-on-GitHub.
 /// Carries the same WP-3d′ inline peek as `RadarRowView` (title ≤3 · subtitle ≤2; no
 /// excerpt on pulse rows) — see that class for the carve-out/tooltip/a11y contracts.
-final class PulseRowView: IslandClickableView, KeySessionActionable {
-    private let url: URL?
-    private let onPeekToggle: ((Bool) -> Void)?
-    private var chevron: PeekChevronView?
-    private var titleLabel: NSTextField!
-    private var subtitleLabel: NSTextField!
-    private(set) var peeked = false
-
+final class PulseRowView: PeekableRowView {
     /// TAIL DEMOTION (WP 2026-07-26-001, widened by 2026-07-29-001), derived from the row — never
     /// passed in. The predicate is one idea: **not in the live glance**. A draft is your own WIP
     /// and a quiet row has been rotting a fortnight; neither is a peer of live work, so the title
@@ -1747,9 +1760,7 @@ final class PulseRowView: IslandClickableView, KeySessionActionable {
          elideOwner: Bool = false, emphasizeOwner: String? = nil,
          onPeekToggle: ((Bool) -> Void)? = nil) {
         let subdued = row.isDraft || row.isStale
-        self.url = URL(string: row.url)
-        self.onPeekToggle = onPeekToggle
-        super.init(frame: .zero)
+        super.init(url: URL(string: row.url), onPeekToggle: onPeekToggle)
 
         // WP-6k ink-bar focus tokens — mirrors RadarRowView (see its comment).
         keyFocusFill = theme.hoverFill
@@ -1875,108 +1886,17 @@ final class PulseRowView: IslandClickableView, KeySessionActionable {
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
-
-    // MARK: peek mechanics (mirrors RadarRowView — see its doc comments)
-
-    override func hitTest(_ point: NSPoint) -> NSView? {
-        switch PeekReveal.hitTarget(point: convert(point, from: superview),
-                                    rowBounds: bounds, chevronFrame: chevron?.frame) {
-        case .chevron: return chevron
-        case .row: return self
-        case .none: return nil
-        }
-    }
-
-    override func mouseEntered(with event: NSEvent) {
-        super.mouseEntered(with: event)
-        chevron?.setRowHovered(true)
-    }
-
-    override func mouseExited(with event: NSEvent) {
-        super.mouseExited(with: event)
-        chevron?.setRowHovered(false)
-    }
-
-    private func togglePeek() {
-        guard chevron != nil else { return }
-        setPeeked(!peeked, animatedChevron: true)
-        onPeekToggle?(peeked)
-    }
-
-    private func setPeeked(_ open: Bool, animatedChevron: Bool) {
-        peeked = open
-        applyLineCap(titleLabel, open ? PeekReveal.titleLineCap : 1)
-        applyLineCap(subtitleLabel, open ? PeekReveal.subtitleLineCap : 1)
-        chevron?.setPointingUp(open, animated: animatedChevron)
-        refreshPeekAction()
-    }
-
-    private func applyLineCap(_ label: NSTextField, _ cap: Int) {
-        label.maximumNumberOfLines = cap
-        label.lineBreakMode = cap == 1 ? .byTruncatingTail : .byWordWrapping
-        label.cell?.truncatesLastVisibleLine = cap > 1
-    }
-
-    private func refreshPeekAction() {
-        guard chevron != nil else { return }
-        let name = peeked ? "Hide full text" : "Show full text"
-        setAccessibilityCustomActions([NSAccessibilityCustomAction(name: name) { [weak self] in
-            self?.togglePeek()
-            return true
-        }])
-    }
-
-    @objc private func rowClicked() {
-        if chevron != nil, NSApp.currentEvent?.modifierFlags.contains(.option) == true {
-            togglePeek()
-            return
-        }
-        openInBrowser()
-    }
-
-    override func accessibilityPerformPress() -> Bool {
-        guard url != nil else { return false }
-        openInBrowser(); return true
-    }
-
-    // MARK: WP-6k key-session actions — mirrors RadarRowView (see its comments)
-
-    @discardableResult func performOpen() -> Bool {
-        guard url != nil else { return false }
-        openInBrowser()
-        return true
-    }
-
-    @discardableResult func performPeekToggle() -> Bool {
-        guard chevron != nil else { return false }
-        togglePeek()
-        return true
-    }
-
-    @objc private func openInBrowser() {
-        if let url { NSWorkspace.shared.open(url) }
-    }
 }
 
 /// One standing-inbound row (WP 2026-07-09-001): a leading kind glyph (PR pull-arrow /
 /// issue dot-circle, ink — nothing here is a color-doctrine emergency) + title +
 /// "repo #n · @opener · waiting-age". Clickable → Open-on-GitHub. Carries the same
-/// WP-3d′ inline peek and WP-6k key-session contracts as `PulseRowView` (see
-/// `RadarRowView` for the carve-out/tooltip/a11y documentation) — a third copy of the
-/// row mechanics, disclosed: extracting a shared peek base across three landed, reviewed
-/// row classes is a refactor candidate, not a rider on a feature commit.
-final class InboundRowView: IslandClickableView, KeySessionActionable {
-    private let url: URL?
-    private let onPeekToggle: ((Bool) -> Void)?
-    private var chevron: PeekChevronView?
-    private var titleLabel: NSTextField!
-    private var subtitleLabel: NSTextField!
-    private(set) var peeked = false
-
+/// WP-3d′ inline peek and WP-6k key-session contracts as `PulseRowView` — all three now
+/// inherit them from `PeekableRowView` (see `RadarRowView` for the carve-out/tooltip/a11y
+/// documentation).
+final class InboundRowView: PeekableRowView {
     init(row: InboundRow, theme: Theme, peeked: Bool = false, onPeekToggle: ((Bool) -> Void)? = nil) {
-        self.url = URL(string: row.url)
-        self.onPeekToggle = onPeekToggle
-        super.init(frame: .zero)
+        super.init(url: URL(string: row.url), onPeekToggle: onPeekToggle)
 
         keyFocusFill = theme.hoverFill
         keyFocusBarColor = theme.inkPrimary
@@ -2077,87 +1997,6 @@ final class InboundRowView: IslandClickableView, KeySessionActionable {
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
-
-    // MARK: peek mechanics (mirrors PulseRowView — see RadarRowView's doc comments)
-
-    override func hitTest(_ point: NSPoint) -> NSView? {
-        switch PeekReveal.hitTarget(point: convert(point, from: superview),
-                                    rowBounds: bounds, chevronFrame: chevron?.frame) {
-        case .chevron: return chevron
-        case .row: return self
-        case .none: return nil
-        }
-    }
-
-    override func mouseEntered(with event: NSEvent) {
-        super.mouseEntered(with: event)
-        chevron?.setRowHovered(true)
-    }
-
-    override func mouseExited(with event: NSEvent) {
-        super.mouseExited(with: event)
-        chevron?.setRowHovered(false)
-    }
-
-    private func togglePeek() {
-        guard chevron != nil else { return }
-        setPeeked(!peeked, animatedChevron: true)
-        onPeekToggle?(peeked)
-    }
-
-    private func setPeeked(_ open: Bool, animatedChevron: Bool) {
-        peeked = open
-        applyLineCap(titleLabel, open ? PeekReveal.titleLineCap : 1)
-        applyLineCap(subtitleLabel, open ? PeekReveal.subtitleLineCap : 1)
-        chevron?.setPointingUp(open, animated: animatedChevron)
-        refreshPeekAction()
-    }
-
-    private func applyLineCap(_ label: NSTextField, _ cap: Int) {
-        label.maximumNumberOfLines = cap
-        label.lineBreakMode = cap == 1 ? .byTruncatingTail : .byWordWrapping
-        label.cell?.truncatesLastVisibleLine = cap > 1
-    }
-
-    private func refreshPeekAction() {
-        guard chevron != nil else { return }
-        let name = peeked ? "Hide full text" : "Show full text"
-        setAccessibilityCustomActions([NSAccessibilityCustomAction(name: name) { [weak self] in
-            self?.togglePeek()
-            return true
-        }])
-    }
-
-    @objc private func rowClicked() {
-        if chevron != nil, NSApp.currentEvent?.modifierFlags.contains(.option) == true {
-            togglePeek()
-            return
-        }
-        openInBrowser()
-    }
-
-    override func accessibilityPerformPress() -> Bool {
-        guard url != nil else { return false }
-        openInBrowser(); return true
-    }
-
-    // MARK: WP-6k key-session actions — mirrors RadarRowView (see its comments)
-
-    @discardableResult func performOpen() -> Bool {
-        guard url != nil else { return false }
-        openInBrowser()
-        return true
-    }
-
-    @discardableResult func performPeekToggle() -> Bool {
-        guard chevron != nil else { return false }
-        togglePeek()
-        return true
-    }
-
-    @objc private func openInBrowser() {
-        if let url { NSWorkspace.shared.open(url) }
-    }
 }
 
 extension IslandContentView {

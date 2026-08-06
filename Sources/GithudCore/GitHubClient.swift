@@ -126,6 +126,48 @@ public final class GitHubClient {
         return req
     }
 
+    /// Build an endpoint URL under `baseURL` with query items. `nil` when the injected
+    /// base URL or the composed query cannot form a valid URL — the callers turn that
+    /// into `.transport`, so a malformed base URL fails honestly instead of trapping.
+    private func endpoint(_ path: String, query: [URLQueryItem]) -> URL? {
+        guard var comps = URLComponents(url: baseURL.appendingPathComponent(path),
+                                        resolvingAgainstBaseURL: false) else { return nil }
+        comps.queryItems = query
+        return comps.url
+    }
+
+    /// The shape every simple REST endpoint here shares: fail fast while the shared
+    /// rate-limit pause is open, fire one authed GET, then the SAME response cascade in
+    /// the SAME order — transport error, non-HTTP response, rate-limit (which opens the
+    /// shared pause), non-200, decode. The per-endpoint part is just the URL and how to
+    /// read the body. (`fetchNotifications` and `fetchOpenPullRequests` are deliberately
+    /// NOT folded in: the first has 304 + pagination + poll-plan headers, the second is a
+    /// POST with its own headers and body.)
+    private func decodingGET<T>(_ url: URL,
+                                _ decode: @escaping (Data) throws -> T,
+                                completion: @escaping (Result<T, GitHubClientError>) -> Void) {
+        if let pause = activePauseSeconds() { completion(.failure(.rateLimited(retryAfter: pause))); return }
+        let task = session.dataTask(with: authedRequest(url: url)) { data, response, error in
+            if let error { completion(.failure(.transport(error.localizedDescription))); return }
+            guard let http = response as? HTTPURLResponse else {
+                completion(.failure(.transport("no HTTPURLResponse"))); return
+            }
+            if let pause = Self.rateLimitPause(http) {
+                self.openPause(seconds: pause)
+                completion(.failure(.rateLimited(retryAfter: pause))); return
+            }
+            guard http.statusCode == 200, let data else {
+                completion(.failure(.http(http.statusCode, ""))); return
+            }
+            do {
+                completion(.success(try decode(data)))
+            } catch {
+                completion(.failure(.decode("\(error)")))
+            }
+        }
+        task.resume()
+    }
+
     /// Extract the `rel="next"` URL from an RFC-5988 `Link` header (GitHub paginates
     /// `/notifications`; default + max `per_page` is 50). Pure + testable. Returns nil
     /// when there is no next page.
@@ -166,14 +208,14 @@ public final class GitHubClient {
         includeRead: Bool = false,
         completion: @escaping (Result<NotificationsResponse, GitHubClientError>) -> Void
     ) {
-        if let pause = activePauseSeconds() { completion(.failure(.rateLimited(retryAfter: pause))); return }
-        var comps = URLComponents(url: baseURL.appendingPathComponent("notifications"),
-                                  resolvingAgainstBaseURL: false)!
-        comps.queryItems = [
+        guard let url = endpoint("notifications", query: [
             URLQueryItem(name: "all", value: includeRead ? "true" : "false"),
             URLQueryItem(name: "per_page", value: "50"),
-        ]
-        let task = session.dataTask(with: authedRequest(url: comps.url!, conditional: validators)) { data, response, error in
+        ]) else {
+            completion(.failure(.transport("bad request url"))); return
+        }
+        if let pause = activePauseSeconds() { completion(.failure(.rateLimited(retryAfter: pause))); return }
+        let task = session.dataTask(with: authedRequest(url: url, conditional: validators)) { data, response, error in
             self.handleFirstPage(data: data, response: response, error: error,
                                  validators: validators, completion: completion)
         }
@@ -280,76 +322,29 @@ public final class GitHubClient {
             completion(.failure(.transport("bad latest_comment_url")))
             return
         }
-        if let pause = activePauseSeconds() { completion(.failure(.rateLimited(retryAfter: pause))); return }
-        var req = URLRequest(url: url)
-        req.httpMethod = "GET"
-        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        req.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
-        req.setValue("2022-11-28", forHTTPHeaderField: "X-GitHub-Api-Version")
-        req.setValue("githud/0.0.1", forHTTPHeaderField: "User-Agent")
-        let task = session.dataTask(with: req) { data, response, error in
-            if let error { completion(.failure(.transport(error.localizedDescription))); return }
-            guard let http = response as? HTTPURLResponse else {
-                completion(.failure(.transport("no HTTPURLResponse"))); return
-            }
-            if let pause = Self.rateLimitPause(http) {
-                self.openPause(seconds: pause)
-                completion(.failure(.rateLimited(retryAfter: pause))); return
-            }
-            guard http.statusCode == 200, let data else {
-                completion(.failure(.http(http.statusCode, ""))); return
-            }
-            do {
-                let comment = try JSONDecoder().decode(LatestComment.self, from: data)
-                completion(.success((comment.user.login, comment.user.type, comment.body)))
-            } catch {
-                completion(.failure(.decode("\(error)")))
-            }
-        }
-        task.resume()
+        decodingGET(url, { data in
+            let comment = try JSONDecoder().decode(LatestComment.self, from: data)
+            return (comment.user.login, comment.user.type, comment.body)
+        }, completion: completion)
     }
 
     /// `GET subject.url` — the subject PR/Issue's lifecycle state, so the radar can demote
     /// a notification whose PR is already MERGED/CLOSED (a stale "review requested" lingers
-    /// unread for weeks otherwise). Returns a normalized `"open" | "closed" | "merged"`.
-    /// A PR carries `merged`/`merged_at`; an issue only `state` (→ never "merged").
+    /// unread for weeks otherwise). Returns a normalized `SubjectLifecycle`.
+    /// A PR carries `merged`/`merged_at`; an issue only `state` (→ never `.merged`).
     public func fetchSubjectState(
         urlString: String,
-        completion: @escaping (Result<String, GitHubClientError>) -> Void
+        completion: @escaping (Result<SubjectLifecycle, GitHubClientError>) -> Void
     ) {
         guard let url = URL(string: urlString) else {
             completion(.failure(.transport("bad subject url")))
             return
         }
-        if let pause = activePauseSeconds() { completion(.failure(.rateLimited(retryAfter: pause))); return }
-        var req = URLRequest(url: url)
-        req.httpMethod = "GET"
-        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        req.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
-        req.setValue("2022-11-28", forHTTPHeaderField: "X-GitHub-Api-Version")
-        req.setValue("githud/0.0.1", forHTTPHeaderField: "User-Agent")
-        let task = session.dataTask(with: req) { data, response, error in
-            if let error { completion(.failure(.transport(error.localizedDescription))); return }
-            guard let http = response as? HTTPURLResponse else {
-                completion(.failure(.transport("no HTTPURLResponse"))); return
-            }
-            if let pause = Self.rateLimitPause(http) {
-                self.openPause(seconds: pause)
-                completion(.failure(.rateLimited(retryAfter: pause))); return
-            }
-            guard http.statusCode == 200, let data else {
-                completion(.failure(.http(http.statusCode, ""))); return
-            }
-            do {
-                let s = try JSONDecoder().decode(SubjectStateDTO.self, from: data)
-                let normalized = (s.merged == true || s.mergedAt != nil) ? "merged"
-                               : (s.state.lowercased() == "closed") ? "closed" : "open"
-                completion(.success(normalized))
-            } catch {
-                completion(.failure(.decode("\(error)")))
-            }
-        }
-        task.resume()
+        decodingGET(url, { data in
+            let s = try JSONDecoder().decode(SubjectStateDTO.self, from: data)
+            return (s.merged == true || s.mergedAt != nil) ? .merged
+                 : (s.state.lowercased() == "closed") ? .closed : .open
+        }, completion: completion)
     }
 
     /// `GET /notifications/threads/{id}` → the thread's CURRENT unread flag. The
@@ -362,33 +357,10 @@ public final class GitHubClient {
         threadID: String,
         completion: @escaping (Result<Bool, GitHubClientError>) -> Void
     ) {
-        if let pause = activePauseSeconds() { completion(.failure(.rateLimited(retryAfter: pause))); return }
-        var req = URLRequest(url: baseURL.appendingPathComponent("notifications/threads/\(threadID)"))
-        req.httpMethod = "GET"
-        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        req.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
-        req.setValue("2022-11-28", forHTTPHeaderField: "X-GitHub-Api-Version")
-        req.setValue("githud/0.0.1", forHTTPHeaderField: "User-Agent")
-        let task = session.dataTask(with: req) { data, response, error in
-            if let error { completion(.failure(.transport(error.localizedDescription))); return }
-            guard let http = response as? HTTPURLResponse else {
-                completion(.failure(.transport("no HTTPURLResponse"))); return
-            }
-            if let pause = Self.rateLimitPause(http) {
-                self.openPause(seconds: pause)
-                completion(.failure(.rateLimited(retryAfter: pause))); return
-            }
-            guard http.statusCode == 200, let data else {
-                completion(.failure(.http(http.statusCode, ""))); return
-            }
-            struct ThreadDTO: Decodable { let unread: Bool }
-            do {
-                completion(.success(try JSONDecoder().decode(ThreadDTO.self, from: data).unread))
-            } catch {
-                completion(.failure(.decode("\(error)")))
-            }
-        }
-        task.resume()
+        struct ThreadDTO: Decodable { let unread: Bool }
+        decodingGET(baseURL.appendingPathComponent("notifications/threads/\(threadID)"),
+                    { try JSONDecoder().decode(ThreadDTO.self, from: $0).unread },
+                    completion: completion)
     }
 
     /// `GET /user` — the authenticated user's login, so self-activity (your own
@@ -396,32 +368,26 @@ public final class GitHubClient {
     public func fetchAuthenticatedUserLogin(
         completion: @escaping (Result<String, GitHubClientError>) -> Void
     ) {
-        if let pause = activePauseSeconds() { completion(.failure(.rateLimited(retryAfter: pause))); return }
-        var req = URLRequest(url: baseURL.appendingPathComponent("user"))
-        req.httpMethod = "GET"
-        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        req.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
-        req.setValue("2022-11-28", forHTTPHeaderField: "X-GitHub-Api-Version")
-        req.setValue("githud/0.0.1", forHTTPHeaderField: "User-Agent")
-        let task = session.dataTask(with: req) { data, response, error in
-            if let error { completion(.failure(.transport(error.localizedDescription))); return }
-            guard let http = response as? HTTPURLResponse else {
-                completion(.failure(.transport("no HTTPURLResponse"))); return
-            }
-            if let pause = Self.rateLimitPause(http) {
-                self.openPause(seconds: pause)
-                completion(.failure(.rateLimited(retryAfter: pause))); return
-            }
-            guard http.statusCode == 200, let data else {
-                completion(.failure(.http(http.statusCode, ""))); return
-            }
-            do {
-                completion(.success(try JSONDecoder().decode(AuthUser.self, from: data).login))
-            } catch {
-                completion(.failure(.decode("\(error)")))
-            }
+        decodingGET(baseURL.appendingPathComponent("user"),
+                    { try JSONDecoder().decode(AuthUser.self, from: $0).login },
+                    completion: completion)
+    }
+
+    /// The two standing sweeps' shared body: `GET /search/issues` with the SAME sort/order/
+    /// per_page (oldest-first, capped at 50 — see each caller's doc for why that cap is the
+    /// right end to truncate), decoded through `InboundItem.reading(fromSearchData:)`. Only
+    /// the `q` value differs between them.
+    private func searchIssues(query: String,
+                              completion: @escaping (Result<InboundReading, GitHubClientError>) -> Void) {
+        guard let url = endpoint("search/issues", query: [
+            URLQueryItem(name: "q", value: query),
+            URLQueryItem(name: "sort", value: "created"),
+            URLQueryItem(name: "order", value: "asc"),
+            URLQueryItem(name: "per_page", value: "50"),
+        ]) else {
+            completion(.failure(.transport("bad request url"))); return
         }
-        task.resume()
+        decodingGET(url, { try InboundItem.reading(fromSearchData: $0) }, completion: completion)
     }
 
     /// `GET /search/issues` — the standing inbound sweep: every OPEN issue/PR others
@@ -438,45 +404,12 @@ public final class GitHubClient {
         login: String,
         completion: @escaping (Result<InboundReading, GitHubClientError>) -> Void
     ) {
-        if let pause = activePauseSeconds() { completion(.failure(.rateLimited(retryAfter: pause))); return }
-        var comps = URLComponents(url: baseURL.appendingPathComponent("search/issues"),
-                                  resolvingAgainstBaseURL: false)!
-        comps.queryItems = [
-            // `-author:{login}` is LOAD-BEARING beyond scope (review note): it is what
-            // keeps inbound row ids ("owner/repo#n") structurally disjoint from the pulse
-            // lane's identically-formatted ids (pulse = authored-by-viewer) — the island's
-            // keyRows map and the peek stash key on that disjointness. Dropping this
-            // clause would silently collide the two lanes' ids.
-            URLQueryItem(name: "q", value: "user:\(login) is:open -author:\(login)"),
-            URLQueryItem(name: "sort", value: "created"),
-            URLQueryItem(name: "order", value: "asc"),
-            URLQueryItem(name: "per_page", value: "50"),
-        ]
-        var req = URLRequest(url: comps.url!)
-        req.httpMethod = "GET"
-        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        req.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
-        req.setValue("2022-11-28", forHTTPHeaderField: "X-GitHub-Api-Version")
-        req.setValue("githud/0.0.1", forHTTPHeaderField: "User-Agent")
-        let task = session.dataTask(with: req) { data, response, error in
-            if let error { completion(.failure(.transport(error.localizedDescription))); return }
-            guard let http = response as? HTTPURLResponse else {
-                completion(.failure(.transport("no HTTPURLResponse"))); return
-            }
-            if let pause = Self.rateLimitPause(http) {
-                self.openPause(seconds: pause)
-                completion(.failure(.rateLimited(retryAfter: pause))); return
-            }
-            guard http.statusCode == 200, let data else {
-                completion(.failure(.http(http.statusCode, ""))); return
-            }
-            do {
-                completion(.success(try InboundItem.reading(fromSearchData: data)))
-            } catch {
-                completion(.failure(.decode("\(error)")))
-            }
-        }
-        task.resume()
+        // `-author:{login}` is LOAD-BEARING beyond scope (review note): it is what
+        // keeps inbound row ids ("owner/repo#n") structurally disjoint from the pulse
+        // lane's identically-formatted ids (pulse = authored-by-viewer) — the island's
+        // keyRows map and the peek stash key on that disjointness. Dropping this
+        // clause would silently collide the two lanes' ids.
+        searchIssues(query: "user:\(login) is:open -author:\(login)", completion: completion)
     }
 
     /// `GET /search/issues` — the REVIEWS-OWED standing sweep (WP 2026-07-17-002): every
@@ -494,40 +427,7 @@ public final class GitHubClient {
         login: String,
         completion: @escaping (Result<InboundReading, GitHubClientError>) -> Void
     ) {
-        if let pause = activePauseSeconds() { completion(.failure(.rateLimited(retryAfter: pause))); return }
-        var comps = URLComponents(url: baseURL.appendingPathComponent("search/issues"),
-                                  resolvingAgainstBaseURL: false)!
-        comps.queryItems = [
-            URLQueryItem(name: "q", value: "is:open is:pr review-requested:\(login)"),
-            URLQueryItem(name: "sort", value: "created"),
-            URLQueryItem(name: "order", value: "asc"),
-            URLQueryItem(name: "per_page", value: "50"),
-        ]
-        var req = URLRequest(url: comps.url!)
-        req.httpMethod = "GET"
-        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        req.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
-        req.setValue("2022-11-28", forHTTPHeaderField: "X-GitHub-Api-Version")
-        req.setValue("githud/0.0.1", forHTTPHeaderField: "User-Agent")
-        let task = session.dataTask(with: req) { data, response, error in
-            if let error { completion(.failure(.transport(error.localizedDescription))); return }
-            guard let http = response as? HTTPURLResponse else {
-                completion(.failure(.transport("no HTTPURLResponse"))); return
-            }
-            if let pause = Self.rateLimitPause(http) {
-                self.openPause(seconds: pause)
-                completion(.failure(.rateLimited(retryAfter: pause))); return
-            }
-            guard http.statusCode == 200, let data else {
-                completion(.failure(.http(http.statusCode, ""))); return
-            }
-            do {
-                completion(.success(try InboundItem.reading(fromSearchData: data)))
-            } catch {
-                completion(.failure(.decode("\(error)")))
-            }
-        }
-        task.resume()
+        searchIssues(query: "is:open is:pr review-requested:\(login)", completion: completion)
     }
 
     /// `POST /graphql` — the H2 pulse: every open PR's CI rollup + review decision +

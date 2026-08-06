@@ -152,13 +152,13 @@ public struct RadarReading {
     /// (dogfood 2026-07-16 — `needsSubjectState` re-checks nil, never a
     /// cached "open"). Returns whether a terminal verdict was stored.
     @discardableResult
-    public mutating func applySubjectVerdict(at index: Int, state: String) -> Bool {
-        guard state == "merged" || state == "closed" else { return false }
+    public mutating func applySubjectVerdict(at index: Int, state: SubjectLifecycle) -> Bool {
+        guard state == .merged || state == .closed else { return false }
         // Departure capture BEFORE the verdict lands — surfaces() must judge the
         // pre-verdict truth ("was this row on the glass?"), and only reasons whose ask
         // dies with the subject actually depart on a verdict (the read-me class stays).
         if SignalClassifier.asksDieWithSubject.contains(threads[index].reason) {
-            captureCleared(threads[index], why: state == "merged" ? .merged : .closed)
+            captureCleared(threads[index], why: state == .merged ? .merged : .closed)
         }
         threads[index].subjectState = state
         return true
@@ -200,7 +200,7 @@ public struct RadarReading {
         threads.indices.filter { index in
             let t = threads[index]
             return t.unread
-                && (t.subjectState == nil || t.subjectState == "open")
+                && (t.subjectState == nil || t.subjectState == .open)
                 && (t.subject.type == "PullRequest" || t.subject.type == "Issue")
                 && t.subject.url != nil
                 && isOnRadar(t)
@@ -302,7 +302,7 @@ public struct RadarReading {
     /// The asymmetry is intentional, not drift (refactor pass 2026-07-17).
     private func reviewAskURL(_ t: NotificationThread, requireLiveSubject: Bool) -> String? {
         guard t.reason == "review_requested" else { return nil }
-        if requireLiveSubject, t.subjectState != nil, t.subjectState != "open" { return nil }
+        if requireLiveSubject, t.subjectState != nil, t.subjectState != .open { return nil }
         return RadarPresenter.htmlURL(for: t)
     }
 

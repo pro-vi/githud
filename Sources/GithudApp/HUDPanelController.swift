@@ -173,127 +173,88 @@ final class HUDPanelController {
                 pendingMorph = nil
             }
         case .pillStyleChooser:
-            if model.pillStyleChooser != nil {
-                // Show: must-appear on the gear click. Treat like an EXPAND so the click-away
-                // monitor arms + the expand seam fires — the chooser IS dismissable (unlike the
-                // must-see ledger). No key moment: the chooser render branch keeps
-                // keySessionActive false (PillStyleChooser.takesKeyMoment == false).
-                isVisible = true
-                cancelWindowHideFx()
-                let wasExpanded = expanded
-                if !wasExpanded {
-                    expanded = true
-                    onExpandChange?(true)         // the seam (poll-now on expand)
-                    updateClickAwayMonitor()      // arm click-away dismissal
-                }
-                pendingMorph = .expand   // pane arrivals ALWAYS animate (dogfood 2026-07-14)
-                renderNow()
-                pendingMorph = nil
-            } else if model.lensChooser != nil || model.settingsCard != nil {
-                // Pane navigation: another card already took the surface — animate the
-                // swap on the WP-3d morph, stay expanded. Never a collapse.
-                pendingMorph = .expand
-                renderNow()
-                pendingMorph = nil
-            } else if pillCardBackToIsland {
-                pillCardBackToIsland = false
-                pendingMorph = .expand        // card → island, animated
-                renderNow()
-                pendingMorph = nil
-            } else {
-                // Dismiss (click-away / chevron / gear-again): collapse back to the pill.
-                endKeySummonSession()
-                let wasExpanded = expanded
-                if wasExpanded {
-                    expanded = false
-                    onExpandChange?(false)
-                    updateClickAwayMonitor()      // tear down the click-away monitor
-                }
-                pendingMorph = (contentView is PillStyleChooserView) ? .collapse : nil
-                renderNow()
-                pendingMorph = nil
-            }
+            handleCardPresence(
+                isShowing: model.pillStyleChooser != nil,
+                siblingShowing: model.lensChooser != nil || model.settingsCard != nil,
+                backToIsland: \.pillCardBackToIsland,
+                outgoingIsThisCard: contentView is PillStyleChooserView)
         case .lensChooser:
             // The owner-lens card (WP 2026-07-14-001) — same lifecycle as its pill-style
             // sibling: show-as-expand (click-away arms, expand seam fires, no key moment),
             // dismiss-as-collapse.
-            if model.lensChooser != nil {
-                isVisible = true
-                cancelWindowHideFx()
-                let wasExpanded = expanded
-                if !wasExpanded {
-                    expanded = true
-                    onExpandChange?(true)
-                    updateClickAwayMonitor()
-                }
-                pendingMorph = .expand   // pane arrivals ALWAYS animate (dogfood 2026-07-14)
-                renderNow()
-                pendingMorph = nil
-            } else if model.pillStyleChooser != nil || model.settingsCard != nil {
-                // Pane navigation — animate the swap, stay expanded.
-                pendingMorph = .expand
-                renderNow()
-                pendingMorph = nil
-            } else if lensCardBackToIsland {
-                // "(back)": return to the expanded island (the eye's origin) — animated.
-                lensCardBackToIsland = false
-                pendingMorph = .expand
-                renderNow()
-                pendingMorph = nil
-            } else {
-                endKeySummonSession()
-                let wasExpanded = expanded
-                if wasExpanded {
-                    expanded = false
-                    onExpandChange?(false)
-                    updateClickAwayMonitor()
-                }
-                pendingMorph = (contentView is LensChooserView) ? .collapse : nil
-                renderNow()
-                pendingMorph = nil
-            }
+            handleCardPresence(
+                isShowing: model.lensChooser != nil,
+                siblingShowing: model.pillStyleChooser != nil || model.settingsCard != nil,
+                backToIsland: \.lensCardBackToIsland,
+                outgoingIsThisCard: contentView is LensChooserView)
         case .settingsCard:
             // Same lifecycle as its two card siblings: show-as-expand, dismiss-as-collapse,
             // "(back)" returns to the island.
-            if model.settingsCard != nil {
-                isVisible = true
-                cancelWindowHideFx()
-                let wasExpanded = expanded
-                if !wasExpanded {
-                    expanded = true
-                    onExpandChange?(true)
-                    updateClickAwayMonitor()
-                }
-                pendingMorph = .expand   // pane arrivals ALWAYS animate (dogfood 2026-07-14)
-                renderNow()
-                pendingMorph = nil
-            } else if model.pillStyleChooser != nil || model.lensChooser != nil {
-                // Pane navigation — animate the swap, stay expanded.
-                pendingMorph = .expand
-                renderNow()
-                pendingMorph = nil
-            } else if settingsBackToIsland {
-                settingsBackToIsland = false
-                pendingMorph = .expand        // card → island, animated
-                renderNow()
-                pendingMorph = nil
-            } else {
-                endKeySummonSession()
-                let wasExpanded = expanded
-                if wasExpanded {
-                    expanded = false
-                    onExpandChange?(false)
-                    updateClickAwayMonitor()
-                }
-                pendingMorph = (contentView is SettingsCardView) ? .collapse : nil
-                renderNow()
-                pendingMorph = nil
-            }
+            handleCardPresence(
+                isShowing: model.settingsCard != nil,
+                siblingShowing: model.pillStyleChooser != nil || model.lensChooser != nil,
+                backToIsland: \.settingsBackToIsland,
+                outgoingIsThisCard: contentView is SettingsCardView)
         case .surfacePreferences:
             // No island render — fresh H1 rows arrive via the scheduler's recompute →
             // `.radar` (the two-step flow). But the SETTINGS CARD shows the reason set
             // live: while it is up, a toggle re-renders the card in place.
             if model.settingsCard != nil { setNeedsRender() }
+        }
+    }
+
+    /// The lifecycle the three dismissable cards (pill style, owner lens, settings) share
+    /// verbatim — one four-way decision, previously written out three times:
+    ///
+    /// - **showing** — must-appear on the click. Treated like an EXPAND so the click-away
+    ///   monitor arms and the expand seam fires (these cards ARE dismissable, unlike the
+    ///   must-see ledger). No key moment: their render branches keep `keySessionActive`
+    ///   false (`takesKeyMoment == false`). Pane arrivals ALWAYS animate (dogfood 2026-07-14).
+    /// - **a sibling card is showing** — pane navigation: another card already took the
+    ///   surface, so animate the swap on the WP-3d morph and stay expanded. Never a collapse.
+    /// - **"(back)"** — return to the expanded island (the card's origin), animated.
+    /// - **otherwise** — dismiss (click-away / chevron / the opening control again):
+    ///   collapse back to the pill, but only morph when the OUTGOING content is this
+    ///   card's own view type.
+    ///
+    /// `backToIsland` is a key path so the flag is read and cleared on `self` without an
+    /// inout access spanning `renderNow()`.
+    private func handleCardPresence(isShowing: Bool,
+                                    siblingShowing: Bool,
+                                    backToIsland: ReferenceWritableKeyPath<HUDPanelController, Bool>,
+                                    outgoingIsThisCard: Bool) {
+        if isShowing {
+            isVisible = true
+            cancelWindowHideFx()
+            let wasExpanded = expanded
+            if !wasExpanded {
+                expanded = true
+                onExpandChange?(true)         // the seam (poll-now on expand)
+                updateClickAwayMonitor()      // arm click-away dismissal
+            }
+            pendingMorph = .expand
+            renderNow()
+            pendingMorph = nil
+        } else if siblingShowing {
+            pendingMorph = .expand
+            renderNow()
+            pendingMorph = nil
+        } else if self[keyPath: backToIsland] {
+            self[keyPath: backToIsland] = false
+            pendingMorph = .expand            // card → island, animated
+            renderNow()
+            pendingMorph = nil
+        } else {
+            endKeySummonSession()
+            let wasExpanded = expanded
+            if wasExpanded {
+                expanded = false
+                onExpandChange?(false)
+                updateClickAwayMonitor()      // tear down the click-away monitor
+            }
+            pendingMorph = outgoingIsThisCard ? .collapse : nil
+            renderNow()
+            pendingMorph = nil
         }
     }
 
@@ -304,13 +265,20 @@ final class HUDPanelController {
     /// removed by `present()`), so it survives content swaps. The appearance-change hook the
     /// factory installs re-bakes IN PLACE (see `handleAppearanceChange`) — never a rebuild.
     private func buildSurface() {
-        // Stash the outgoing per-lane scroll offsets before the teardown below nils the
-        // content — the immediately-following renderNow() consumes them, so a mid-read theme /
-        // Reduce-Transparency switch keeps the reader's place (nil when not the expanded island).
-        pendingScrollOffsets = (contentView as? IslandContentView)?.scrollOffsets()
-        // Same contract for the WP-3d′ open peeks — a theme switch mid-read must not
-        // silently re-truncate the row the user just opened.
-        pendingPeekStash = (contentView as? IslandContentView)?.peekStash()
+        // Stash the outgoing per-lane scroll offsets and the WP-3d′ open peeks before the
+        // teardown below nils the content — the immediately-following renderNow() consumes
+        // them, so a mid-read theme / Reduce-Transparency switch keeps the reader's place and
+        // must not silently re-truncate the row the user just opened.
+        //
+        // CAPTURE-OR-CARRY, same shape as render(): write only when the outgoing content
+        // really IS the island. When a card holds the surface (a theme chip tapped on the
+        // settings card, an OS a11y flip while any card is up) an unconditional write would
+        // store nil over the island stash render() is holding for the "(back)" trip, and the
+        // lane would jump to the top on return.
+        if let outgoingIsland = contentView as? IslandContentView {
+            pendingScrollOffsets = outgoingIsland.scrollOffsets()
+            pendingPeekStash = outgoingIsland.peekStash()
+        }
         // Same contract for the ledger card's in-progress token text (fix round, finding 9):
         // a theme/a11y surface rebuild would otherwise destroy a half-pasted secret. Held
         // only across the synchronous buildSurface()→renderNow() pair, never logged.
@@ -473,8 +441,10 @@ final class HUDPanelController {
     /// rebuilds within one expanded session (captured from the outgoing island, fed into
     /// the next island's init — where a changed row signature drops its peek honestly).
     /// Reset-on-collapse is structural: only the expanded render path carries it forward,
-    /// so a fresh expand from the pill always opens clean. This slot covers the surface
-    /// rebuilds (theme / a11y flips) that tear the content down before render() runs.
+    /// so a fresh expand from the pill always opens clean. Written at the top of every
+    /// render pass that has an outgoing island, and by `buildSurface()` for the surface
+    /// rebuilds (theme / a11y flips) that tear the content down before render() runs — so
+    /// it also carries the peeks across a card round-trip, which never collapses.
     private var pendingPeekStash: PeekStash?
 
     // MARK: - WP-3d/3x animation state
@@ -853,6 +823,14 @@ final class HUDPanelController {
         screenProvider?() ?? NSScreen.main
     }
 
+    /// The one height ceiling every clamped surface uses: the resolved screen's visible
+    /// height less the menu-bar gap and a 12pt breathing margin (1000 is the no-screen
+    /// fallback). Four call sites shared this expression verbatim under two names.
+    /// The pill-style chooser deliberately applies NO cap — it is not a call site.
+    private func screenHeightCap() -> CGFloat {
+        (resolvedScreen()?.visibleFrame.height ?? 1000) - IslandGeometry.menuBarGap - 12
+    }
+
     /// The summon: collapsed ⇄ expanded (a deliberate status-item click, NOT a
     /// top-edge-hover trap). While a ledger card is showing, the summon just re-asserts
     /// visibility (the card is already the must-see surface — fix round, finding 11: no
@@ -870,12 +848,31 @@ final class HUDPanelController {
         // tertiary ink) flow through every content view via this ONE call site — never the
         // raw theme — so a11y state can't be forgotten at a future call site.
         let theme = effectiveTheme()
+        // Capture the OUTGOING island's read state (per-lane scroll offsets + open peeks)
+        // here, ahead of every branch, because the card branches below return early. A card
+        // round-trip (island → settings / lens / pill card → "(back)") never collapses the
+        // island, so the reader's place has to survive it; capturing only in the island
+        // branch lost it the moment a card took the surface. Capture-or-carry: while a card
+        // is up `contentView` is not an island, so the earlier stash simply rides along to
+        // the return trip. buildSurface() writes the same two slots under the same
+        // capture-or-carry guard, so a theme flip while a card is up can't erase the carry.
+        // The ledger branch below is the one card that deliberately drops the stash.
+        if let outgoingIsland = contentView as? IslandContentView {
+            pendingScrollOffsets = outgoingIsland.scrollOffsets()
+            pendingPeekStash = outgoingIsland.peekStash()
+        }
         if let card = model.ledger {
             endKeySummonSession()       // WP-6k end path: the card takes the surface → the list
                                         // session dies here (its key moment hands back via the
                                         // pulse; the fresh-card build below re-derives the card's
                                         // OWN eligibility from its presence)
             lastPillFingerprint = nil   // the pill left the screen; a later return is a fresh paint
+            // The read-state carry is for the DISMISSABLE cards only (settings / lens / pill),
+            // where "(back)" is one tap away. An auth ledger is an interruption of unbounded
+            // length that ends in a refetched — possibly different-account — row set, so the
+            // stash dies here rather than restoring a stale offset over new rows.
+            pendingScrollOffsets = nil
+            pendingPeekStash = nil
             // Key ELIGIBILITY rides the card's presence (fix round): a field-bearing card
             // with a live field may take key — on the user's field click only
             // (`becomesKeyOnlyIfNeeded`). During the completion hold the field is disabled
@@ -973,7 +970,7 @@ final class HUDPanelController {
                 prefs: model.lensPreferences, selfLogin: model.selfLogin)
             // Screen clamp (Codex P2, round 4): a large owner set must scroll in place,
             // never push the card's lower rows off-screen.
-            let cardCap = (resolvedScreen()?.visibleFrame.height ?? 1000) - IslandGeometry.menuBarGap - 12
+            let cardCap = screenHeightCap()
             if let existing = contentView as? LensChooserView {
                 existing.update(chooser: chooser)
                 animateCardResize(existing, to: NSSize(width: LensChooserView.width,
@@ -1007,7 +1004,7 @@ final class HUDPanelController {
                 inbound: model.inboundPreferences, themeID: model.themeID,
                 launchAtLogin: currentLaunchAtLogin?() ?? false,
                 showJustCleared: model.showJustCleared)
-            let cardCap = (resolvedScreen()?.visibleFrame.height ?? 1000) - IslandGeometry.menuBarGap - 12
+            let cardCap = screenHeightCap()
             if let existing = contentView as? SettingsCardView, existing.builtTheme == theme {
                 existing.update(card: card)
                 animateCardResize(existing, to: NSSize(width: SettingsCardView.width,
@@ -1041,15 +1038,14 @@ final class HUDPanelController {
         panel.keySessionActive = keySelection != nil
         pendingFieldText = nil           // a non-card render drops any stale stash
         // Per-lane scroll preservation: a data-driven rebuild mid-read must not yank the user's
-        // scroll position. Capture the OUTGOING island's offsets before teardown (only meaningful
-        // expanded→expanded — a fresh expand from the pill legitimately opens at the top). When
-        // buildSurface() already tore the content down (theme / Reduce-Transparency), fall back
-        // to the offsets it stashed. One-shot: consumed here (or dropped by a collapsed render).
-        let previousScroll = (contentView as? IslandContentView)?.scrollOffsets() ?? pendingScrollOffsets
+        // scroll position. The offsets were captured at the top of this pass (from the outgoing
+        // island, or carried over from buildSurface()/a card round-trip). One-shot: consumed
+        // here (or dropped by a collapsed render — a fresh expand opens at the top).
+        let previousScroll = pendingScrollOffsets
         pendingScrollOffsets = nil
         // WP-3d′ peeks ride the same channel; consumed ONLY by the expanded branch below,
         // so a collapsed render drops them — peeks reset when the island collapses (spec).
-        let previousPeeks = (contentView as? IslandContentView)?.peekStash() ?? pendingPeekStash
+        let previousPeeks = pendingPeekStash
         pendingPeekStash = nil
         if expanded {
             lastPillFingerprint = nil   // pill leaves the screen; collapse re-tracks from scratch
@@ -1097,8 +1093,7 @@ final class HUDPanelController {
             // REACTIVE height — the island sizes to its content (no dead space when a lane is
             // short); each lane self-caps at perPaneMaxHeight and scrolls, so this stays bounded.
             // Clamped to the screen as a final safety.
-            let screenCap = (resolvedScreen()?.visibleFrame.height ?? 1000) - IslandGeometry.menuBarGap - 12
-            let height = min(view.fittingHeight(), screenCap)
+            let height = min(view.fittingHeight(), screenHeightCap())
             let size = NSSize(width: IslandContentView.width, height: height)
             present(content: view, size: size, morph: pendingMorph)
             // Restore AFTER present() (the panes are now framed + laid out) so each lane resumes
@@ -1321,8 +1316,8 @@ final class HUDPanelController {
     /// one-shot, nothing repeats (idle-footprint).
     private func animatePeekReflow() {
         guard expanded, let island = contentView as? IslandContentView else { return }
-        let screenCap = (resolvedScreen()?.visibleFrame.height ?? 1000) - IslandGeometry.menuBarGap - 12
-        let size = NSSize(width: IslandContentView.width, height: min(island.fittingHeight(), screenCap))
+        let size = NSSize(width: IslandContentView.width,
+                          height: min(island.fittingHeight(), screenHeightCap()))
         guard let target = resolvedScreen().map({ IslandGeometry.frame(size: size, in: $0.visibleFrame) })
         else { return }
         if reduceMotion || !panel.isVisible || outgoingMorphView != nil || windowFxInFlight {

@@ -34,6 +34,12 @@ public struct SettingsCard: Equatable, Sendable {
     /// Like its card siblings: no field, never takes key (focus-non-theft).
     public static let takesKeyMoment = false
 
+    /// The receipts row's sentinel id. Named here so the card that emits it and the app
+    /// that dispatches on it (AppDelegate.toggleReason) share ONE literal — a rename on
+    /// one side alone would silently route the toggle into `SurfacePreferences.toggling`
+    /// and write a junk reason key.
+    public static let justClearedItemID = "justCleared"
+
     /// Built fresh at every render while the card is up (the lens-card rule): the checks
     /// can never disagree with the prefs behind them.
     public static func make(surface: SurfacePreferences, pulse: PulsePreferences,
@@ -54,7 +60,7 @@ public struct SettingsCard: Equatable, Sendable {
                 // The receipts band rides the radar section (land-triage F5): not a
                 // reason, but the same lane — dispatched by its sentinel id, which the
                 // reason toggler branches on (never a SurfacePreferences key).
-                CheckItem(id: "justCleared", label: PlainWords.justClearedGearItem,
+                CheckItem(id: SettingsCard.justClearedItemID, label: PlainWords.justClearedGearItem,
                           tooltip: PlainWords.justClearedGearTooltip, on: showJustCleared),
             ],
             pulseHeader: PlainWords.settingsPRHeader,

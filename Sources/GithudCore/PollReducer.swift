@@ -302,15 +302,35 @@ public enum PollReducer {
             }
             // Same facts — re-render ONLY on a visible coarse-age-bucket flip (the WP-1c
             // contract the other lanes follow; collapsed flips are invisible churn).
-            if s.expanded, let rows = s.lastRenderedInbound {
-                let sig = InboundPresenter.ageSignature(for: rows, now: now)
-                if sig != s.lastInboundAgeSig {
-                    s.lastInboundAgeSig = sig
-                    return (s, [.renderInbound(rows)])
-                }
+            if let flip = ageFlip(rows: s.lastRenderedInbound, baseline: &s.lastInboundAgeSig,
+                                  expanded: s.expanded, alreadyRendered: false,
+                                  signature: InboundPresenter.ageSignature(for:now:), now: now,
+                                  effect: Effect.renderInbound) {
+                return (s, [flip])
             }
             return (s, [])
         }
+    }
+
+    /// THE coarse-age-bucket flip rule (WP-1c), once, for every lane. A lane that did NOT
+    /// freshly render this tick re-emits its RETAINED rows — the identical structs, never
+    /// freshly built ones — when their displayed-age bucket has flipped since the last
+    /// render, and stores the new baseline. Gates, in this order: already-rendered (a fresh
+    /// render already carries the right age), `expanded` (a collapsed pill shows no per-row
+    /// age, so a flip there is invisible churn), rows present.
+    ///
+    /// It was written out three times — radar, pulse, and inbound under a different event —
+    /// which is exactly how the inbound copy could drift from the other two, and how a
+    /// fourth lane could silently omit the `expanded` gate.
+    private static func ageFlip<Row>(rows: [Row]?, baseline: inout [String]?,
+                                     expanded: Bool, alreadyRendered: Bool,
+                                     signature: ([Row], Date) -> [String], now: Date,
+                                     effect: ([Row]) -> Effect) -> Effect? {
+        guard !alreadyRendered, expanded, let rows else { return nil }
+        let sig = signature(rows, now)
+        guard sig != baseline else { return nil }
+        baseline = sig
+        return effect(rows)
     }
 
     /// Accept/refuse an immediate-poll request. Two refusals, HARD guard first:
@@ -427,19 +447,17 @@ public enum PollReducer {
         // new timer); gated on `expanded` so the collapsed pill (ageless) never rebuilds on an
         // invisible flip; gated on `radarRender == nil` so a fresh render (already carrying the
         // right age) is never duplicated. Between-tick staleness is bounded by one poll interval.
-        if radarRender == nil, s.expanded, let rows = s.lastRenderedRadar {
-            let sig = RadarPresenter.ageSignature(for: rows, now: now)
-            if sig != s.lastRadarAgeSig {
-                s.lastRadarAgeSig = sig
-                radarRender = .renderRadar(rows)
-            }
+        if let flip = ageFlip(rows: s.lastRenderedRadar, baseline: &s.lastRadarAgeSig,
+                              expanded: s.expanded, alreadyRendered: radarRender != nil,
+                              signature: RadarPresenter.ageSignature(for:now:), now: now,
+                              effect: Effect.renderRadar) {
+            radarRender = flip
         }
-        if pulseRender == nil, s.expanded, let rows = s.lastRenderedPulse {
-            let sig = PulsePresenter.ageSignature(for: rows, now: now)
-            if sig != s.lastPulseAgeSig {
-                s.lastPulseAgeSig = sig
-                pulseRender = .renderPulse(rows)
-            }
+        if let flip = ageFlip(rows: s.lastRenderedPulse, baseline: &s.lastPulseAgeSig,
+                              expanded: s.expanded, alreadyRendered: pulseRender != nil,
+                              signature: PulsePresenter.ageSignature(for:now:), now: now,
+                              effect: Effect.renderPulse) {
+            pulseRender = flip
         }
 
         // WORST-OF-BOTH reading freshness (WP-1b): fold the notifications lane and the

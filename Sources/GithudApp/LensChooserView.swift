@@ -38,7 +38,7 @@ final class LensChooserView: NSView {
         spacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
         spacer.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         // The way back to the island (the eye's origin) — the revealed-header verb idiom.
-        let back = LensBackControl(theme: theme, onBack: onBack)
+        let back = CardBackControl(theme: theme, onBack: onBack)
         back.setContentHuggingPriority(.required, for: .horizontal)
         let headerRow = NSStackView(views: [title, spacer, back])
         headerRow.orientation = .horizontal
@@ -332,46 +332,6 @@ private final class LensOwnerRow: NSView {
             },
         ]
     }
-}
-
-/// The card's "(back)" control — returns to the expanded island (the eye's origin).
-/// Mirrors `HideControlView`'s ink (11px underlined tertiary, small rounded target).
-private final class LensBackControl: IslandClickableView {
-    private let onBack: (() -> Void)?
-
-    init(theme: Theme, onBack: (() -> Void)?) {
-        self.onBack = onBack
-        super.init(frame: .zero)
-        wantsLayer = true
-        layer?.cornerRadius = 4
-        layer?.cornerCurve = .continuous
-        hoverFill = theme.hoverFill
-
-        let attr = NSMutableAttributedString(
-            string: PlainWords.lensBackControl,
-            attributes: [.font: NSFont.systemFont(ofSize: 11),
-                         .foregroundColor: theme.inkTertiary,
-                         .underlineStyle: NSUnderlineStyle.single.rawValue])
-        let label = NSTextField(labelWithString: "")
-        label.attributedStringValue = attr
-        label.translatesAutoresizingMaskIntoConstraints = false
-        addSubview(label)
-        NSLayoutConstraint.activate([
-            label.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 4),
-            label.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -4),
-            label.topAnchor.constraint(equalTo: topAnchor, constant: 2),
-            label.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -2),
-        ])
-        addGestureRecognizer(NSClickGestureRecognizer(target: self, action: #selector(clicked)))
-        setAccessibilityElement(true)
-        setAccessibilityRole(.button)
-        setAccessibilityLabel(PlainWords.lensBackSpoken)
-    }
-
-    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
-
-    override func accessibilityPerformPress() -> Bool { onBack?(); return true }
-    @objc private func clicked() { onBack?() }
 }
 
 /// One checkable card row (the "Group by owner" shape toggle): a 14pt check box +

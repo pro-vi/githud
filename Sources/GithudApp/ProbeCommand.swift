@@ -57,7 +57,7 @@ enum ProbeCommand {
         print("  scopes=\(r.scopes ?? "?")  poll_interval=\(r.nextPollAfter)s  rate_remaining=\(r.rateRemaining.map(String.init) ?? "?")")
         print("  reason histogram: \(formatHistogram(r.reasonHistogram))")
         print("▸ enrichment: enriched=\(r.enriched) skipped_private_no_repo_scope=\(r.skippedPrivate); action_required \(r.radarPreEnrich.count) → \(r.radar.count) (demoted \(r.demotedByEnrichment) bot/self)")
-        let stateHist = Dictionary(grouping: r.resolvedThreads, by: { $0.subjectState ?? "?" }).mapValues { $0.count }
+        let stateHist = Dictionary(grouping: r.resolvedThreads, by: { $0.subjectState?.rawValue ?? "?" }).mapValues { $0.count }
         print("▸ subject-state: enriched \(r.subjectStateEnriched) (PR/Issue merged/closed/open) — \(formatHistogram(stateHist)); resolved (merged/closed) drop off the radar")
         if r.skippedPrivate > 0 && !r.hasRepoScope {
             print("  ⓘ \(r.skippedPrivate) private-repo threads not enriched — PAT lacks the `repo` scope.")

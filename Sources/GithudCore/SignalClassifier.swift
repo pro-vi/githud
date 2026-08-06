@@ -89,7 +89,7 @@ public enum SignalClassifier {
     /// the subject (`asksDieWithSubject`). Only true once the subject state is ENRICHED —
     /// an unknown (`nil`) state never suppresses (never-miss on missing data).
     public static func isSubjectResolved(_ t: NotificationThread) -> Bool {
-        t.subjectState == "merged" || t.subjectState == "closed"
+        t.subjectState == .merged || t.subjectState == .closed
     }
 
     /// Reasons whose ASK dies with the subject: a review request, an assignment, watched

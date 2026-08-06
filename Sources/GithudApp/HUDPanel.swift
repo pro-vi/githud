@@ -224,8 +224,8 @@ class IslandClickableView: NSView {
             keyFocusBar = nil
             // Hand-back keeps the one vocabulary: a row the pointer still rests on
             // stays hovered (fill only); otherwise the ink retires completely.
-            let stillHovered = hoverFill != nil && pointerInside()
-            layer?.backgroundColor = stillHovered ? hoverFill!.cgColor : NSColor.clear.cgColor
+            let stillHovered: NSColor? = (hoverFill != nil && pointerInside()) ? hoverFill : nil
+            layer?.backgroundColor = stillHovered?.cgColor ?? NSColor.clear.cgColor
         }
     }
 

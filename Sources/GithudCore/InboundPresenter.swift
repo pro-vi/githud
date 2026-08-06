@@ -81,15 +81,14 @@ public enum InboundPresenter {
     /// The full rendered line — "repo · @opener · age" — age formatted AT RENDER from the
     /// row's waiting-since timestamp (never baked; `RadarPresenter.age` shared buckets).
     public static func displaySubtitle(for row: InboundRow, now: Date) -> String {
-        let age = RadarPresenter.age(fromISO8601: row.timestamp, now: now)
-        return [row.repo, row.subtitle, age.isEmpty ? nil : age]
-            .compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · ")
+        RadarPresenter.displayLine(repo: row.repo, subtitle: row.subtitle,
+                                   timestamp: row.timestamp, now: now)
     }
 
     /// Coarse displayed-age buckets — the scheduler re-renders when one flips, never
     /// otherwise (the same redraw-on-change-only contract as the other lanes).
     public static func ageSignature(for rows: [InboundRow], now: Date) -> [String] {
-        rows.map { RadarPresenter.age(fromISO8601: $0.timestamp, now: now) }
+        RadarPresenter.ageSignature(forTimestamps: rows.map(\.timestamp), now: now)
     }
 
     /// The lane split + ordering. `active` is **waiting-longest first** — a triage QUEUE,

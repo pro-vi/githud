@@ -35,9 +35,16 @@ public enum RadarPresenter {
         return formatter
     }()
 
+    /// Parse an ISO8601 stamp with the ONE shared formatter (the other presenters used to
+    /// build their own identical instance). `nil` when unparseable — each caller decides
+    /// what that means (an empty age, an infinite age, "never fresh").
+    static func date(fromISO8601 string: String) -> Date? {
+        iso.date(from: string)
+    }
+
     /// Compact relative age: "now" · "5m" · "2h" · "3d" · "2w".
     public static func age(fromISO8601 string: String, now: Date) -> String {
-        guard let date = iso.date(from: string) else { return "" }
+        guard let date = date(fromISO8601: string) else { return "" }
         let seconds = max(0, now.timeIntervalSince(date))
         switch seconds {
         case ..<60: return "now"
@@ -61,7 +68,7 @@ public enum RadarPresenter {
         case "security_alert": return "exclamationmark.shield.fill"
         case "invitation": return "envelope.fill"
         case "your_activity": return "person.crop.circle"
-        case "inbound": return "tray.and.arrow.down.fill"   // arriving at your door (derived reason)
+        case SignalClassifier.inboundReason: return "tray.and.arrow.down.fill"   // arriving at your door (derived reason)
         default: return "bell.fill"
         }
     }
@@ -78,7 +85,7 @@ public enum RadarPresenter {
         case "security_alert": return "security alert"
         case "invitation": return "invitation"
         case "your_activity": return "your activity"
-        case "inbound": return "opened on your repo"   // derived reason — one label for menu + row
+        case SignalClassifier.inboundReason: return "opened on your repo"   // derived reason — one label for menu + row
         default: return reason
         }
     }
@@ -157,8 +164,17 @@ public enum RadarPresenter {
     /// this with `Date()`; tests call it with an injected `now`, so the EXACT string shown is a
     /// pure, testable function and no stale baked age can exist (expand-after-hours → correct age).
     public static func displaySubtitle(for row: RadarRow, now: Date) -> String {
-        let age = age(fromISO8601: row.timestamp, now: now)
-        return [row.repo, row.subtitle, age.isEmpty ? nil : age]
+        displayLine(repo: row.repo, subtitle: row.subtitle, timestamp: row.timestamp, now: now)
+    }
+
+    /// The ONE assembly of a rendered row line — leading token · subtitle · age, empty
+    /// parts dropped, " · " between. All three lanes (and the owner-lens variant, which
+    /// passes the owner-elided repo token) render through this, so no lane can drift in
+    /// its separator or its empty-part handling.
+    public static func displayLine(repo: String, subtitle: String,
+                                   timestamp: String, now: Date) -> String {
+        let age = age(fromISO8601: timestamp, now: now)
+        return [repo, subtitle, age.isEmpty ? nil : age]
             .compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · ")
     }
 
@@ -168,7 +184,14 @@ public enum RadarPresenter {
     /// redraw, preserving the redraw-on-change-only idle-footprint contract; between-tick
     /// staleness is bounded by one poll interval, which is honest). Pure + unit-tested.
     public static func ageSignature(for rows: [RadarRow], now: Date) -> [String] {
-        rows.map { age(fromISO8601: $0.timestamp, now: now) }
+        ageSignature(forTimestamps: rows.map(\.timestamp), now: now)
+    }
+
+    /// The lane-agnostic form of the above — the per-row age buckets over the rows'
+    /// timestamps. The pulse and inbound lanes' `ageSignature(for:now:)` delegate here,
+    /// so all three compare buckets from one implementation.
+    public static func ageSignature(forTimestamps timestamps: [String], now: Date) -> [String] {
+        timestamps.map { age(fromISO8601: $0, now: now) }
     }
 
     /// Change-detection signature for a radar set: a per-thread string over every

@@ -477,7 +477,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func toggleReason(_ reason: String) {
         // The settings card's receipts row rides the radar section with a sentinel id
         // (land-triage F5) — it flips the ClearedStore preference, never a reason key.
-        if reason == "justCleared" { toggleShowJustCleared(); return }
+        if reason == SettingsCard.justClearedItemID { toggleShowJustCleared(); return }
         let next = model.surfacePreferences.toggling(reason)
         SurfaceStore.save(next)
         model.setSurfacePreferences(next)                 // no render on this change — fresh rows arrive via…
@@ -543,26 +543,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         model.setLensPreferences(next)                    // re-render from cached pulse, no re-fetch
     }
 
-    /// Toggle the pill-style chooser card (gear → "Pill style…"). Open when hidden; a second
-    /// invocation with the card up dismisses it (gear-again — the ordinary card lifecycle).
-    /// A must-see ledger card (no token / auth error) outranks it — deal with the token
-    /// first; the chooser would otherwise stage invisibly behind the ledger's surface.
     /// Card provenance (dogfood 2026-07-14): which pane a card was opened FROM — its
     /// "(back)" returns there. Settings' doors set these; direct entries clear them.
     private var lensOpenedFromSettings = false
     private var pillOpenedFromSettings = false
-
-    private func togglePillStyleChooser() {
-        guard model.ledger == nil else { return }
-        if model.pillStyleChooser != nil {
-            model.clearPillStyleChooser()
-        } else {
-            pillOpenedFromSettings = false
-            model.showPillStyleChooser(.standard)   // show FIRST — a sibling's dismissal
-            model.clearLensChooser()                // then reads "navigation", never collapse
-            model.clearSettingsCard()
-        }
-    }
 
     /// Settings → Pill style door: same show-first order; back returns to Settings.
     private func openPillFromSettings() {

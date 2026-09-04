@@ -12,6 +12,41 @@ import Foundation
 /// it IS the line's affordance (the whole caption is the click target); the App underlines
 /// just that token where a styled-substring precedent already exists.
 public enum PlainWords {
+    // MARK: Quick navigator — one home for jump-line and destination-row words.
+
+    public static let jumpPlaceholder = "Type to jump · #214, a repo, a branch"
+    public static let jumpNothingMatches = "Nothing on the island matches."
+    public static let jumpNothingMatchesDetail =
+        "The island only knows your PRs, inbound PRs and issues, and what needs you. Everything else is the row below."
+
+    public static func jumpCount(matched: Int, admitted: Int) -> String {
+        "\(matched) of \(admitted)"
+    }
+
+    public static func jumpDestinationTitle(for handle: JumpQuery.Handle) -> String {
+        switch handle {
+        case .number(let number): return "Find #\(number) on GitHub"
+        case .repo(let repo): return "Open \(repo)"
+        case .repoNumber(let repo, let number): return "Open \(repo)#\(number)"
+        case .branch(let branch): return "Find the PR for “\(branch)”"
+        case .link: return "Open this GitHub link"
+        case .text(let text): return "Search GitHub for “\(text)”"
+        }
+    }
+
+    public static func jumpDestinationSubtitle(for handle: JumpQuery.Handle,
+                                               offline: Bool) -> String {
+        if offline { return "offline · cached rows only" }
+        switch handle {
+        case .number: return "searches your PRs and repos you own for that number"
+        case .repo(let repo): return "github.com/\(repo)"
+        case .repoNumber: return "opens the pull request on github.com"
+        case .branch: return "head-branch search across repos you own"
+        case .link: return "github.com"
+        case .text: return "issues and pull requests, all repos"
+        }
+    }
+
     // MARK: Pulse "gone quiet" (stale) subsection — untouched-14d+ PRs, default-off.
 
     /// "3 gone quiet" — THE one home for the quiet noun phrase, sibling of `draftsNoun`. No

@@ -20,6 +20,10 @@ public struct PulseRow: Sendable, Equatable, Codable {
     public let isStale: Bool        // grouping fact — untouched > staleAfter: a rotting PR drops to the (default-off) Stale group, OUT of the live glance
     public let isFresh: Bool        // just-raised (opened ≤ freshWithin) — floats to the top of the live lane (position only; no novelty chrome — consult RUBRIC #attention-non-theft)
     public let merge: MergeState    // raw mergeability — a `.conflicting` PR gets GitHub's own conflict glyph
+    /// The source branch, when the pulse query supplied it. The transport is
+    /// wired in U2; the optional seam lands with JumpQuery so U1 can compile and
+    /// test branch narrowing independently.
+    public let headBranch: String?
     /// Per-row change signature over the displayed texts + their age source + the rollup
     /// state (see `RadarRow.changeSignature` — same rule): a changed signature drops the
     /// row's open peek, because the content is new and must re-truncate honestly.
@@ -191,6 +195,7 @@ public enum PulsePresenter {
             isStale: isStale(pulse, now: now),
             isFresh: isFresh(pulse, now: now),
             merge: pulse.merge,
+            headBranch: nil,
             // Same rule + separator as RadarPresenter.changeSignature; the rollup state
             // rides along for safety even though every state change also renames a
             // subtitle member (the honesty mappers keep the subtitle composition visible).

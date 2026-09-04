@@ -4385,6 +4385,98 @@ suite("PeekReveal — the hitTest carve-out: a chevron click NEVER resolves to t
                 PeekReveal.HitTarget.row, "chevron-less row: the trailing corner is still just the row")
 }
 
+// MARK: - JumpQuery (quick navigator — parse, narrow, destination)
+
+suite("JumpQuery — handle parsing follows the quick-navigator table") {
+    expectEqual(JumpQuery("214").handle, .number(214), "bare number")
+    expectEqual(JumpQuery("#214").handle, .number(214), "hash number")
+    expectEqual(JumpQuery("githud 214").handle(knownRepos: ["pro-vi/githud"]),
+                .repoNumber(repo: "githud", number: 214), "bare repo plus number")
+    expectEqual(JumpQuery("pro-vi/githud#214").handle,
+                .repoNumber(repo: "pro-vi/githud", number: 214), "full repo plus number")
+    expectEqual(JumpQuery("githud").handle(knownRepos: ["pro-vi/githud"]),
+                .repo("pro-vi/githud"), "known bare repo resolves to its full name")
+    expectEqual(JumpQuery("pro-vi/githud").handle(knownRepos: ["pro-vi/githud"]),
+                .repo("pro-vi/githud"), "known full repo")
+    expectEqual(JumpQuery("provi/eng").handle(knownRepos: ["pro-vi/githud"]),
+                .branch("provi/eng"), "slash text that is not a known repo is a branch")
+    expectEqual(JumpQuery("eng-4240-jump").handle, .branch("eng-4240-jump"),
+                "ticket-prefixed branch")
+    expectEqual(JumpQuery("github.com/pro-vi/githud/pull/214").handle,
+                .link("https://github.com/pro-vi/githud/pull/214"), "scheme-less GitHub link")
+    expectEqual(JumpQuery("#").handle, .text("#"), "a lone hash is text")
+    expectEqual(JumpQuery("quick navigator").handle, .text("quick navigator"), "free text")
+}
+
+suite("JumpQuery — narrows all three row arrays without changing their order") {
+    let iso = ISO8601DateFormatter(); iso.formatOptions = [.withInternetDateTime]
+    let now = iso.date(from: "2026-06-16T10:00:00Z")!
+    let radarJSON = """
+    [{"id":"r90","unread":true,"reason":"review_requested","updated_at":"2026-06-16T08:00:00Z","subject":{"title":"Coverage decreased on #90","type":"PullRequest","latest_comment_url":null},"repository":{"full_name":"acme/web","private":false,"owner":{"login":"acme","type":"Organization"}}}]
+    """
+    let radar = RadarPresenter.rows(
+        for: SignalClassifier.radar((try? NotificationThread.list(from: Data(radarJSON.utf8))) ?? []),
+        now: now)
+    let inbound = [InboundPresenter.row(for: InboundItem(
+        repo: "someone/tools", number: 8, title: "Quick Navigator polish",
+        url: "https://github.com/someone/tools/pull/8", authorLogin: "Alice",
+        authorType: "User", isPR: true, isDraft: false,
+        createdAt: "2026-06-16T07:00:00Z", updatedAt: "2026-06-16T09:00:00Z"))]
+    let pulseJSON = """
+    {"id":"pro-vi/githud#214","repo":"pro-vi/githud #214","title":"Filter the island","subtitle":"CI passing · approved","timestamp":"2026-06-16T08:00:00Z","state":"ready","symbolName":"checkmark.circle.fill","url":"https://github.com/pro-vi/githud/pull/214","isDraft":false,"isStale":false,"isFresh":true,"merge":"mergeable","headBranch":"feat/per-org-quiet-tails","changeSignature":"sig"}
+    """
+    let pulse = [try! JSONDecoder().decode(PulseRow.self, from: Data(pulseJSON.utf8))]
+
+    let byNumber = JumpQuery("214").narrow(radar: radar, inbound: inbound, pulse: pulse)
+    expectEqual(byNumber.radar, [], "number removes nonmatching Needs-you rows")
+    expectEqual(byNumber.inbound, [], "number removes nonmatching Inbound rows")
+    expectEqual(byNumber.pulse.map(\.id), ["pro-vi/githud#214"], "number keeps the matching pulse row")
+    expectEqual(byNumber.matched, 1, "one number match")
+    expectEqual(byNumber.admitted, 3, "admitted count spans all lanes")
+
+    let byBranch = JumpQuery("FEAT/per-org").narrow(radar: radar, inbound: inbound, pulse: pulse)
+    expectEqual(byBranch.pulse.map(\.id), ["pro-vi/githud#214"],
+                "head branch match is case-insensitive")
+    expectEqual(JumpQuery("navigator").narrow(radar: radar, inbound: inbound, pulse: pulse).inbound.map(\.id),
+                ["someone/tools#8"], "free text matches the displayed title")
+    expectEqual(JumpQuery("90").narrow(radar: radar, inbound: inbound, pulse: pulse).radar.map(\.id),
+                ["r90"], "a missing PR number falls back to displayed-line substring")
+
+    let empty = JumpQuery("   \n").narrow(radar: radar, inbound: inbound, pulse: pulse)
+    expectEqual(empty.radar, radar, "whitespace-only query preserves radar exactly")
+    expectEqual(empty.inbound, inbound, "whitespace-only query preserves inbound exactly")
+    expectEqual(empty.pulse, pulse, "whitespace-only query preserves pulse exactly")
+    expectEqual(empty.matched, empty.admitted, "identity narrowing admits every row")
+}
+
+suite("JumpQuery — destinations are valid, encoded github.com URLs") {
+    expectEqual(JumpQuery("214").destination(selfLogin: "pro-vi", knownRepos: []),
+                "https://github.com/search?q=214+is:pr+author:@me",
+                "number scopes to the signed-in author's PRs")
+    expectEqual(JumpQuery("214").destination(selfLogin: nil, knownRepos: []),
+                "https://github.com/search?q=214+is:pr", "number without a login stays unscoped")
+    expectEqual(JumpQuery("githud 214").destination(selfLogin: nil, knownRepos: ["pro-vi/githud"]),
+                "https://github.com/pro-vi/githud/pull/214", "known repo number opens the PR directly")
+    expectEqual(JumpQuery("pro-vi/githud").destination(selfLogin: nil, knownRepos: ["pro-vi/githud"]),
+                "https://github.com/pro-vi/githud", "known repo opens directly")
+    expectEqual(JumpQuery("feat/one two").destination(selfLogin: nil, knownRepos: []),
+                "https://github.com/search?q=is:pr+head:feat/one+two", "branch query is encoded")
+    expectEqual(JumpQuery("github.com/pro-vi/githud/pull/214").destination(selfLogin: nil, knownRepos: []),
+                "https://github.com/pro-vi/githud/pull/214", "GitHub link opens itself")
+    let hostile = JumpQuery("fix | #214").destination(selfLogin: nil, knownRepos: [])
+    expectEqual(hostile, "https://github.com/search?q=fix+%7C+%23214", "reserved query characters are encoded")
+    expect(URL(string: hostile) != nil, "encoded destination is a valid URL")
+}
+
+suite("PlainWords — quick navigator strings have one Core home") {
+    expectEqual(PlainWords.jumpCount(matched: 2, admitted: 9), "2 of 9", "jump count")
+    expectEqual(PlainWords.jumpNothingMatches, "Nothing on the island matches.", "nothing-matches line")
+    expectEqual(PlainWords.jumpDestinationTitle(for: .number(214)), "Find #214 on GitHub",
+                "number destination title")
+    expectEqual(PlainWords.jumpDestinationTitle(for: .branch("feat/jump")),
+                "Find the PR for “feat/jump”", "branch destination title")
+}
+
 // MARK: - KeySession (WP-6k — the ⌃⌥G scoped key session's pure brain)
 
 suite("KeySession — flattened actionable list: radar then pulse, structure skipped") {

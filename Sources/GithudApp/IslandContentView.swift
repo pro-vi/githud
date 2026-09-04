@@ -86,6 +86,7 @@ final class IslandContentView: NSView {
 
     init(rows: [RadarRow], pulse: [PulseRow] = [], inbound: [InboundRow] = [],
          jump: JumpQuery? = nil, jumpCount: String? = nil,
+         jumpHandle: JumpQuery.Handle? = nil, jumpDestination: String? = nil,
          showDrafts: Bool = false, showStale: Bool = false, showHeldBackInbound: Bool = false,
          freshness: Freshness = .fresh, radarConfirmed: Bool = false, inboundConfirmed: Bool = false,
          reviewsConfirmed: Bool = false,
@@ -109,6 +110,8 @@ final class IslandContentView: NSView {
         self.onOpenLensCard = onOpenLensCard
         self.peeks = peeks
         super.init(frame: .zero)
+        let queryActive = jump?.isEmpty == false
+        let pollFailed: Bool = { if case .failing = freshness { return true }; return false }()
 
         // WP-3d′ caught-up affirmation: exactly one treatment per state (block XOR header
         // phrase, never per-lane filler). All the trust rules — the radar-confirmation
@@ -123,7 +126,7 @@ final class IslandContentView: NSView {
                                                  inboundConfirmed: inboundConfirmed,
                                                  reviewsConfirmed: reviewsConfirmed)
         var caughtUpPhrase: String?
-        if case .headerPhrase(let phrase) = caughtUp { caughtUpPhrase = phrase }
+        if !queryActive, case .headerPhrase(let phrase) = caughtUp { caughtUpPhrase = phrase }
 
         // PINNED header: an optional degraded-reading banner + the "Needs you" header
         // (count badge, Surface gear, Collapse chevron). Stays put while the lanes scroll,
@@ -152,12 +155,12 @@ final class IslandContentView: NSView {
         // ONLY where the reading actually knew one. Display-only: these views never
         // enter `rows`, so the affirmation/pill/glyph never see them.
         var radarViews: [NSView] = rows.map { radarRowView($0) }
-        if showJustCleared {
+        if !queryActive, showJustCleared {
             if !clearedRows.isEmpty {
                 radarViews.append(revealedHeader(PlainWords.justClearedHeader, onHide: onToggleJustCleared))
             }
             radarViews += clearedRows.map { clearedRowView($0) }
-        } else if !clearedRows.isEmpty {
+        } else if !queryActive, !clearedRows.isEmpty {
             radarViews.append(captionButton(
                 text: PlainWords.justClearedCaption(clearedRows.count),
                 spoken: PlainWords.justClearedCaptionSpoken(clearedRows.count),
@@ -362,7 +365,7 @@ final class IslandContentView: NSView {
         // below it — real content, not filler (the per-lane placeholder stays banned).
         var middle: [NSView] = []
         var affirmation: NSView?
-        if case .block(let line1, let line2) = caughtUp {
+        if !queryActive, case .block(let line1, let line2) = caughtUp {
             let block = affirmationBlock(line1: line1, line2: line2)
             affirmation = block
             middle.append(block)
@@ -372,6 +375,27 @@ final class IslandContentView: NSView {
         if let inboundScroll { middle.append(inboundScroll) }
         if let pulseLabel { middle.append(pulseLabel) }
         if let pulseScroll { middle.append(pulseScroll) }
+        var nothingMatches: NSView?
+        if queryActive, rows.isEmpty, inbound.isEmpty, pulse.isEmpty {
+            let block = affirmationBlock(line1: PlainWords.jumpNothingMatches,
+                                         line2: PlainWords.jumpNothingMatchesDetail)
+            nothingMatches = block
+            middle.append(block)
+        }
+        var destinationRow: JumpDestinationRowView?
+        if queryActive, let jumpHandle, let jumpDestination {
+            middle.append(sectionHeader("GitHub"))
+            let row = JumpDestinationRowView(
+                title: PlainWords.jumpDestinationTitle(for: jumpHandle),
+                subtitle: PlainWords.jumpDestinationSubtitle(
+                    for: jumpHandle, offline: pollFailed),
+                url: jumpDestination,
+                failed: pollFailed,
+                theme: theme)
+            keyRows[KeySession.destinationID] = row
+            destinationRow = row
+            middle.append(row)
+        }
         let body = NSStackView(views: middle)
         body.orientation = .vertical
         body.alignment = .leading
@@ -416,6 +440,12 @@ final class IslandContentView: NSView {
         // island (the leading-aligned body stack would otherwise hug it left).
         if let affirmation {
             cons.append(affirmation.widthAnchor.constraint(equalTo: body.widthAnchor))
+        }
+        if let nothingMatches {
+            cons.append(nothingMatches.widthAnchor.constraint(equalTo: body.widthAnchor))
+        }
+        if let destinationRow {
+            cons.append(destinationRow.widthAnchor.constraint(equalTo: body.widthAnchor))
         }
         NSLayoutConstraint.activate(cons)
     }
@@ -543,8 +573,8 @@ final class IslandContentView: NSView {
     /// Show/hide the session-only hint on the existing footer line ("↑↓ move · ⏎ open ·
     /// esc dismiss", right-aligned) — visible ONLY while the ⌃⌥G session is live, so the
     /// mouse-path island never wears keyboard chrome (the provable F8 boundary).
-    func setKeySessionHint(_ visible: Bool) {
-        (footerView as? InboxLinkView)?.setHintVisible(visible)
+    func setKeySessionHint(_ visible: Bool, hasQuery: Bool = false) {
+        (footerView as? InboxLinkView)?.setHintVisible(visible, hasQuery: hasQuery)
     }
 
     /// Move the ink bar to `id` (nil retires it). 0ms — the bar is a steered cursor, not
@@ -1380,7 +1410,10 @@ final class InboxLinkView: IslandClickableView {
 
     /// WP-6k: hint on ⇄ off with the session — a hidden label, never a rebuild (the
     /// footer line's height is unchanged, so no reflow rides the toggle).
-    func setHintVisible(_ visible: Bool) {
+    func setHintVisible(_ visible: Bool, hasQuery: Bool = false) {
+        hintLabel.stringValue = hasQuery
+            ? "↑↓ move · ⏎ open · esc clear"
+            : "↑↓ move · ⏎ open · esc dismiss"
         hintLabel.isHidden = !visible
     }
 
@@ -1627,6 +1660,78 @@ class PeekableRowView: IslandClickableView, KeySessionActionable {
     @objc private func openInBrowser() {
         if let url { NSWorkspace.shared.open(url) }
     }
+}
+
+/// The final row in a live jump walk. It opens a precomputed github.com URL;
+/// it never resolves or fetches anything inside the app.
+final class JumpDestinationRowView: PeekableRowView {
+    init(title titleText: String, subtitle subtitleText: String, url: String,
+         failed: Bool, theme: Theme) {
+        super.init(url: URL(string: url), onPeekToggle: nil)
+
+        keyFocusFill = theme.hoverFill
+        keyFocusBarColor = theme.inkPrimary
+        hoverFill = theme.hoverFill
+        wantsLayer = true
+        layer?.cornerRadius = 6
+        layer?.cornerCurve = .continuous
+        addGestureRecognizer(NSClickGestureRecognizer(target: self, action: #selector(rowClicked)))
+
+        let title = NSTextField(labelWithString: titleText)
+        title.font = .systemFont(ofSize: 13, weight: .medium)
+        title.textColor = theme.inkPrimary
+        title.lineBreakMode = .byTruncatingTail
+        title.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        titleLabel = title
+
+        let subtitle = NSTextField(labelWithString: subtitleText)
+        subtitle.font = .systemFont(ofSize: 11, weight: .regular)
+        subtitle.textColor = theme.inkSecondary
+        subtitle.lineBreakMode = .byTruncatingTail
+        subtitle.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        subtitleLabel = subtitle
+
+        let icon = NSImageView()
+        icon.image = NSImage(systemSymbolName: failed ? "xmark.circle" : "magnifyingglass",
+                             accessibilityDescription: nil)?
+            .withSymbolConfiguration(.init(pointSize: 13, weight: .semibold))
+        icon.contentTintColor = failed ? theme.caution : theme.inkSecondary
+        icon.translatesAutoresizingMaskIntoConstraints = false
+        icon.setContentHuggingPriority(.required, for: .horizontal)
+
+        let iconWrap = NSView()
+        iconWrap.translatesAutoresizingMaskIntoConstraints = false
+        iconWrap.addSubview(icon)
+        NSLayoutConstraint.activate([
+            iconWrap.widthAnchor.constraint(equalToConstant: 20),
+            iconWrap.heightAnchor.constraint(equalToConstant: 18),
+            icon.centerXAnchor.constraint(equalTo: iconWrap.centerXAnchor),
+            icon.centerYAnchor.constraint(equalTo: iconWrap.centerYAnchor),
+        ])
+
+        let text = NSStackView(views: [title, subtitle])
+        text.orientation = .vertical
+        text.alignment = .leading
+        text.spacing = 1
+        let row = NSStackView(views: [iconWrap, text])
+        row.orientation = .horizontal
+        row.alignment = .top
+        row.spacing = 8
+        row.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(row)
+        NSLayoutConstraint.activate([
+            row.leadingAnchor.constraint(equalTo: leadingAnchor),
+            row.trailingAnchor.constraint(equalTo: trailingAnchor),
+            row.topAnchor.constraint(equalTo: topAnchor),
+            row.bottomAnchor.constraint(equalTo: bottomAnchor),
+        ])
+
+        setAccessibilityElement(true)
+        setAccessibilityRole(.button)
+        setAccessibilityLabel("\(titleText). \(subtitleText). \(url)")
+    }
+
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 }
 
 /// One action-required row: a leading SF Symbol (ink by default; `danger` only for a

@@ -612,18 +612,22 @@ final class HUDPanelController {
         guard expanded, isVisible, model.ledger == nil,
               let island = contentView as? IslandContentView else { return }
         if keySelection == nil {
-            jumpQuery = JumpQuery()
+            let query = JumpQuery()
+            let narrowed = query.narrow(radar: model.radarRows,
+                                        inbound: model.inboundRows,
+                                        pulse: model.pulseRows)
+            jumpQuery = query
             keySelection = KeySelection(ids: KeySession.actionableIDs(
-                radar: model.radarRows, pulse: model.pulseRows,
+                radar: narrowed.radar, pulse: narrowed.pulse,
                 showDrafts: model.pulsePreferences.showDrafts,
                 showStale: model.pulsePreferences.showStale,
-                inbound: model.inboundRows,
+                inbound: narrowed.inbound,
                 showHeldBackInbound: model.inboundPreferences.showHeldBack,
                 lens: model.lensPreferences))   // folded rows are off-screen → never in the walk
         }
         if jumpQuery == nil { jumpQuery = JumpQuery() }
         panel.keySessionActive = true            // eligibility flips with the session
-        island.setKeySessionHint(true)           // session-only chrome
+        island.setKeySessionHint(true, hasQuery: false)   // session-only chrome
         island.setKeyFocus(id: keySelection?.selectedID)   // initial selection = first actionable row
         panel.makeFirstResponder(nil)
         panel.makeKey()
@@ -674,7 +678,7 @@ final class HUDPanelController {
         guard keySelection != nil, var query = jumpQuery else { return false }
         guard event.modifierFlags.intersection(.deviceIndependentFlagsMask).isEmpty else { return false }
         switch KeySession.intent(forKeyCode: event.keyCode, characters: event.characters,
-                                 hasQuery: !query.text.isEmpty) {
+                                 hasQuery: !query.isEmpty) {
         case .moveUp:
             keySelection?.moveUp()
             (contentView as? IslandContentView)?.setKeyFocus(id: keySelection?.selectedID)
@@ -738,7 +742,7 @@ final class HUDPanelController {
             .replacingOccurrences(of: "\n", with: " ")
         let printable = oneLine.filter { character in
             character.unicodeScalars.allSatisfy { !CharacterSet.controlCharacters.contains($0) }
-        }
+        }.trimmingCharacters(in: .whitespacesAndNewlines)
         query.text.append(contentsOf: printable)
         jumpQuery = query
         debugJumpQuery("paste")
@@ -1121,22 +1125,43 @@ final class HUDPanelController {
         pendingPeekStash = nil
         if expanded {
             lastPillFingerprint = nil   // pill leaves the screen; collapse re-tracks from scratch
+            // One narrowing result feeds both the drawn island and its keyboard walk.
+            // With no live query this is the identity operation, preserving today's island.
+            let query = jumpQuery ?? JumpQuery()
+            let narrowed = query.narrow(radar: model.radarRows,
+                                        inbound: model.inboundRows,
+                                        pulse: model.pulseRows)
+            let queryActive = jumpQuery?.isEmpty == false
+            let knownRepos = JumpQuery.knownRepos(radar: model.radarRows,
+                                                  inbound: model.inboundRows,
+                                                  pulse: model.pulseRows)
+            let jumpHandle = queryActive ? query.handle(knownRepos: knownRepos) : nil
+            let jumpDestination = queryActive
+                ? query.destination(selfLogin: model.selfLogin, knownRepos: knownRepos)
+                : nil
             // WP-6k: the selection survives a data rebuild keyed on the STABLE row id
             // (the ink bar's PeekStash-analog) — a rebuild that drops the selected row
             // clamps to the nearest index (pure rule, tested in Core).
             if var selection = keySelection {
                 selection.rebuild(ids: KeySession.actionableIDs(
-                    radar: model.radarRows, pulse: model.pulseRows,
+                    radar: narrowed.radar, pulse: narrowed.pulse,
                     showDrafts: model.pulsePreferences.showDrafts,
                     showStale: model.pulsePreferences.showStale,
-                    inbound: model.inboundRows,
+                    inbound: narrowed.inbound,
                     showHeldBackInbound: model.inboundPreferences.showHeldBack,
-                    lens: model.lensPreferences))   // folded rows are off-screen → out of the walk
+                    lens: model.lensPreferences,
+                    includeDestination: queryActive))   // folded rows are off-screen → out of the walk
                 keySelection = selection
             }
-            let view = IslandContentView(rows: model.radarRows, pulse: model.pulseRows,
-                                         inbound: model.inboundRows,
+            let view = IslandContentView(rows: narrowed.radar, pulse: narrowed.pulse,
+                                         inbound: narrowed.inbound,
                                          jump: jumpQuery,
+                                         jumpCount: queryActive && narrowed.matched > 0
+                                            ? PlainWords.jumpCount(matched: narrowed.matched,
+                                                                   admitted: narrowed.admitted)
+                                            : nil,
+                                         jumpHandle: jumpHandle,
+                                         jumpDestination: jumpDestination,
                                          showDrafts: model.pulsePreferences.showDrafts,
                                          showStale: model.pulsePreferences.showStale,
                                          showHeldBackInbound: model.inboundPreferences.showHeldBack,
@@ -1176,7 +1201,7 @@ final class HUDPanelController {
             // on the (id-followed) selection. AFTER the scroll restore, so the focused
             // row's whole-row visibility wins: the bar is where the keys act.
             if let selection = keySelection {
-                view.setKeySessionHint(true)
+                view.setKeySessionHint(true, hasQuery: queryActive)
                 view.setKeyFocus(id: selection.selectedID)
             }
             return

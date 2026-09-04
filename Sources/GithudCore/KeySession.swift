@@ -22,6 +22,8 @@ import Foundation
 ///    chords are rejected by the controller before they reach this pure map; ⌘V has its
 ///    explicit panel route.
 public enum KeySession {
+    public static let destinationID = "jump:github"
+
     /// The flattened actionable row ids, in on-screen order: radar (already
     /// urgency-sorted upstream), then pulse `active`, then `stale`/`drafts` only when
     /// rendered. A collapsed stale group's caption line ("N gone quiet (show)") — and its
@@ -29,7 +31,8 @@ public enum KeySession {
     public static func actionableIDs(radar: [RadarRow], pulse: [PulseRow],
                                      showDrafts: Bool, showStale: Bool,
                                      inbound: [InboundRow] = [], showHeldBackInbound: Bool = false,
-                                     lens: LensPreferences = .default) -> [String] {
+                                     lens: LensPreferences = .default,
+                                     includeDestination: Bool = false) -> [String] {
         let sections = PulsePresenter.sections(for: pulse)
         let inboundSections = InboundPresenter.sections(for: inbound)
         var ids = radar.map(\.id)
@@ -71,6 +74,7 @@ public enum KeySession {
         // the reported dogfood defect's keyboard half.
         ids += layout.terminalDrafts.map(\.id)
         if showStale { ids += layout.terminalQuiet.map(\.id) }
+        if includeDestination { ids.append(destinationID) }
         return ids
     }
 

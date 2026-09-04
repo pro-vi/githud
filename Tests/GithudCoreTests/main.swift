@@ -4500,6 +4500,58 @@ suite("PlainWords — quick navigator strings have one Core home") {
                 "Find the PR for “feat/jump”", "branch destination title")
 }
 
+suite("Quick navigator — narrowed draw set and keyboard walk stay in agreement") {
+    let iso = ISO8601DateFormatter(); iso.formatOptions = [.withInternetDateTime]
+    let now = iso.date(from: "2026-06-16T10:00:00Z")!
+    func row(_ number: Int, branch: String, title: String = "PR") -> PulseRow {
+        PulsePresenter.row(for: PullRequestPulse(
+            repo: "pro-vi/githud", number: number, title: title,
+            url: "https://github.com/pro-vi/githud/pull/\(number)", isDraft: false,
+            createdAt: "2026-06-16T08:00:00Z", updatedAt: "2026-06-16T09:00:00Z",
+            ci: .passing, review: .approved, merge: .mergeable, headBranch: branch), now: now)
+    }
+    let old = row(214, branch: "feat/quick-navigator")
+    let other = row(215, branch: "fix/unrelated")
+    let query = JumpQuery("feat/quick-navigator")
+    let narrowed = query.narrow(radar: [], inbound: [], pulse: [old, other])
+    let walk = KeySession.actionableIDs(
+        radar: narrowed.radar, pulse: narrowed.pulse,
+        showDrafts: false, showStale: false, inbound: narrowed.inbound,
+        includeDestination: true)
+    let drawnIDs = Set(narrowed.radar.map(\.id) + narrowed.inbound.map(\.id) +
+                       narrowed.pulse.map(\.id) + [KeySession.destinationID])
+    expect(Set(walk).isSubset(of: drawnIDs), "every walked id belongs to a drawn narrowed row")
+    expectEqual(walk, [old.id, KeySession.destinationID],
+                "matching row is followed by the GitHub destination")
+    expectEqual(walk.last, KeySession.destinationID, "GitHub destination is always last")
+
+    let none = JumpQuery("xq-zeta").narrow(radar: [], inbound: [], pulse: [old, other])
+    expectEqual(KeySession.actionableIDs(
+        radar: none.radar, pulse: none.pulse, showDrafts: false, showStale: false,
+        inbound: none.inbound, includeDestination: true),
+        [KeySession.destinationID], "nothing matched leaves only the GitHub destination")
+    expectEqual(KeySession.actionableIDs(
+        radar: [], pulse: [old], showDrafts: false, showStale: false,
+        includeDestination: false), [old.id], "an empty query adds no destination row")
+
+    var selection = KeySelection(ids: walk)
+    let added = row(213, branch: "feat/quick-navigator-prep")
+    let afterPoll = query.narrow(radar: [], inbound: [], pulse: [added, old, other])
+    selection.rebuild(ids: KeySession.actionableIDs(
+        radar: afterPoll.radar, pulse: afterPoll.pulse,
+        showDrafts: false, showStale: false, includeDestination: true))
+    expectEqual(selection.selectedID, old.id,
+                "a poll-added match does not move selection off its stable row id")
+
+    let narrowedAway = JumpQuery("xq-zeta").narrow(radar: [], inbound: [], pulse: [old])
+    selection = KeySelection(ids: [old.id, KeySession.destinationID])
+    selection.rebuild(ids: KeySession.actionableIDs(
+        radar: narrowedAway.radar, pulse: narrowedAway.pulse,
+        showDrafts: false, showStale: false, includeDestination: true))
+    expectEqual(selection.selectedID, KeySession.destinationID,
+                "a removed selection clamps to the remaining drawn destination")
+}
+
 // MARK: - KeySession (WP-6k — the ⌃⌥G scoped key session's pure brain)
 
 suite("KeySession — flattened actionable list: radar then pulse, structure skipped") {

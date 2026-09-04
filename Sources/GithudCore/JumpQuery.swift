@@ -176,8 +176,8 @@ public struct JumpQuery: Equatable, Sendable {
         string.range(of: "#\(number)(?![0-9])", options: [.regularExpression, .caseInsensitive]) != nil
     }
 
-    private static func knownRepos(radar: [RadarRow], inbound: [InboundRow],
-                                   pulse: [PulseRow]) -> [String] {
+    public static func knownRepos(radar: [RadarRow], inbound: [InboundRow],
+                                  pulse: [PulseRow]) -> [String] {
         var seen = Set<String>()
         return (radar.map(\.repo) + inbound.map(\.repo) + pulse.map(\.repo)).compactMap {
             let repo = repositoryName(from: $0)

@@ -43,6 +43,9 @@ final class HUDPanel: NSPanel {
     /// responder behavior. Card key moments are untouched: their keystrokes live in the
     /// field editor, which sits ahead of the window in the responder chain.
     var onSessionKeyDown: ((NSEvent) -> Bool)?
+    /// The list session's one allowed command chord. The controller returns false
+    /// outside a list session, preserving the ledger field's existing responder path.
+    var onSessionPaste: ((String?) -> Bool)?
     override func keyDown(with event: NSEvent) {
         if onSessionKeyDown?(event) == true { return }
         super.keyDown(with: event)
@@ -82,9 +85,15 @@ final class HUDPanel: NSPanel {
     /// Copy/cut on the SECURE field are refused by NSSecureTextView itself — the secret
     /// can never be copied back out; ⌘V/⌘A are the ones that matter.
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+        let key = event.charactersIgnoringModifiers?.lowercased()
+        if isKeyWindow, modifiers == .command, key == "v",
+           onSessionPaste?(NSPasteboard.general.string(forType: .string)) == true {
+            return true
+        }
         if isKeyWindow,
-           event.modifierFlags.intersection(.deviceIndependentFlagsMask) == .command,
-           let key = event.charactersIgnoringModifiers?.lowercased() {
+           modifiers == .command,
+           let key {
             let action: Selector?
             switch key {
             case "v": action = #selector(NSText.paste(_:))

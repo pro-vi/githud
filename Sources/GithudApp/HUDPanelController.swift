@@ -87,6 +87,7 @@ final class HUDPanelController {
         // the whole life of the card.
         panel.onDidResignKey = { [weak self] in
             guard let self else { return }
+            let wasListSession = self.keySelection != nil
             (self.contentView as? LedgerCardView)?.setFieldFocused(false)
             self.panel.makeFirstResponder(nil)
             // WP-6k: losing key MID-list-session (a browser open off a row click, a
@@ -95,11 +96,17 @@ final class HUDPanelController {
             // No-op for the session's own order-out pulse (the flag is already nil) and
             // for card moments (the flag was never set).
             self.endKeySummonSession()
+            // A click-away can end a typed list session without collapsing the
+            // island. Rebuild once so the ordinary header replaces the jump line.
+            if wasListSession, self.expanded, self.model.ledger == nil {
+                self.renderNow()
+            }
         }
 
         // WP-6k: list-session key routing + the VoiceOver focus mirror. Both are inert
         // outside a session (`keySelection == nil` → passthrough / nil).
         panel.onSessionKeyDown = { [weak self] event in self?.handleSessionKey(event) ?? false }
+        panel.onSessionPaste = { [weak self] text in self?.handleSessionPaste(text) ?? false }
         panel.sessionFocusElement = { [weak self] in
             guard let self, self.keySelection != nil else { return nil }
             return (self.contentView as? IslandContentView)?.keyFocusedRowView()
@@ -589,6 +596,9 @@ final class HUDPanelController {
     /// and the panel's own key LOSS (`onDidResignKey` — a bar that outlives its keys
     /// would lie about where keystrokes land).
     private var keySelection: KeySelection?
+    /// Non-nil exactly while `keySelection` is non-nil. The controller owns
+    /// both transient values for the lifetime of one ⌃⌥G session.
+    private var jumpQuery: JumpQuery?
 
     /// Begin the list session. The ⌃⌥G summon path (AppDelegate) is the ONLY caller —
     /// mouse paths (pill click, status-item click, "Show island") never reach this, so
@@ -602,6 +612,7 @@ final class HUDPanelController {
         guard expanded, isVisible, model.ledger == nil,
               let island = contentView as? IslandContentView else { return }
         if keySelection == nil {
+            jumpQuery = JumpQuery()
             keySelection = KeySelection(ids: KeySession.actionableIDs(
                 radar: model.radarRows, pulse: model.pulseRows,
                 showDrafts: model.pulsePreferences.showDrafts,
@@ -610,9 +621,11 @@ final class HUDPanelController {
                 showHeldBackInbound: model.inboundPreferences.showHeldBack,
                 lens: model.lensPreferences))   // folded rows are off-screen → never in the walk
         }
+        if jumpQuery == nil { jumpQuery = JumpQuery() }
         panel.keySessionActive = true            // eligibility flips with the session
         island.setKeySessionHint(true)           // session-only chrome
         island.setKeyFocus(id: keySelection?.selectedID)   // initial selection = first actionable row
+        panel.makeFirstResponder(nil)
         panel.makeKey()
         // Chrome follows REAL key state, not the attempt (the WP-4d fix-round rule: a
         // "keys land here" hint wired to nothing is a fabricated interaction state).
@@ -633,8 +646,9 @@ final class HUDPanelController {
     /// `resignKey()`, per the recorded spec amendment). Safe to call with no session
     /// live (no-op) — every choke point calls it unconditionally.
     private func endKeySummonSession() {
-        guard keySelection != nil else { return }
+        guard keySelection != nil || jumpQuery != nil else { return }
         keySelection = nil
+        jumpQuery = nil
         panel.keySessionActive = false           // the never-key resting state (no card can
                                                  // coexist with a list session — the card
                                                  // branch re-derives its own eligibility)
@@ -657,9 +671,10 @@ final class HUDPanelController {
     /// ratified map is plain ↑/↓/⏎/esc/space — consuming surplus chords would be
     /// unratified capture (review panel: AppKit LOW / trust note 5).
     private func handleSessionKey(_ event: NSEvent) -> Bool {
-        guard keySelection != nil else { return false }   // not a list session → existing behavior
+        guard keySelection != nil, var query = jumpQuery else { return false }
         guard event.modifierFlags.intersection(.deviceIndependentFlagsMask).isEmpty else { return false }
-        switch KeySession.intent(forKeyCode: event.keyCode) {
+        switch KeySession.intent(forKeyCode: event.keyCode, characters: event.characters,
+                                 hasQuery: !query.text.isEmpty) {
         case .moveUp:
             keySelection?.moveUp()
             (contentView as? IslandContentView)?.setKeyFocus(id: keySelection?.selectedID)
@@ -687,8 +702,65 @@ final class HUDPanelController {
             let toggled = (contentView as? IslandContentView)?.togglePeekOnKeyFocusedRow() ?? false
             debugKeyLog("space — peek toggled=\(toggled)")
             return true
+        case .type(let character):
+            query.text.append(character)
+            jumpQuery = query
+            debugJumpQuery("type")
+            renderNow()
+            return true
+        case .deleteBackward:
+            if !query.text.isEmpty { query.text.removeLast() }
+            jumpQuery = query
+            debugJumpQuery("delete")
+            renderNow()
+            return true
+        case .clearQuery:
+            jumpQuery = JumpQuery()
+            debugJumpQuery("clear")
+            renderNow()
+            return true
         case .passthrough:
             return false
+        }
+    }
+
+    /// ⌘V's list-session route. Pasteboard text is flattened to one line and
+    /// control characters are dropped so the label cannot change header geometry.
+    private func handleSessionPaste(_ pasted: String?) -> Bool {
+        guard keySelection != nil, var query = jumpQuery else { return false }
+        guard let pasted else {
+            debugKeyLog("paste skipped — queryLength=\(query.text.count) handle=\(jumpHandleKind(query))")
+            return true
+        }
+        let oneLine = pasted
+            .replacingOccurrences(of: "\r\n", with: " ")
+            .replacingOccurrences(of: "\r", with: " ")
+            .replacingOccurrences(of: "\n", with: " ")
+        let printable = oneLine.filter { character in
+            character.unicodeScalars.allSatisfy { !CharacterSet.controlCharacters.contains($0) }
+        }
+        query.text.append(contentsOf: printable)
+        jumpQuery = query
+        debugJumpQuery("paste")
+        renderNow()
+        return true
+    }
+
+    /// O3: query contents structurally cannot enter this log line. Only its
+    /// length and the associated-value-free handle case are interpolated.
+    private func debugJumpQuery(_ action: String) {
+        guard let query = jumpQuery else { return }
+        debugKeyLog("\(action) — queryLength=\(query.text.count) handle=\(jumpHandleKind(query))")
+    }
+
+    private func jumpHandleKind(_ query: JumpQuery) -> String {
+        switch query.handle {
+        case .number: return "number"
+        case .repo: return "repo"
+        case .repoNumber: return "repoNumber"
+        case .branch: return "branch"
+        case .link: return "link"
+        case .text: return "text"
         }
     }
 
@@ -1064,6 +1136,7 @@ final class HUDPanelController {
             }
             let view = IslandContentView(rows: model.radarRows, pulse: model.pulseRows,
                                          inbound: model.inboundRows,
+                                         jump: jumpQuery,
                                          showDrafts: model.pulsePreferences.showDrafts,
                                          showStale: model.pulsePreferences.showStale,
                                          showHeldBackInbound: model.inboundPreferences.showHeldBack,

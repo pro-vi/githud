@@ -4560,17 +4560,29 @@ suite("KeySession — flattened actionable list: radar then pulse, structure ski
                 [], "empty lanes → empty list (a caught-up island has nothing to select)")
 }
 
-suite("KeySession — the key map (↑↓⏎ esc space consumed; everything else falls through)") {
-    expectEqual(KeySession.intent(forKeyCode: 126), .moveUp, "126 → moveUp")
-    expectEqual(KeySession.intent(forKeyCode: 125), .moveDown, "125 → moveDown")
-    expectEqual(KeySession.intent(forKeyCode: 36), .open, "36 ⏎ → open")
-    expectEqual(KeySession.intent(forKeyCode: 53), .dismiss, "53 esc → dismiss")
-    expectEqual(KeySession.intent(forKeyCode: 49), .peek, "49 space → peek (D-reveal's ratified mapping)")
-    expectEqual(KeySession.intent(forKeyCode: 76), .passthrough, "76 keypad-enter is NOT mapped (spec names 36 only)")
-    expectEqual(KeySession.intent(forKeyCode: 48), .passthrough, "48 tab falls through")
-    expectEqual(KeySession.intent(forKeyCode: 0), .passthrough, "0 'a' falls through (letters are not captured)")
-    expectEqual(KeySession.intent(forKeyCode: 123), .passthrough, "123 ← falls through (only ↑/↓ move the bar)")
-    expectEqual(KeySession.intent(forKeyCode: 124), .passthrough, "124 → falls through")
+suite("KeySession — the query-aware key map") {
+    func intent(_ code: UInt16, _ characters: String? = nil, hasQuery: Bool = false) -> KeySession.Intent {
+        KeySession.intent(forKeyCode: code, characters: characters, hasQuery: hasQuery)
+    }
+    expectEqual(intent(126), .moveUp, "126 → moveUp")
+    expectEqual(intent(125), .moveDown, "125 → moveDown")
+    expectEqual(intent(36), .open, "36 ⏎ → open")
+    expectEqual(intent(36, hasQuery: true), .open, "36 ⏎ still opens with text")
+    expectEqual(intent(53), .dismiss, "53 esc dismisses an empty query")
+    expectEqual(intent(53, hasQuery: true), .clearQuery, "53 esc clears a live query")
+    expectEqual(intent(51), .passthrough, "51 delete falls through with no query")
+    expectEqual(intent(51, hasQuery: true), .deleteBackward, "51 deletes from a live query")
+    expectEqual(intent(49, " "), .peek, "49 space keeps the ratified empty-query peek")
+    expectEqual(intent(49, " ", hasQuery: true), .type(" "), "49 types a space into a live query")
+    expectEqual(intent(124), .passthrough, "124 → falls through with no query")
+    expectEqual(intent(124, hasQuery: true), .peek, "124 → peeks while text is present")
+    expectEqual(intent(0, "a"), .type("a"), "a printable letter starts a query")
+    expectEqual(intent(18, "1", hasQuery: true), .type("1"), "a printable digit extends a query")
+    expectEqual(intent(0, "ab"), .passthrough, "multi-character dead-key or IME text falls through")
+    expectEqual(intent(0, "\u{7f}"), .passthrough, "control characters fall through")
+    expectEqual(intent(76, "\r"), .passthrough, "76 keypad-enter stays unmapped")
+    expectEqual(intent(48, "\t", hasQuery: true), .passthrough, "48 tab falls through with text")
+    expectEqual(intent(123), .passthrough, "123 ← falls through")
 }
 
 suite("KeySelection — initial selection, clamped movement, no wrap") {

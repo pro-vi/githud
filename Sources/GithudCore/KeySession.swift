@@ -17,11 +17,10 @@ import Foundation
 ///    peek stash's own identity rule), and a rebuild that drops the selected row clamps
 ///    to the nearest index instead of resetting to the top.
 ///
-/// 3. **The key map.** Which keyCodes the session consumes — ↑126 · ↓125 · ⏎36 · esc53 ·
-///    space49 (Space = the D-reveal chevron peek's ratified keyboard mapping). Everything
-///    else is `.passthrough`: it falls through to the existing behavior (the ⌘-edit
-///    routing stays card-scoped; letters reach nothing — honestly, because the panel IS
-///    key during the session).
+/// 3. **The key map.** Which keyCodes the session consumes — navigation plus printable
+///    single characters, delete, and the query-aware esc/space/right-arrow rules. Modified
+///    chords are rejected by the controller before they reach this pure map; ⌘V has its
+///    explicit panel route.
 public enum KeySession {
     /// The flattened actionable row ids, in on-screen order: radar (already
     /// urgency-sorted upstream), then pulse `active`, then `stale`/`drafts` only when
@@ -83,20 +82,34 @@ public enum KeySession {
         case open          // 36  — open the selected row (Open-on-GitHub ceiling), end + collapse
         case dismiss       // 53  — end session + collapse
         case peek          // 49  — toggle the focused row's chevron peek (no-op without one)
+        case type(Character)
+        case deleteBackward
+        case clearQuery
         case passthrough   // everything else
     }
 
-    /// The ratified key map (spec: ↑/↓/⏎/esc + D-reveal's Space-toggles-peek). Keypad
-    /// Enter (76) is deliberately NOT mapped — the spec names keyCode 36 only.
-    public static func intent(forKeyCode code: UInt16) -> Intent {
+    /// The ratified query-aware key map. Keypad Enter (76) and Tab (48) remain
+    /// passthrough even though their character strings contain control characters.
+    public static func intent(forKeyCode code: UInt16, characters: String?,
+                              hasQuery: Bool) -> Intent {
         switch code {
         case 126: return .moveUp
         case 125: return .moveDown
         case 36:  return .open
-        case 53:  return .dismiss
-        case 49:  return .peek
-        default:  return .passthrough
+        case 53:  return hasQuery ? .clearQuery : .dismiss
+        case 51:  return hasQuery ? .deleteBackward : .passthrough
+        case 49:  return hasQuery ? .type(" ") : .peek
+        case 124: return hasQuery ? .peek : .passthrough
+        case 76, 48: return .passthrough
+        default: break
         }
+
+        guard let characters, characters.count == 1,
+              let character = characters.first,
+              character.unicodeScalars.allSatisfy({
+                  !CharacterSet.controlCharacters.contains($0)
+              }) else { return .passthrough }
+        return .type(character)
     }
 }
 

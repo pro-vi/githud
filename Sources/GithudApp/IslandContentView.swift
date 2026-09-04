@@ -85,6 +85,7 @@ final class IslandContentView: NSView {
     var morphBody: [NSView] { [bodyStack, footerView].compactMap { $0 } }
 
     init(rows: [RadarRow], pulse: [PulseRow] = [], inbound: [InboundRow] = [],
+         jump: JumpQuery? = nil, jumpCount: String? = nil,
          showDrafts: Bool = false, showStale: Bool = false, showHeldBackInbound: Bool = false,
          freshness: Freshness = .fresh, radarConfirmed: Bool = false, inboundConfirmed: Bool = false,
          reviewsConfirmed: Bool = false,
@@ -131,7 +132,8 @@ final class IslandContentView: NSView {
         // Reading-freshness banner (the sanctioned `caution` use): ONLY when degraded —
         // a stalled/failing poll leaves last-good data on screen, so say so. Quiet otherwise.
         if let banner = freshnessBanner(freshness) { headerViews.append(banner) }
-        headerViews.append(makeHeader(count: rows.count, caughtUpPhrase: caughtUpPhrase))
+        headerViews.append(makeHeader(count: rows.count, caughtUpPhrase: caughtUpPhrase,
+                                      jump: jump, jumpCount: jumpCount))
         let header = NSStackView(views: headerViews)
         header.orientation = .vertical
         header.alignment = .leading
@@ -695,25 +697,33 @@ final class IslandContentView: NSView {
         return block
     }
 
-    private func makeHeader(count: Int, caughtUpPhrase: String? = nil) -> NSView {
+    private func makeHeader(count: Int, caughtUpPhrase: String? = nil,
+                            jump: JumpQuery? = nil, jumpCount: String? = nil) -> NSView {
         // Radar empty: the slot carries the caught-up phrase when the presenter granted one
         // (live PRs below, confirmed first poll) — otherwise the bare wordmark, exactly as
         // before a confirmed poll or beside the full affirmation block (one treatment only).
-        let title = NSTextField(labelWithString: count == 0 ? (caughtUpPhrase ?? "githud") : "Needs you")
-        title.font = .systemFont(ofSize: 11, weight: .semibold)
-        title.textColor = theme.inkSecondary
-
-        var views: [NSView] = [title]
-        if count > 0 {
-            let badge = countBadge(count)
-            badge.setContentHuggingPriority(.required, for: .horizontal)
-            views.append(badge)
+        var views: [NSView]
+        if let jump, !jump.isEmpty {
+            let line = JumpLineView(text: jump.text, count: jumpCount, theme: theme)
+            line.setContentHuggingPriority(.defaultLow, for: .horizontal)
+            line.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+            views = [line]
+        } else {
+            let title = NSTextField(labelWithString: count == 0 ? (caughtUpPhrase ?? "githud") : "Needs you")
+            title.font = .systemFont(ofSize: 11, weight: .semibold)
+            title.textColor = theme.inkSecondary
+            views = [title]
+            if count > 0 {
+                let badge = countBadge(count)
+                badge.setContentHuggingPriority(.required, for: .horizontal)
+                views.append(badge)
+            }
+            // A flexible trailing spacer pushes the gear to the right edge.
+            let spacer = NSView()
+            spacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
+            spacer.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+            views.append(spacer)
         }
-        // a flexible trailing spacer pushes the gear to the right edge
-        let spacer = NSView()
-        spacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
-        spacer.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
-        views.append(spacer)
 
         if onGearTap != nil {
             // The gear opens the SETTINGS CARD (mark-and-settings option B, dogfood-
@@ -878,6 +888,51 @@ final class IslandContentView: NSView {
                                   fresh: fresh, spoken: spoken, theme: theme, onClick: onClick)
     }
 
+}
+
+/// The query drawn in the existing header slot. It is labels and ink only—never
+/// a field editor or second responder—so the panel keeps one keyboard router.
+final class JumpLineView: NSStackView {
+    init(text: String, count: String?, theme: Theme) {
+        let label = NSTextField(labelWithString: text)
+        label.font = .systemFont(ofSize: 13, weight: .medium)
+        label.textColor = theme.inkPrimary
+        label.lineBreakMode = .byTruncatingTail
+        label.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+
+        let caret = NSView()
+        caret.wantsLayer = true
+        caret.layer?.backgroundColor = theme.inkSecondary.cgColor
+        caret.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            caret.widthAnchor.constraint(equalToConstant: 1),
+            caret.heightAnchor.constraint(equalToConstant: 14),
+        ])
+
+        let spacer = NSView()
+        spacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        spacer.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+
+        var views: [NSView] = [label, caret, spacer]
+        if let count {
+            let countLabel = NSTextField(labelWithString: count)
+            countLabel.font = .monospacedDigitSystemFont(ofSize: 11, weight: .regular)
+            countLabel.textColor = theme.inkTertiary
+            countLabel.setContentHuggingPriority(.required, for: .horizontal)
+            views.append(countLabel)
+        }
+
+        super.init(frame: .zero)
+        views.forEach(addArrangedSubview)
+        orientation = .horizontal
+        alignment = .centerY
+        spacing = 6
+        setAccessibilityElement(true)
+        setAccessibilityRole(.staticText)
+        setAccessibilityLabel(count.map { "\(text), \($0)" } ?? text)
+    }
+
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 }
 
 /// The plain-words caption rendered as a button (WP 2026-07-12-001): the whole line is

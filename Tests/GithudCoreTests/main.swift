@@ -1051,7 +1051,7 @@ suite("PullRequestPulse — PulseState priority lattice (the composition matrix,
 suite("PullRequestPulse — GraphQL decode (nested response → flat model; errors surface)") {
     let ok = """
     {"data":{"viewer":{"pullRequests":{"nodes":[
-      {"number":7,"title":"Add caching","url":"https://github.com/o/r/pull/7","isDraft":false,"updatedAt":"2026-06-16T09:00:00Z","reviewDecision":"APPROVED","mergeable":"MERGEABLE","repository":{"nameWithOwner":"o/r"},"commits":{"nodes":[{"commit":{"statusCheckRollup":{"state":"SUCCESS"}}}]}},
+      {"number":7,"title":"Add caching","url":"https://github.com/o/r/pull/7","isDraft":false,"updatedAt":"2026-06-16T09:00:00Z","headRefName":"feat/cache","reviewDecision":"APPROVED","mergeable":"MERGEABLE","repository":{"nameWithOwner":"o/r"},"commits":{"nodes":[{"commit":{"statusCheckRollup":{"state":"SUCCESS"}}}]}},
       {"number":8,"title":"WIP","url":"https://github.com/o/r/pull/8","isDraft":true,"updatedAt":"2026-06-16T08:00:00Z","reviewDecision":null,"mergeable":"UNKNOWN","repository":{"nameWithOwner":"o/r"},"commits":{"nodes":[{"commit":{"statusCheckRollup":null}}]}}
     ]}}}}
     """
@@ -1061,9 +1061,11 @@ suite("PullRequestPulse — GraphQL decode (nested response → flat model; erro
         expectEqual(pulses[0].number, 7, "number decoded")
         expectEqual(pulses[0].repo, "o/r", "nameWithOwner → repo")
         expectEqual(pulses[0].ci, .passing, "SUCCESS rollup → passing")
+        expectEqual(pulses[0].headBranch, "feat/cache", "headRefName → headBranch")
         expectEqual(pulses[0].state, .ready, "first PR ready")
         expectEqual(pulses[1].ci, CIState.none, "null rollup → none")
         expectEqual(pulses[1].merge, .unknown, "UNKNOWN mergeable decoded")
+        expectEqual(pulses[1].headBranch, nil, "missing headRefName → nil without dropping the PR")
         expectEqual(pulses[1].state, .draft, "second PR draft")
     }
     let empty = """
@@ -1178,6 +1180,23 @@ suite("PulsePresenter — displaySubtitle appends the render-time age; row carri
         != PulsePresenter.ageSignature(for: [row], now: iso.date(from: "2026-06-16T11:00:00Z")!), "2h→3h flips the pulse signature")
 }
 
+suite("PulsePresenter — carries head branch without making it a redraw signal") {
+    let iso = ISO8601DateFormatter(); iso.formatOptions = [.withInternetDateTime]
+    let now = iso.date(from: "2026-06-16T10:00:00Z")!
+    func row(branch: String?) -> PulseRow {
+        PulsePresenter.row(for: PullRequestPulse(
+            repo: "o/r", number: 7, title: "Add caching", url: "u", isDraft: false,
+            createdAt: "2026-06-16T08:00:00Z", updatedAt: "2026-06-16T08:00:00Z",
+            ci: .passing, review: .approved, merge: .mergeable, headBranch: branch), now: now)
+    }
+    expectEqual(row(branch: "feat/cache").headBranch, "feat/cache",
+                "PulsePresenter carries the source branch")
+    expectEqual(row(branch: nil).headBranch, nil, "missing source branch stays nil")
+    expectEqual(row(branch: "feat/cache").changeSignature,
+                row(branch: "renamed/cache").changeSignature,
+                "branch-only rename does not force a redraw")
+}
+
 suite("PulsePresenter — symbols + rows sort blocked > ready > waiting > draft") {
     expectEqual(PulsePresenter.symbolName(for: .blocked), "exclamationmark.triangle.fill", "blocked glyph")
     expectEqual(PulsePresenter.symbolName(for: .ready), "checkmark.circle.fill", "ready glyph")
@@ -1276,6 +1295,10 @@ suite("PullRequestPulse — pulls.json fixture decodes to the full lattice + sta
     expectEqual(hist["waiting"], 3, "3 waiting (review / CI pending / merge unknown)")
     expectEqual(hist["draft"], 2, "2 drafts")
     expectEqual(pulses.filter { $0.isDraft }.count, 2, "2 PRs carry isDraft (the grouping fact)")
+    expectEqual(pulses.first?.headBranch, "feat/request-retry",
+                "fixture headRefName reaches the public pulse model")
+    expectEqual(pulses.compactMap(\.headBranch).count, 11,
+                "every fixture node carries a head branch")
 
     // Privacy: the probe's redacted evidence summarizes the pulse as this state
     // histogram — keys are state names only, never PR titles or repo names.

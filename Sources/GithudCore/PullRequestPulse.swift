@@ -58,9 +58,11 @@ public struct PullRequestPulse: Sendable, Equatable {
     public let ci: CIState
     public let review: ReviewState
     public let merge: MergeState
+    public let headBranch: String?
 
     public init(repo: String, number: Int, title: String, url: String, isDraft: Bool,
-                createdAt: String, updatedAt: String, ci: CIState, review: ReviewState, merge: MergeState) {
+                createdAt: String, updatedAt: String, ci: CIState, review: ReviewState,
+                merge: MergeState, headBranch: String? = nil) {
         self.repo = repo
         self.number = number
         self.title = title
@@ -71,6 +73,7 @@ public struct PullRequestPulse: Sendable, Equatable {
         self.ci = ci
         self.review = review
         self.merge = merge
+        self.headBranch = headBranch
     }
 
     /// The priority lattice (worst-first). Honest about unknowns: an UNKNOWN merge
@@ -162,7 +165,7 @@ public extension PullRequestPulse {
     /// ambient SECONDARY lane; full `pageInfo` pagination deferred — see review).
     static let openPRsQuery = "{ viewer { pullRequests(first: 100, states: OPEN, "
         + "orderBy: {field: UPDATED_AT, direction: DESC}) { nodes { number title url "
-        + "isDraft createdAt updatedAt reviewDecision mergeable repository { nameWithOwner } "
+        + "isDraft createdAt updatedAt headRefName reviewDecision mergeable repository { nameWithOwner } "
         + "commits(last: 1) { nodes { commit { statusCheckRollup { state } } } } } } } }"
 
     /// Decode a GraphQL `viewer.pullRequests` response body into pulses.
@@ -201,6 +204,7 @@ private struct GraphQLEnvelope: Decodable {
         let isDraft: Bool
         let createdAt: String?   // optional-defensive: GitHub always sends it, but a null
         let updatedAt: String    // never invents freshness — it falls back to updatedAt below
+        let headRefName: String? // optional-defensive: one field can never blank the pulse
         let reviewDecision: String?
         let mergeable: String?
         let repository: Repo
@@ -223,7 +227,8 @@ private struct GraphQLEnvelope: Decodable {
                 updatedAt: updatedAt,
                 ci: PullRequestPulse.ciState(fromRollup: commits.nodes.first?.commit.statusCheckRollup?.state),
                 review: PullRequestPulse.reviewState(fromDecision: reviewDecision),
-                merge: PullRequestPulse.mergeState(fromMergeable: mergeable)
+                merge: PullRequestPulse.mergeState(fromMergeable: mergeable),
+                headBranch: headRefName
             )
         }
     }

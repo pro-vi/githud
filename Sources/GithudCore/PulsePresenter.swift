@@ -195,7 +195,7 @@ public enum PulsePresenter {
             isStale: isStale(pulse, now: now),
             isFresh: isFresh(pulse, now: now),
             merge: pulse.merge,
-            headBranch: nil,
+            headBranch: pulse.headBranch,
             // Same rule + separator as RadarPresenter.changeSignature; the rollup state
             // rides along for safety even though every state change also renames a
             // subtitle member (the honesty mappers keep the subtitle composition visible).

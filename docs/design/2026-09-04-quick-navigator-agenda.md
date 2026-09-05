@@ -210,7 +210,7 @@ or theme switches, and no persistent-root refactor.
   state and marks the deferred work as owed; the enclosing transition applies it after
   establishing its final state.
 - The preference controls drawn on the island ("show gone quiet", "show held back",
-  "just cleared", fold/unfold an owner, the group toggle) do not end a session today;
+  "just cleared", hide drafts, unfold an owner) do not end a session today;
   they flip a model preference that reaches `handle(_:)` in the same coalesced group
   as poll data (`:151-153`). Deferring that group would let a click change the
   preference without changing what is displayed. They are deliberate user actions,
@@ -435,7 +435,7 @@ O1–O5 from the original plan remain requirements; O3 covers every new callback
   `model.inboundRows` or `model.pulseRows`; narrowing, count, walk, known repos and
   destination read `jumpSnapshot`. Session-ending choke points (hide, collapse, card,
   ledger, key loss) stay immediate and are never deferred. The island's own
-  preference controls (stale, held back, just cleared, owner fold, group toggle) end
+  preference controls (stale, held back, just cleared, drafts, owner unfold) end
   the session before the preference changes, so a click never changes a preference
   without changing what is displayed.
 - **O8:** Native editing is the only text mutation authority. Remove manual type,
@@ -512,8 +512,8 @@ Escape must clear spaces before dismissing even when narrowing is already identi
   exit path) replays the owed rebuild and render once after its own final state is
   set, so a collapse never paints the expanded island first and a card branch never
   nests a render. The island's preference callbacks (`onToggleStale`,
-  `onToggleHeldBackInbound`, `onToggleJustCleared`, `onLensToggleOwner`,
-  `onLensToggleGroup`) end the session before forwarding the click, so their
+  `onToggleHeldBackInbound`, `onToggleJustCleared`, `onToggleDrafts`,
+  `onToggleFoldedOwner`) end the session before forwarding the click, so their
   preference change renders immediately. Install the native field, delegate, session-scoped
   undo and keyboard table together; feed changes through the existing single narrowing
   call, now over the snapshot. Remove manual input/paste paths and correct
@@ -535,7 +535,7 @@ Escape must clear spaces before dismissing even when narrowing is already identi
     transparency or contrast flip mid-session changes nothing on screen; moving to a
     shorter display re-anchors the panel and shrinks the island and its scroll panes
     while the header, editor, selection and undo stay intact; clicking "show gone
-    quiet", "show held back", "just cleared", an owner fold or the group toggle
+    quiet", "show held back", "just cleared", hide drafts or unfold an owner
     mid-session ends the session and shows the new preference immediately; session
     exit by esc, ⏎, hide, collapse, card or key loss renders the newest rows and
     appearance exactly once, after the transition's final state (a collapse never

@@ -55,8 +55,7 @@ final class HUDPanel: NSPanel {
     /// Provide a session-owned editor only to the exact jump field. Every other
     /// control, including the secure ledger, follows NSWindow's ordinary path.
     override func fieldEditor(_ createFlag: Bool, for object: Any?) -> NSText? {
-        guard (object as? NSTextField).map({ $0 === activeJumpField }) == true
-                || (object == nil && activeJumpField != nil),
+        guard (object as? NSTextField).map({ $0 === activeJumpField }) == true,
               let field = activeJumpField else {
             return super.fieldEditor(createFlag, for: object)
         }

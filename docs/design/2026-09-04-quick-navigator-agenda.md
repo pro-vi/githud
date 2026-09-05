@@ -195,12 +195,26 @@ or theme switches, and no persistent-root refactor.
   destroy a live editor; both are deferred while a session is live and applied once
   at session exit. Polling itself continues unchanged.
 - Screen-parameter changes (`:137-141`) also arrive as `setNeedsRender()`; `present()`
-  recomputes the frame origin. During a session a screen change must still keep the
-  panel on-screen, so the deferral covers island content, not panel placement.
+  recomputes the frame origin, and the island height is clamped to the screen at
+  render time (`min(fittingHeight, screenHeightCap())`, `:1213`, and the peek reflow
+  at `:1437`). During a session a screen change must still keep the panel on-screen
+  and fitting, so it may re-anchor the panel and resize the island and its scroll
+  panes; it must not replace the header or the editor.
 - Session-ending choke points stay immediate and unchanged: `hide()` (`:551`),
   `setExpanded` (`:866`), a card taking the surface (`:960`, `:1012`, `:1053`), the
-  ledger card (`:188`), and key loss (`:109`). Any of them ends the session, and the
-  deferred model and appearance updates apply at that exit.
+  ledger card (`:188`), and key loss (`:109`). Their order matters for the replay:
+  `setExpanded` ends the session *before* it flips `expanded` and calls `renderNow()`,
+  and the card branches end it *inside* `render()`. A replay inside
+  `endKeySummonSession` would therefore render the expanded island before a collapse,
+  render twice, or nest a render inside a render. So teardown only clears session
+  state and marks the deferred work as owed; the enclosing transition applies it after
+  establishing its final state.
+- The preference controls drawn on the island ("show gone quiet", "show held back",
+  "just cleared", fold/unfold an owner, the group toggle) do not end a session today;
+  they flip a model preference that reaches `handle(_:)` in the same coalesced group
+  as poll data (`:151-153`). Deferring that group would let a click change the
+  preference without changing what is displayed. They are deliberate user actions,
+  so they end the jump session first, then apply and render immediately.
 - `LedgerCardView.swift:145` updates in place and lines 287–301 use native
   text-change and command delegates. Its theme rebuild preserves only text and
   deliberately loses focus; that part is not a pattern for the jump field.
@@ -258,7 +272,7 @@ The query parser and destination semantics are not being redesigned.
 | Query interpretation snapshot | JumpQuery | `JumpQuery` | `Sources/GithudCore/JumpQuery.swift` | reuse | Controller, matching, destination | Remove its App-layer editing extension |
 | Result action requested by native command routing | KeySession.Intent | `KeySession.Intent` | `Sources/GithudCore/KeySession.swift` | reuse, narrow cases | JumpLineView delegate and controller | Delete text-editing cases; no parallel command vocabulary |
 | The rows and matching context captured at summon, used for every narrowing in the session | none (render reads `model.*Rows` live) | `JumpSnapshot` | `Sources/GithudCore/JumpQuery.swift`, one value owned by the controller beside `jumpQuery` | new | Narrowing, count, selection walk and destination all read it; nothing in a session reads `model.*Rows` | Zero-dependency value type so narrowing over a snapshot is testable headlessly |
-| Model and appearance updates held back while a session is live | none | `deferredWhileJumping` | Private flag(s) in `HUDPanelController.swift` | new | `handle(_:)` records instead of rendering; session exit replays the newest one | No queue: only "a render is owed" and "a surface rebuild is owed" are remembered |
+| Model and appearance updates held back while a session is live | none | `deferredWhileJumping` | Private flag(s) in `HUDPanelController.swift` | new | `handle(_:)` records instead of rendering; the transition that ended the session replays the newest state after reaching its final state | No queue: only "a render is owed" and "a surface rebuild is owed" are remembered |
 | Native field editor with undo history restricted to one query session | Window's shared field editor | `JumpFieldEditor` | `Sources/GithudApp/IslandContentView.swift` | new | The query must not share undo history with the secure ledger or later sessions | Native NSTextView subclass for this lifetime boundary only; ledger keeps its default editor |
 | Selected result | keySelection | `keySelection` | `HUDPanelController.swift` | reuse | View highlighting and result actions | Never becomes text caret or AX editing focus |
 
@@ -279,9 +293,13 @@ query edit, and that runs a row-only update: the rows below the header are rebui
 from the session's `JumpSnapshot`, the header count and hint are updated in place,
 the header itself is never replaced. Poll and appearance changes do not touch the
 island while the session is live; `handle(_:)` records that a render or a surface
-rebuild is owed and session exit replays the newest state through the existing
-`buildSurface()` and `render()` path. Outside a session nothing changes: the island is
-still rebuilt per render exactly as today.
+rebuild is owed. One owner applies the owed work: the transition that ended the
+session (collapse, hide, card arrival, key loss, or the in-place esc/⏎ exit), after
+it has established its own final state, through the existing `buildSurface()` and
+`render()` path. Teardown itself never renders. A screen change during a session
+re-anchors and, if needed, resizes the island and its scroll panes in place. The
+island's own preference controls end the session and render immediately. Outside a
+session nothing changes: the island is still rebuilt per render exactly as today.
 Keep both the view and the keyboard walk downstream of the controller's existing
 single narrowing computation, now fed from the snapshot. No result-row diff engine
 is needed: rebuilding the small result subtree is sufficient.
@@ -389,9 +407,11 @@ native edit → text-change callback → JumpQuery × JumpSnapshot → one Narro
                                             → replace rows below the header + rebuild KeySelection + update count
 native command → composition check → owned result intent → controller action
 poll/theme/a11y during session → model updates as today; controller records "render owed" / "surface rebuild owed"; island untouched
-screen change during session → panel placement only; island content untouched
-exit (esc, ⏎, hide, collapse, card, key loss) → clear session ownership and callbacks → detach editor → discard undo → release key
-                                             → replay owed surface rebuild and render from the live model
+screen change during session → re-anchor panel; resize island and scroll panes in place if the screen shrank; header/editor untouched
+island preference control during session → end session (teardown below) → apply preference → render immediately
+teardown (any exit) → clear session ownership and callbacks → detach editor → discard undo → release key; NO render here
+enclosing transition (collapse, hide, card, key loss, or the esc/⏎ exit itself) → reach its final state
+                                             → replay owed surface rebuild and render once from the live model
 ```
 
 #### Program obligations
@@ -401,8 +421,11 @@ O1–O5 from the original plan remain requirements; O3 covers every new callback
 - **O6:** While a session is live, query edits and peek reflow preserve the field,
   attached field editor, selected range, marked range, and undo continuity, and no
   poll, theme, transparency, contrast or screen-parameter change replaces or reparents
-  the island's header. The deferred updates are applied exactly once, at session exit,
-  from the live model, and never earlier.
+  the island's header. A screen-parameter change may re-anchor the panel and resize
+  the island and its scroll panes in place. The deferred updates are applied exactly
+  once, from the live model, by the transition that ended the session after it has
+  reached its final state; never by teardown itself, never earlier, never nested
+  inside a running render.
 - **O7:** `jumpQuery != nil iff keySelection != nil iff jumpSnapshot != nil`; all three
   transition synchronously at session boundaries. An editable JumpLineView is
   available iff that session is live on the list surface after reconciliation.
@@ -411,7 +434,10 @@ O1–O5 from the original plan remain requirements; O3 covers every new callback
 - **O6a:** Nothing computed during a session reads `model.radarRows`,
   `model.inboundRows` or `model.pulseRows`; narrowing, count, walk, known repos and
   destination read `jumpSnapshot`. Session-ending choke points (hide, collapse, card,
-  ledger, key loss) stay immediate and are never deferred.
+  ledger, key loss) stay immediate and are never deferred. The island's own
+  preference controls (stale, held back, just cleared, owner fold, group toggle) end
+  the session before the preference changes, so a click never changes a preference
+  without changing what is displayed.
 - **O8:** Native editing is the only text mutation authority. Remove manual type,
   delete, word-delete and paste paths, their obsolete Intent cases and key map.
   Clear-query uses a native undoable edit; teardown discards history.
@@ -436,8 +462,9 @@ repeat/race rule and locking test; serialized native edits are not deduplicated.
 | Summon × ordinary expanded/collapsed list | JumpSnapshot captured, editor appears, key/editor acquisition is checked; initial result selected | Existing panel presentation only | Session state set before reentrant callbacks; failed acquisition retires it | session-acquires-native-editor |
 | Poll × editing or composing | Model rows update; island, editor, selection, marked range and undo untouched; "render owed" recorded | None | Repeated polls collapse to one owed render; a poll cannot force marked text to commit | poll-deferred-during-session |
 | Theme / transparency / contrast × editing | Model updates; no `buildSurface()`, no render; "surface rebuild owed" recorded | None | Repeated flips collapse to one owed rebuild | appearance-deferred-during-session |
-| Screen parameters × editing | Panel re-anchored on the current screen; island content untouched | Existing placement only | Same coalesced path as today | screen-change-keeps-panel-on-screen |
-| Exit × owed updates | Latest model rows and appearance rendered once through the existing path after the editor is detached | Existing order-out release if still key | Owed flags cleared before the replay so a reentrant change is not lost | exit-applies-deferred-updates |
+| Screen parameters × editing | Panel re-anchored; island height and scroll-pane heights re-clamped in place if the screen shrank; header, editor, selection and undo untouched | Existing placement only | Same coalesced path as today | screen-change-keeps-panel-on-screen-and-fitting |
+| Island preference control × editing | Session ends (teardown), then the preference applies and the island renders immediately from the live model | Existing preference persistence | The click is the transition; it owns the replay | preference-control-ends-session |
+| Exit × owed updates | Teardown clears session state and detaches the editor without rendering; the enclosing transition (collapse, hide, card, key loss, esc/⏎ exit) renders the latest rows and appearance once after its final state | Existing order-out release if still key | Owed flags cleared before the replay so a reentrant change is not lost; no render nested in a render | exit-applies-deferred-updates |
 | Edit × live session | Native edit observed, query snapshot/results update; caret follows native edit | Metadata-only diagnostics if enabled | Reentrant result rendering never writes text back | native-edit-operations |
 | Escape × raw nonempty field | Native clear, identity results, session remains; undo can restore | None | Next Escape sees actual empty field and dismisses | whitespace-and-clear-undo |
 | Command × composing | Native input method receives command; result action count stays unchanged | Native candidate UI only | Commit/cancel notification publishes final state before later result commands | composition-command-priority |
@@ -476,11 +503,18 @@ Escape must clear spaces before dismissing even when narrowing is already identi
   inbound and lens preferences, and `selfLogin`) and narrow it for the initial
   selection. While the session is live, `handle(_:)` records an owed render for the
   data cases and an owed surface rebuild for the appearance cases instead of running
-  them; the screen-parameter case still re-anchors the panel. A query edit runs a
-  row-only update on the attached island: rebuild the rows below the header from the
-  snapshot, update the count and hint in place. Every session-ending choke point
-  detaches the editor, clears the session values, then replays the owed rebuild and
-  render once from the live model. Install the native field, delegate, session-scoped
+  them; the screen-parameter case still re-anchors the panel and re-clamps the island
+  and scroll-pane heights in place. A query edit runs a row-only update on the
+  attached island: rebuild the rows below the header from the snapshot, update the
+  count and hint in place. Teardown (`endKeySummonSession`) detaches the editor and
+  clears the session values and never renders; the transition that called it
+  (`setExpanded`, `hide()`, the card branches of `render()`, key loss, or the esc/⏎
+  exit path) replays the owed rebuild and render once after its own final state is
+  set, so a collapse never paints the expanded island first and a card branch never
+  nests a render. The island's preference callbacks (`onToggleStale`,
+  `onToggleHeldBackInbound`, `onToggleJustCleared`, `onLensToggleOwner`,
+  `onLensToggleGroup`) end the session before forwarding the click, so their
+  preference change renders immediately. Install the native field, delegate, session-scoped
   undo and keyboard table together; feed changes through the existing single narrowing
   call, now over the snapshot. Remove manual input/paste paths and correct
   accessibility focus. There is no separately shipped rendering foundation or
@@ -498,9 +532,14 @@ Escape must clear spaces before dismissing even when narrowing is already identi
   - *Lifecycle edges:* edit, peek and interrupted morphs preserve editor identity,
     selection, marked range and undo. A poll that adds, removes or changes rows
     mid-session changes nothing on screen and nothing the session computes; a theme,
-    transparency or contrast flip mid-session changes nothing on screen; a screen
-    change re-anchors the panel and nothing else; session exit by esc, ⏎, hide,
-    collapse, card or key loss renders the newest rows and appearance exactly once.
+    transparency or contrast flip mid-session changes nothing on screen; moving to a
+    shorter display re-anchors the panel and shrinks the island and its scroll panes
+    while the header, editor, selection and undo stay intact; clicking "show gone
+    quiet", "show held back", "just cleared", an owner fold or the group toggle
+    mid-session ends the session and shows the new preference immediately; session
+    exit by esc, ⏎, hide, collapse, card or key loss renders the newest rows and
+    appearance exactly once, after the transition's final state (a collapse never
+    paints the expanded island first; a card arrival never nests a render).
     Row maps, folds, tails, scroll and peeks remain consistent. Mouse/pill renders
     and hit targets are pixel-unchanged, since their path did not change.
   - *Error paths:* refused key/editor acquisition retires the session; late callbacks
@@ -593,7 +632,9 @@ Escape must clear spaces before dismissing even when narrowing is already identi
 | No input cue on invoke | session-acquires-native-editor checks actual first responder and native placeholder | Prompt/editor on successful keyboard summon |
 | Rebuild destroys selection/composition | poll-deferred-during-session and appearance-deferred-during-session capture editor identity and ranges, then fire a poll and a theme flip mid-session | Same field/editor, caret, marked range and undo; island header identity unchanged |
 | Session narrows against rows the user has not seen | Core test mutates the model rows after summon and re-narrows | Count, walk and destination come from `JumpSnapshot`; nothing changes until exit |
-| Deferred updates are lost or applied twice | exit-applies-deferred-updates ends the session by each choke point after owed changes | Newest rows and appearance render exactly once at exit |
+| Deferred updates are lost, applied twice, or applied before the transition settles | exit-applies-deferred-updates ends the session by each choke point after owed changes and records the render sequence | Newest rows and appearance render exactly once, after the transition's final state; no expanded paint before a collapse, no nested render |
+| A preference click changes the preference but not the display | preference-control-ends-session clicks each island control mid-session | Session ends, preference applies, island renders the new preference immediately |
+| A shorter display leaves a too-tall island | screen-change-keeps-panel-on-screen-and-fitting moves the fixture to a shorter screen mid-session | Island and scroll panes re-clamped; header/editor identity, selection and undo intact |
 | IME confirmation opens a PR | composition-command-priority counts result actions during composition | Zero app actions until composition is resolved |
 | AX reports result instead of editor | editor-focus-versus-result-selection uses external AX on live panel | Actual editing focus plus separate selected-result state |
 | Mouse summon captures letters | mouse-summon-never-edits with disposable foreground markers | Marker reaches foreground only |
@@ -663,7 +704,8 @@ fails qualification; do not claim a cross-machine latency guarantee.
 | Risk | Mechanism / proof |
 |---|---|
 | A refresh path not listed here still reaches the island mid-session and kills the editor | Verify-at-contact fires every `handle(_:)` case and the screen notification mid-session in the native runner |
-| Owed updates replay twice or not at all at exit | exit-applies-deferred-updates covers every choke point; flags cleared before the replay |
+| Owed updates replay twice, not at all, or before the transition settles | One owner per exit: teardown never renders; the enclosing transition replays after its final state; exit-applies-deferred-updates covers every choke point; flags cleared before the replay |
+| A deferred preference group swallows a deliberate click | Island preference callbacks end the session first; preference-control-ends-session |
 | A long-open session shows stale rows | Accepted and documented (README, U5); the destination is a URL and stays valid |
 | Query history reaches ledger/next query | Query-only JumpFieldEditor, exact client identity checks and teardown tests |
 | Composition consumes navigation/open keys differently | Native delegate guard plus actual candidate-window witness |

@@ -4,6 +4,9 @@ date: 2026-09-04
 status: RATIFIED 2026-09-04 — user picked thesis A ("lets do A first"); the two build-time
   forks below (input model, fallback row) were delegated to the runner ("go figure it out")
   and are decisions D1/D2 here, amendable at build with a recorded note.
+  AMENDED 2026-09-05 — after U1–U4 landed, D1's manual editing was replaced by a native
+  text field with a summon-time row snapshot; see "Native editing — replacement plan"
+  under Build-time spec amendments. That section is the build entry point (U6 → U5).
 mocks: 2026-09-04-quick-navigator-mocks.html (interactive; option A, eight states, typing is live)
 origin: a voice note ("I want a quick navigator to the PR — I don't always have the link or
   the branch when talking to agents") → /ui-sketch (three theses) → this record. Every
@@ -126,7 +129,550 @@ line puts the island away as today. `↑ ↓ ⏎` walk and open the narrowed row
 
 ## Build-time spec amendments (recorded, not silent)
 
-After the U4 pause, the owner reported “the white thing looks ugly on open and no inline input on invoke” and requested screenshots and fixes. This amends AC9 for keyboard summons: the header shows an empty “Type to jump…” line as soon as the session acquires key; mouse summons keep the ordinary header. Selection uses a stronger background highlight instead of the white edge strip. D1 still holds: no editable field. The no-match state keeps one sentence; its extra paragraph was removed after a native render showed horizontal overflow. Native AppKit view renders cover mouse, empty-session, number, no-match, and long-query states in two themes. They do not prove global shortcut delivery or foreground-app focus return. The computer-use runtime failed before capture with `process is not defined`. D4 and the per-keystroke rebuild remain unchanged pending the keyboard exercise.
+### Landed U4 amendments
+
+The owner reported “the white thing looks ugly on open and no inline input on invoke.”
+The header now shows “Type to jump…” when a keyboard session begins; mouse summons
+keep the ordinary header. Selection uses a background highlight instead of a white
+edge strip. Native view renders exposed an overflowing no-match paragraph, which was
+removed. Option–Backspace was subsequently added using AppKit word boundaries.
+These landed changes still use a label and manual character accumulation.
+
+### Native editing — replacement plan (approved 2026-09-05, session-snapshot shape)
+
+**Objective:** look up a PR in the existing island while typing, selecting, correcting,
+and pasting text with normal macOS editing behavior.
+**Origin:** conversation — punctuation and Option–Backspace exposed the cost of manual
+editing; the owner requested `/architect` after discussing native fields.
+**Date:** 2026-09-04, revised 2026-09-05. **Status:** approved. The 2026-09-04 draft kept
+a persistent panel root so the editor could survive every poll and appearance refresh.
+The owner chose the smaller shape recorded here instead: the island's existing
+rebuild-per-render path stays untouched outside a session; inside a session the
+rows are a snapshot taken at summon, poll and appearance updates are deferred to
+session exit, and only the query's row-only update runs while the editor is alive.
+**Depth:** Deep for editor ownership, responder lifecycle, and focus proof; no stored
+format, dependency, network endpoint, or global shortcut changes.
+**Inspected base:** `db22bf4` on `main`.
+
+**Precedence:** this replacement plan is the build entry point. The earlier
+Decisions, Architecture Decision, Scope Boundaries and U3/U4 instructions below are
+historical wherever they conflict with the tables here. U1–U4 are already implemented,
+not work to repeat. Their acceptance obligations remain, revised below.
+Execution order is **U6 → U5**: one native-input change, then the outstanding
+laws, README and final proof. Former U7/U8 are folded into U6; existing IDs are not
+renumbered. Do not recreate `docs/plans/`.
+The amendments section remains the editable plan home; the older record is retained
+rather than silently rewritten.
+
+**What the snapshot shape trades away.** Rows shown during a session are the rows
+that existed at summon, until the session ends. That is not "a few seconds stale":
+a session left open stays at its summon-time state for as long as it is open. This
+explicitly replaces AC8 (a poll tick re-narrows against new rows mid-query). What it
+buys: no change to how the island renders for mouse summons, the collapsed pill, cards,
+or theme switches, and no persistent-root refactor.
+
+#### Background and evidence
+
+- `HUDPanelController.swift:690` rejects modified input before the Core key map;
+  manual append, deletion, word deletion and paste follow. This caused the reported
+  editing gaps. `JumpQuery` is still the authority for matching and destinations.
+- `IslandContentView.swift:138` builds the header in its initializer.
+  `HUDPanelController.swift:1175` constructs a new island on every result render;
+  `present` at line 1286 detaches its previous subtree. A native field cannot
+  survive that, so during a session that path must not run; the query needs its
+  own row-only update that leaves the header attached.
+- Narrowing reads the live model arrays: `beginKeySummonSession`
+  (`HUDPanelController.swift:627`) and `render()` (`:1150`) both call
+  `query.narrow(radar: model.radarRows, …)`. `AppModel` receives poll rows before it
+  notifies the controller, so freezing renders alone would leave the next query edit
+  narrowing against rows the user has not seen. The session therefore captures its
+  rows and matching context at summon and uses that snapshot for filtering, counts,
+  selection and destinations until it ends.
+- Poll-driven changes reach the controller through `handle(_:)`
+  (`HUDPanelController.swift:150-164`) as a coalesced `setNeedsRender()`. Theme,
+  Reduce-Transparency and Increase-Contrast changes (`:165-168`) call `buildSurface()`
+  (`:285`), which replaces `panel.contentView`, and then `renderNow()`. Both routes
+  destroy a live editor; both are deferred while a session is live and applied once
+  at session exit. Polling itself continues unchanged.
+- Screen-parameter changes (`:137-141`) also arrive as `setNeedsRender()`; `present()`
+  recomputes the frame origin. During a session a screen change must still keep the
+  panel on-screen, so the deferral covers island content, not panel placement.
+- Session-ending choke points stay immediate and unchanged: `hide()` (`:551`),
+  `setExpanded` (`:866`), a card taking the surface (`:960`, `:1012`, `:1053`), the
+  ledger card (`:188`), and key loss (`:109`). Any of them ends the session, and the
+  deferred model and appearance updates apply at that exit.
+- `LedgerCardView.swift:145` updates in place and lines 287–301 use native
+  text-change and command delegates. Its theme rebuild preserves only text and
+  deliberately loses focus; that part is not a pattern for the jump field.
+- `HUDPanel.swift:87` already forwards standard Edit commands through the responder
+  chain because the app has no main menu. Its query-specific paste interception
+  bypasses selection and must go. Redo needs an explicit Command–Shift–Z route.
+- `HUDPanel.swift:61` and `IslandContentView.swift:589` currently report result-row
+  accessibility focus. Native editing requires actual editor focus and separate
+  result selection.
+- The recorded iTerm2/CotEditor/Maccy/Strongbox precedent is about releasing key,
+  not evidence for avoiding text fields. Current
+  [Maccy SearchFieldView](https://github.com/p0deje/Maccy/blob/master/Maccy/Views/SearchFieldView.swift)
+  uses a plain native text control; its
+  [KeyHandlingView](https://github.com/p0deje/Maccy/blob/master/Maccy/Views/KeyHandlingView.swift)
+  handles app commands and defers during composition. We are using this ownership
+  pattern, not copying its particular shortcuts.
+- Apple's [control command delegate](https://developer.apple.com/documentation/appkit/nscontroltexteditingdelegate/control(_:textview:docommandby:))
+  allows selective command handling and returns false for native handling.
+  [Field editors](https://developer.apple.com/documentation/appkit/nstextview/isfieldeditor)
+  treat Tab and Return as editing commands rather than ordinary text.
+- **Executed, limited evidence:** a temporary AppKit probe in an unshown window
+  created an actual field editor, replaced a selected word with punctuation,
+  executed native undo/redo, dispatched move-down and Return through the control
+  delegate, and preserved the editor/selection/marked range while replacing a
+  sibling view. Its composition guard returned false without opening a result.
+  No visible window or global events were used. It did not exercise this controller,
+  a real IME candidate window, a material change, or focus return. Recreate those
+  assertions in the committed native runner; the temporary probe is not a build input.
+- The previous computer-use runtime returned `process is not defined` before any
+  app capture. Recheck available tooling at build time; do not equate that failure
+  with a passing focus test.
+
+#### Requirements and prior-contract replacement
+
+| ID | Required outcome | Prior obligations carried forward |
+|---|---|---|
+| R1 | Native insertion, uppercase, punctuation including !@#$, selection replacement, horizontal and word movement, character/word deletion, cut/copy/paste, undo/redo, and text composition | Replaces D1 and the printable-input part of AC7; includes the reported modifier bugs |
+| R2 | The header is an inline borderless editor immediately after keyboard summon; ordinary mouse summons have no editable query control | AC9 as amended, D6; current header dimensions, placeholder and background selection treatment |
+| R3 | One narrowed row set feeds drawn results and keyboard traversal; local matching and GitHub fallback behave as before | AC1–3,5,6,8, O1, O2, O4, O5, D2, D3 |
+| R4 | Native editing commands coexist with result navigation using the command table below | Revises D4/D7 and AC4/7; retains keyboard peek through Option–Return |
+| R5 | Editor identity, selection, marked text and undo survive query edits and peek reflow. Poll, theme, transparency and contrast updates are deferred while the session is live and applied at exit; the session's rows are the summon-time snapshot | Replaces AC8 (live re-narrowing mid-query is given up); the island's rendering path outside a session is unchanged |
+| R6 | Key acquisition is explicit, mouse summons never acquire it, every exit releases editor ownership, and ledger editing stays separate | D6, AC9/11; no app activation |
+| R7 | Diagnostics never log query contents; native accessibility focus is truthful and result selection remains discoverable | O3, AC5/11; overrides the old AX row-focus proof expectation |
+| R8 | Tests, README, law text/assertions and a current input-routing artifact match the shipped behavior | AC10–12 and original U5; no acceptance item is discarded |
+
+D2 and D3 stay unchanged: no query-triggered network request and no new branch
+fetch for Needs you or Inbound. D5's law/assertion coupling remains binding.
+The query parser and destination semantics are not being redesigned.
+
+#### Naming ledger
+
+| Role / meaning | Existing term | Chosen name | Owner / placement | Status | Consumer / reason | Sibling disposition |
+|---|---|---|---|---|---|---|
+| Header containing editable query and count | JumpLineView | `JumpLineView` | `Sources/GithudApp/IslandContentView.swift` | reuse, implementation changes | IslandContentView; native tests | LedgerCardView retains its secure input policy |
+| Query interpretation snapshot | JumpQuery | `JumpQuery` | `Sources/GithudCore/JumpQuery.swift` | reuse | Controller, matching, destination | Remove its App-layer editing extension |
+| Result action requested by native command routing | KeySession.Intent | `KeySession.Intent` | `Sources/GithudCore/KeySession.swift` | reuse, narrow cases | JumpLineView delegate and controller | Delete text-editing cases; no parallel command vocabulary |
+| The rows and matching context captured at summon, used for every narrowing in the session | none (render reads `model.*Rows` live) | `JumpSnapshot` | `Sources/GithudCore/JumpQuery.swift`, one value owned by the controller beside `jumpQuery` | new | Narrowing, count, selection walk and destination all read it; nothing in a session reads `model.*Rows` | Zero-dependency value type so narrowing over a snapshot is testable headlessly |
+| Model and appearance updates held back while a session is live | none | `deferredWhileJumping` | Private flag(s) in `HUDPanelController.swift` | new | `handle(_:)` records instead of rendering; session exit replays the newest one | No queue: only "a render is owed" and "a surface rebuild is owed" are remembered |
+| Native field editor with undo history restricted to one query session | Window's shared field editor | `JumpFieldEditor` | `Sources/GithudApp/IslandContentView.swift` | new | The query must not share undo history with the secure ledger or later sessions | Native NSTextView subclass for this lifetime boundary only; ledger keeps its default editor |
+| Selected result | keySelection | `keySelection` | `HUDPanelController.swift` | reuse | View highlighting and result actions | Never becomes text caret or AX editing focus |
+
+No new Swift module, dependency, generic editor framework, or search service.
+The existing file and type names already describe the jobs.
+
+#### Architecture Decision
+
+**Approach:** put a borderless ordinary `NSTextField` inside `JumpLineView`.
+AppKit owns editing, the caret, selection, composition, and undo. The controller
+owns a `JumpQuery` snapshot used for narrowing, not an independently edited buffer.
+A text-change callback reads native text and updates results; it never assigns the
+snapshot back to the field during routine rendering.
+
+Keep the expanded `IslandContentView`, its header and its query field attached for
+the whole session. Inside a session the only thing that changes the island is a
+query edit, and that runs a row-only update: the rows below the header are rebuilt
+from the session's `JumpSnapshot`, the header count and hint are updated in place,
+the header itself is never replaced. Poll and appearance changes do not touch the
+island while the session is live; `handle(_:)` records that a render or a surface
+rebuild is owed and session exit replays the newest state through the existing
+`buildSurface()` and `render()` path. Outside a session nothing changes: the island is
+still rebuilt per render exactly as today.
+Keep both the view and the keyboard walk downstream of the controller's existing
+single narrowing computation, now fed from the snapshot. No result-row diff engine
+is needed: rebuilding the small result subtree is sufficient.
+
+Reuse the ledger's delegate-and-in-place-update pattern, not its secure field or
+its text-only theme stash. Reuse the panel's standard Edit-action routing; remove
+query-specific clipboard reads and manual text mutation. Use a session-owned JumpFieldEditor, configured as a native single-line field
+editor with undo enabled and its own UndoManager. HUDPanel supplies it through
+its field-editor lookup only for this session's exact query field; every other
+client uses the existing native editor. This subclass owns undo lifetime, not
+keystroke interpretation.
+The native editor's delegate translates only owned commands to `KeySession.Intent`;
+all other text operations remain with AppKit.
+
+**Why this wins:** extending `KeySession.intent` and the controller's string edits
+would require implementing selection, insertion positions, composition, clipboard
+replacement and undo. `NSTextField` supplies those facilities. `NSSearchField`
+adds search/cancel chrome not needed in this header; a SwiftUI wrapper adds a second
+UI framework to an AppKit view. Retaining/reparenting a field across whole-island
+rebuilds does not protect its attached editor. The rejected alternative, a persistent
+panel root that survives every refresh, protects the editor by changing how the island
+renders for everyone; the session snapshot protects it by not refreshing the island
+while the editor is alive, and leaves everyone else's rendering untouched.
+
+**Consequences:** rows shown during a session are fixed at their summon-time state
+until dismissal. Space and horizontal arrows become editing commands. Native caret
+blinking and native IME candidate UI are allowed during editing; the no-idle-timers
+rule prohibits new app-owned repeating work, not the operating system's focused
+editor. The existing mouse layout and collapsed pill remain the baseline.
+
+**D1, restated rather than discarded.** D1's intention was clear keyboard ownership:
+one place decides what a key does. That survives. Its implementation, manual
+accumulation in the key session, is replaced by native editing. Text belongs to the
+editor; result commands belong to the controller through the field's command delegate.
+Space belongs to editing.
+
+**Approval means:** native input replaces D1's implementation; the following keyboard
+table replaces D4/D7; the session's rows are a snapshot and poll/appearance updates
+are deferred to exit (replacing AC8); input-routing proof remains required rather
+than being inferred from renders.
+
+#### Keyboard and input contract
+
+| Input/state | Owner and effect |
+|---|---|
+| Printable characters, Shift/Option-produced text, Caps Lock, dead keys, Unicode | Native editor; no printable-character allowlist |
+| Left/Right, modified horizontal arrows, selection shortcuts, Backspace and Option–Backspace | Native editor at its real insertion point or selection |
+| Space, including an empty field | Native text insertion; no peek |
+| Unmodified Up/Down outside composition | Select previous/next result, clamped; editor retains keyboard focus |
+| Unmodified Return or keypad Enter outside composition | Open selected result once, then end session and collapse |
+| Option–Return outside composition | Peek selected result through its existing action; no insertion or open |
+| Escape outside composition, any raw text including spaces | Clear via native editing so undo can restore it; keep session |
+| Escape outside composition, truly empty field | End session and collapse |
+| Commands while marked text exists | Defer to AppKit/input method; no result navigation, peek, open or dismissal |
+| Command–A/C/X/V/Z and Command–Shift–Z | Shared native responder Edit actions, including redo; query-specific paste code removed |
+| Tab/Shift–Tab | Native key-view traversal; the query is the sole key-view stop in this list session, so traversal returns to it; no inserted tabs and no loss of typing |
+| Other modified commands | Not treated as app result actions; leave to native responder behavior |
+| Pointer click/drag inside query during session | Native caret placement and selection; no row click flattening over the field |
+| Mouse-summoned island outside session | No editable query control and no key acquisition |
+
+Ignore AppKit's incidental numeric-pad/function flags when classifying plain arrow
+or keypad keys, not Shift/Control/Option/Command. Use the field delegate's
+selectors and the actual event only to distinguish owned result commands.
+Do not install a broad event monitor that consumes native editing before the field.
+If Option–Return arrives as an alternate newline selector, recognize that selector
+in the same delegate; do not add a second independent keyboard router.
+
+Whitespace is deliberately two facts: raw field text determines clear-vs-dismiss
+and the Escape hint; `JumpQuery.isEmpty` determines identity narrowing and absence
+of the GitHub row/count. Never trim or rewrite the editor to reconcile them.
+Use the native single-line field's paste behavior; test embedded line breaks against
+an ordinary native field. Do not append a second flattened clipboard string.
+
+During composition, native marked text is authoritative. Results use the latest
+text snapshot delivered by native change notifications; interim text may narrow
+locally if a notification exposes it. No query result action is allowed while
+marked text remains. A composition commit publishes its final text. Poll updates
+never reach the island during a session, so nothing can commit/cancel composition
+or write into the field from the model side.
+
+#### Representation and integration contracts
+
+| Meaning | Authority | Derived consumers / boundary | Guard |
+|---|---|---|---|
+| Current text and edit state | Native field editor while editing | Control text-change notification → controller's JumpQuery snapshot | Native editing integration tests; no stringValue echo on refresh |
+| Query meaning | JumpQuery | Narrowed rows, destination, count | Existing parser/narrowing suites |
+| Rows and matching context during a session | JumpSnapshot, captured once at summon | Narrowing, count, KeySelection walk, knownRepos, destination | Core test: a poll that changes `model.*Rows` mid-session changes nothing the session computes; exit applies the newest rows |
+| App result commands | KeySession.Intent | Field delegate translates native selectors; controller executes an exhaustive switch | Native command-routing tests; unknown selectors return false |
+| Selected result | KeySelection | Highlight, open, peek, accessible selection information | Stable-ID rebuild and walk/render tests |
+| Key eligibility | Controller session/card lifecycle | HUDPanel flag and actual first responder | Acquisition/teardown and mouse/card tests |
+| Edit history | Native undo operations in JumpFieldEditor | Query editor only; default field editor for ledger | Same-session undo continuity and cross-session isolation tests |
+
+There is no new persistence or wire representation.
+The control delegate's input is `NSControl`/`NSTextView`/`Selector`, not the
+existing `NSEvent` callback. Its Boolean result means handled-or-defer, while the
+controller needs a result intent. **U6 owns this integration change**;
+matching return types do not establish that the old callback can be reused.
+The temporary probe executed the native delegate path. Integration with HUDPanel's query-only field-editor lookup and the row-only update path remains unverified.
+
+Directional flow, not an implementation signature:
+
+```text
+keyboard summon → capture JumpSnapshot → attach jump field → grant key eligibility → acquire key/editor once
+native edit → text-change callback → JumpQuery × JumpSnapshot → one Narrowed result
+                                            → replace rows below the header + rebuild KeySelection + update count
+native command → composition check → owned result intent → controller action
+poll/theme/a11y during session → model updates as today; controller records "render owed" / "surface rebuild owed"; island untouched
+screen change during session → panel placement only; island content untouched
+exit (esc, ⏎, hide, collapse, card, key loss) → clear session ownership and callbacks → detach editor → discard undo → release key
+                                             → replay owed surface rebuild and render from the live model
+```
+
+#### Program obligations
+
+O1–O5 from the original plan remain requirements; O3 covers every new callback.
+
+- **O6:** While a session is live, query edits and peek reflow preserve the field,
+  attached field editor, selected range, marked range, and undo continuity, and no
+  poll, theme, transparency, contrast or screen-parameter change replaces or reparents
+  the island's header. The deferred updates are applied exactly once, at session exit,
+  from the live model, and never earlier.
+- **O7:** `jumpQuery != nil iff keySelection != nil iff jumpSnapshot != nil`; all three
+  transition synchronously at session boundaries. An editable JumpLineView is
+  available iff that session is live on the list surface after reconciliation.
+  Acquisition-pending state cannot execute result commands; any failed acquisition
+  clears all three values and replays nothing (nothing was deferred yet).
+- **O6a:** Nothing computed during a session reads `model.radarRows`,
+  `model.inboundRows` or `model.pulseRows`; narrowing, count, walk, known repos and
+  destination read `jumpSnapshot`. Session-ending choke points (hide, collapse, card,
+  ledger, key loss) stay immediate and are never deferred.
+- **O8:** Native editing is the only text mutation authority. Remove manual type,
+  delete, word-delete and paste paths, their obsolete Intent cases and key map.
+  Clear-query uses a native undoable edit; teardown discards history.
+- **O9:** Composition suppresses only app result actions, never native text
+  operations. Unrecognized commands remain unconsumed.
+- **O10:** AX focus reports the actual text editor. Result highlighting and selected
+  result announcements never impersonate an editing-focus change.
+- **O11:** Query undo history cannot be reached from the next session or ledger.
+  Query-specific callbacks cannot observe the secure ledger's text.
+- **O12:** User edits cause local result work only. No added fetch, debounce timer,
+  repeating animation or polling loop is introduced. Native caret behavior is scoped
+  to editing and disappears on teardown.
+
+#### State-action contracts
+
+All callbacks execute on the main thread. No durable query or editor state is
+written in any cell. Each row names observation, transient effect, external effect,
+repeat/race rule and locking test; serialized native edits are not deduplicated.
+
+| Action × state | Observation and transient effect | External effect | Repeat/race rule | Test |
+|---|---|---|---|---|
+| Summon × ordinary expanded/collapsed list | JumpSnapshot captured, editor appears, key/editor acquisition is checked; initial result selected | Existing panel presentation only | Session state set before reentrant callbacks; failed acquisition retires it | session-acquires-native-editor |
+| Poll × editing or composing | Model rows update; island, editor, selection, marked range and undo untouched; "render owed" recorded | None | Repeated polls collapse to one owed render; a poll cannot force marked text to commit | poll-deferred-during-session |
+| Theme / transparency / contrast × editing | Model updates; no `buildSurface()`, no render; "surface rebuild owed" recorded | None | Repeated flips collapse to one owed rebuild | appearance-deferred-during-session |
+| Screen parameters × editing | Panel re-anchored on the current screen; island content untouched | Existing placement only | Same coalesced path as today | screen-change-keeps-panel-on-screen |
+| Exit × owed updates | Latest model rows and appearance rendered once through the existing path after the editor is detached | Existing order-out release if still key | Owed flags cleared before the replay so a reentrant change is not lost | exit-applies-deferred-updates |
+| Edit × live session | Native edit observed, query snapshot/results update; caret follows native edit | Metadata-only diagnostics if enabled | Reentrant result rendering never writes text back | native-edit-operations |
+| Escape × raw nonempty field | Native clear, identity results, session remains; undo can restore | None | Next Escape sees actual empty field and dismisses | whitespace-and-clear-undo |
+| Command × composing | Native input method receives command; result action count stays unchanged | Native candidate UI only | Commit/cancel notification publishes final state before later result commands | composition-command-priority |
+| Return × selected row or fallback | One selected destination opens, session retires, island collapses | Browser open through existing path | Reentrant resign callback sees retired/inactive session; no duplicate open | native-open-once |
+| Return × no actionable ID | No destination opened; session ends as existing open path does | Collapse/release only | Repeated late callbacks cannot open stale selection | empty-open |
+| Exit/card/key-loss × editing or composing | Query/selection retired, editor detached, history discarded | Existing order-out release if still key | Late native end-edit callbacks ignored by sender/session identity | editor-session-teardown |
+| Edit or command callback × ended session | No query reconstructed and no row acted upon | None | Sender/current-session checks reject obsolete notifications | late-editor-callback |
+| Mouse summon × no session | Ordinary header, no editable query view, never-key list | Existing presentation only | Letters stay outside the island | mouse-summon-never-edits |
+| Edit shortcut × ledger card | Native secure-field behavior; no jump callback/history | Existing ledger behavior only | Query route absent; never inspect a real token during testing | ledger-edit-isolation |
+
+Additional states explicitly covered: secure-input/key acquisition refusal; appearance
+change while marked text is active. Neither is treated as an ordinary successful
+refresh. Production checks fail by retiring an unusable session or declining the
+result action, not by assertions that leave a false focus cue in release builds.
+Escape must clear spaces before dismissing even when narrowing is already identity.
+
+#### Implementation units
+
+##### U6. Native input, editor lifetime and verification
+
+- **Goal:** Replace manual character accumulation with normal native editing in
+  the existing header, preserving that editing state while the query narrows a
+  summon-time snapshot of the rows. The session-scoped deferral and its tests are
+  part of this one end-to-end unit; the rendering path outside a session is not touched.
+- **Requirements:** R1–R7 and the verification part of R8; O1–O12 including O6a.
+- **Dependencies:** Landed U1–U4; verify current main rather than repeating them.
+- **Files:** Modify `Sources/GithudApp/HUDPanelController.swift`,
+  `Sources/GithudApp/IslandContentView.swift`, `Sources/GithudApp/HUDPanel.swift`,
+  `Sources/GithudCore/JumpQuery.swift` (add `JumpSnapshot`),
+  `Sources/GithudCore/KeySession.swift`, `Sources/GithudCore/PlainWords.swift`.
+  `Sources/GithudApp/IslandSurfaceFactory.swift` is not expected to change.
+  Test through `Tests/GithudCoreTests/main.swift`,
+  `Tests/GithudAppSnapshots/main.swift` and `Tests/GithudAppSnapshots/run.sh`.
+  Existing `scripts/ax-drive.swift` remains read-only reference.
+- **Approach:** At summon, capture `JumpSnapshot` (the three row arrays, the pulse,
+  inbound and lens preferences, and `selfLogin`) and narrow it for the initial
+  selection. While the session is live, `handle(_:)` records an owed render for the
+  data cases and an owed surface rebuild for the appearance cases instead of running
+  them; the screen-parameter case still re-anchors the panel. A query edit runs a
+  row-only update on the attached island: rebuild the rows below the header from the
+  snapshot, update the count and hint in place. Every session-ending choke point
+  detaches the editor, clears the session values, then replays the owed rebuild and
+  render once from the live model. Install the native field, delegate, session-scoped
+  undo and keyboard table together; feed changes through the existing single narrowing
+  call, now over the snapshot. Remove manual input/paste paths and correct
+  accessibility focus. There is no separately shipped rendering foundation or
+  qualification unit.
+- **Patterns to follow:** LedgerCardView's in-place apply and native delegate;
+  HUDPanel's shared Edit dispatch; existing scroll/peek carry, KeySelection,
+  row open/peek actions, surface/grain ownership and native test runner.
+- **Test scenarios:**
+  - *Happy path:* punctuation/uppercase, insertion in the middle, selection
+    replacement, word deletion, native paste, undo/redo; results track text.
+    Up/Down changes selected result without moving editing focus; Return opens once.
+  - *Editing edges:* spaces-only clear-vs-dismiss and hint; clear/undo/clear/dismiss;
+    long text, keypad Enter, native Tab traversal, unowned modified commands,
+    Unicode and marked-text composition. Composition commands never act on results.
+  - *Lifecycle edges:* edit, peek and interrupted morphs preserve editor identity,
+    selection, marked range and undo. A poll that adds, removes or changes rows
+    mid-session changes nothing on screen and nothing the session computes; a theme,
+    transparency or contrast flip mid-session changes nothing on screen; a screen
+    change re-anchors the panel and nothing else; session exit by esc, ⏎, hide,
+    collapse, card or key loss renders the newest rows and appearance exactly once.
+    Row maps, folds, tails, scroll and peeks remain consistent. Mouse/pill renders
+    and hit targets are pixel-unchanged, since their path did not change.
+  - *Error paths:* refused key/editor acquisition retires the session; late callbacks
+    cannot recreate it; undo cannot recover a previous query or reach ledger history.
+    Missing permission/tooling or blank capture is unverified evidence, not a pass.
+  - *Integration:* exercise production native callbacks in isolated fixture windows
+    with captured destinations and synthetic text, not only Core intent methods.
+    Then use a contained fixture session and disposable foreground marker document
+    to witness global summon, editor-only input, Escape focus return, mouse non-key
+    behavior and external AX focus. Test Return/browser focus separately; opening a
+    browser legitimately changes the foreground app.
+- **Verification:** Native editing, the session snapshot, the deferral and O1–O12
+  (including O6a) hold through the relevant tests. Remove the artificial caret,
+  character allowlist, manual deletion helpers and query paste interceptor. Rewrite
+  the existing key-map suite for result commands. Report local/native and live focus
+  evidence separately.
+- **Runtime evidence:** unverified — extend and run the native runner against the
+  production integration, then the authorized live fixture exercise. The isolated
+  planning probe, old renders and WP-6k recording do not prove this integration.
+- **Checkpoint:** auto — Core suite, native integration/render checks and app build;
+  fix observed failures before landing this one source commit. Attempt the contained
+  live exercise when its target/permission conditions hold. If live evidence cannot
+  be obtained, record exactly what is unverified, continue independent U5 preparation,
+  and hold U5's final proof commit. Green local checks do not certify global input.
+  Never synthesize events into an unknown or unrelated app.
+
+##### U5. Reconcile laws, README and the final proof record
+
+- **Goal:** Complete the original pending unit using the native editor's real behavior.
+- **Requirements:** R3, R7, R8; original AC10–12 and D5.
+- **Dependencies:** U6. Drafting can proceed while live evidence is unavailable;
+  recording and the final commit require the implemented editor and current proof.
+- **Files:** Modify `docs/TOPOLOGY.md`, `README.md`,
+  `Tests/GithudCoreTests/main.swift`, and this agenda's amendments section.
+  Create only the authorized new input-routing proof artifact and manifest in
+  `loop/evidence/`; no other loop edits.
+- **Approach:** Carry the original L1 narrowing boundary, L2 admitted-vs-narrowed
+  disclosure and L3 destination-walk explanation into law text and assertions in
+  the same commit. Document the native editing/peek/Escape contract. Record the final
+  contained input-routing exercise and pin its evidence
+  to tested source revision/fingerprint and artifact hashes.
+- **Patterns to follow:** TOPOLOGY's law/assertion rule; README keyboard table;
+  WP-6k manifest's witnessed/not-witnessed distinction.
+- **Test scenarios:** *Laws:* input = matched plus unmatched; existing folds/preferences
+  still account for their own rows; pill/glyph use admitted rows; keyboard walks the
+  drawn set plus the trailing destination; never zero-of-total. *Docs/proof:*
+  every claimed behavior has a relevant witness; real VoiceOver speech is not
+  claimed from AX queries alone.
+- **Verification:** Law text and assertions agree, README no longer promises
+  Space/right-arrow peek or label-only input, README states that the rows stay as
+  they were at summon until the session ends (AC8's live re-narrowing is gone), and
+  the current input-routing record names both successes and any still-unverified
+  human observation.
+- **Runtime evidence:** the actual recording of U6's native editor; capture any
+  missing live witnesses here. Test/build success and old artifacts are insufficient.
+- **Checkpoint:** gate — current complete input-routing evidence plus both scripts
+  green → commit/push and close this plan; missing recording/assistance → hold this
+  commit, finish independent local docs/tests, report the exact missing witness.
+  No bare user “looks fine” is substituted for a missing recording.
+
+#### Scope boundaries and system-wide impact
+
+- Same island, header geometry, summon chord, parser, lane ordering and GitHub URL
+  fallback. No palette, resolver, fuzzy matching or match highlighting.
+- No stored query history, persistence change, new dependency, token access or
+  new network path. Existing pending follow-ups stay recorded in the original
+  Deferred to Follow-Up Work section; none is absorbed here.
+- Pointer peek and the row highlight survive. Only the keyboard peek binding changes.
+- Interaction chain: summon → native first responder → control delegate →
+  query/result update or app command → existing row action → session teardown.
+  Native edits are synchronous; model renders retain their existing coalescing.
+- Surface, grain and morph code is not touched: the island's rendering path outside
+  a session is the one that ships today. Inside a session the island is not
+  re-rendered at all except by the query's row-only update.
+- The rows a session shows are its summon-time snapshot until dismissal. A row
+  opened from the snapshot may have changed on GitHub meanwhile; the destination is
+  a URL, so it still opens the right thing.
+- Ledger's secure editor continues through the shared Edit router with its own
+  delegate and default undo scope. Never test it with real credentials.
+- Query and selection equality remains sufficient for local snapshots: main-thread
+  callbacks are serialized and the existing poll reducer owns network freshness.
+  This plan adds no async query resolver or new event taxonomy.
+
+#### Disconfirming evidence and bug-trace check
+
+| Motivating failure / contract | Falsifier and locking test | Required result |
+|---|---|---|
+| Shift punctuation/uppercase rejected | native-edit-operations sends normal key events through the field | All printable input stays native; no modifier allowlist |
+| Option–Backspace needed custom code | Native editor deletes from middle/selection, then undo | No end-only manual deletion survives |
+| No input cue on invoke | session-acquires-native-editor checks actual first responder and native placeholder | Prompt/editor on successful keyboard summon |
+| Rebuild destroys selection/composition | poll-deferred-during-session and appearance-deferred-during-session capture editor identity and ranges, then fire a poll and a theme flip mid-session | Same field/editor, caret, marked range and undo; island header identity unchanged |
+| Session narrows against rows the user has not seen | Core test mutates the model rows after summon and re-narrows | Count, walk and destination come from `JumpSnapshot`; nothing changes until exit |
+| Deferred updates are lost or applied twice | exit-applies-deferred-updates ends the session by each choke point after owed changes | Newest rows and appearance render exactly once at exit |
+| IME confirmation opens a PR | composition-command-priority counts result actions during composition | Zero app actions until composition is resolved |
+| AX reports result instead of editor | editor-focus-versus-result-selection uses external AX on live panel | Actual editing focus plus separate selected-result state |
+| Mouse summon captures letters | mouse-summon-never-edits with disposable foreground markers | Marker reaches foreground only |
+| Query text leaks through callbacks/undo | query-log-remains-content-free and editor-session-teardown | No diagnostic content; later sessions/ledger cannot recover query |
+| Count and keyboard walk disagree | Existing narrowing suites plus native row-map comparison | Matching count truthful; selected IDs are drawn |
+
+Every row maps to R1–R8 and a named unit above; no motivating failure is waived.
+An editor/range reset, a duplicate browser open, an unexpected app activation,
+or any marker routed to an unrelated app kills the corresponding proof. Fix
+the mechanism; do not downgrade the test or substitute a screenshot.
+Performance check: native editor never resets during a 100-edit fixture sequence;
+measure edit-to-result render duration and report it. A visible backlog or lost edit
+fails qualification; do not claim a cross-machine latency guarantee.
+
+#### Build Execution Contract
+
+- **Closed decisions (approved 2026-09-05):** native NSTextField; summon-time
+  `JumpSnapshot` for every in-session computation; poll and appearance updates
+  deferred to session exit; session-ending choke points stay immediate; the
+  rendering path outside a session is unchanged (no persistent root); native
+  Edit/undo ownership; composition gets command priority; keyboard table; one
+  narrowing result; no global hotkey/network/persistence changes.
+- **Builder autonomy:** exact private method signatures, layout constraint factoring,
+  the shape of result-update arguments, and test fixture names. Keep names from the
+  ledger. Record a reversible implementation choice and continue.
+- **Verify at contact:** native newline/Escape selectors and keypad flags → native
+  event tests → adjust only the selector translation, not the editing model.
+  HUDPanel's field-editor lookup → execute lookup for the query and synthetic
+  ledger clients, assert editor/history isolation → use NSWindow's documented
+  delegate provision if overriding lookup is not called on the actual edit path.
+  Keep the same JumpFieldEditor ownership and native editing; do not add manual undo.
+  The deferral → fire `.radar`, `.theme` and `didChangeScreenParameters` mid-session
+  in the native runner → if any path still reaches `buildSurface()` or a full
+  `render()` while the session is live, route that case through the owed flags; never
+  reparent the active editor to survive it.
+  Marked text publication → real composition tests → observe native commit/end-edit
+  notifications as needed without editing its buffer.
+- **Expected gates:** every landed unit passes `scripts/test.sh` and
+  `scripts/build-app.sh`; U6 also runs the native runner. No failing test is
+  accepted because a later unit owns its file. UI unavailability is unverified
+  evidence and blocks only proof-dependent actions, never ordinary local work.
+- **Authority:** use this checkout on main, preserve pre-existing untracked files,
+  stage explicit unit paths, and push each green unit as already authorized.
+  No branch/PR/release. Only U5's new proof artifact/manifest may be written under
+  loop. The existing agenda is the plan home. A different public artifact location
+  or unrelated source cleanup is not implied by this plan.
+- **Contained effects:** deterministic tests use in-process windows and a captured
+  open-destination callback; no real clipboard or browser effects. Live proof may
+  operate only a verified disposable marker document and fixture app under the
+  owner's supervised exercise. Before sending global keys, identify both targets
+  and exclude send/submit surfaces. If supervision, target identity or permissions
+  are missing, hold that live effect and continue native/local work.
+- **Human inventory:** native-editor design approval is the judgment requested by
+  this document. Subsequent human assistance is needed only for unavailable OS
+  permissions/global-input tooling or the supervised focus recording; local editor
+  correctness uses synthetic fixtures without secrets. No real PAT is needed for
+  this change. Daily-use taste can be reported against the built artifact; it does
+  not block deterministic implementation. The former per-keystroke-rebuild and
+  Space-rule decisions are replaced here, not left as another unanswered pause.
+- **Stop:** only when required external assistance is still unavailable after all
+  safe local work is exhausted, or an observed integration cannot preserve the
+  native editing contract within scope. Report the failed witness and the exact
+  assistance required. Never mark missing evidence passed.
+
+#### Risks and confidence
+
+| Risk | Mechanism / proof |
+|---|---|
+| A refresh path not listed here still reaches the island mid-session and kills the editor | Verify-at-contact fires every `handle(_:)` case and the screen notification mid-session in the native runner |
+| Owed updates replay twice or not at all at exit | exit-applies-deferred-updates covers every choke point; flags cleared before the replay |
+| A long-open session shows stale rows | Accepted and documented (README, U5); the destination is a URL and stays valid |
+| Query history reaches ledger/next query | Query-only JumpFieldEditor, exact client identity checks and teardown tests |
+| Composition consumes navigation/open keys differently | Native delegate guard plus actual candidate-window witness |
+| Result refresh steals text focus through old AX events | Remove row-focus override; announce explicit selection separately |
+| UI tool remains unavailable | Continue native tests and docs; hold only live proof/final evidence commit |
+
+The source inspection and isolated probe justify this architecture, not a claim
+that the integrated feature already works. Global input, actual IME candidates,
+VoiceOver speech and foreground-app hand-back remain distinct evidence obligations.
 
 ## Plan
 

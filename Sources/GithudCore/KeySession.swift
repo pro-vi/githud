@@ -19,8 +19,8 @@ import Foundation
 ///
 /// 3. **The key map.** Which keyCodes the session consumes — navigation plus printable
 ///    single characters, delete, and the query-aware esc/space/right-arrow rules. Modified
-///    chords are rejected by the controller before they reach this pure map; ⌘V has its
-///    explicit panel route.
+///    chords are rejected by the controller except Option, whose Backspace rule lives
+///    here; ⌘V has its explicit panel route.
 public enum KeySession {
     public static let destinationID = "jump:github"
 
@@ -88,6 +88,7 @@ public enum KeySession {
         case peek          // 49  — toggle the focused row's chevron peek (no-op without one)
         case type(Character)
         case deleteBackward
+        case deleteWordBackward
         case clearQuery
         case passthrough   // everything else
     }
@@ -95,7 +96,10 @@ public enum KeySession {
     /// The ratified query-aware key map. Keypad Enter (76) and Tab (48) remain
     /// passthrough even though their character strings contain control characters.
     public static func intent(forKeyCode code: UInt16, characters: String?,
-                              hasQuery: Bool) -> Intent {
+                              hasQuery: Bool, optionOnly: Bool = false) -> Intent {
+        if optionOnly {
+            return code == 51 && hasQuery ? .deleteWordBackward : .passthrough
+        }
         switch code {
         case 126: return .moveUp
         case 125: return .moveDown

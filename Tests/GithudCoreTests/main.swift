@@ -4613,6 +4613,14 @@ suite("KeySession — flattened actionable list: radar then pulse, structure ski
 }
 
 suite("KeySession — the query-aware key map") {
+    expectEqual(KeySession.intent(forKeyCode: 51, characters: nil, hasQuery: true, optionOnly: true),
+                .deleteWordBackward, "Option–Backspace deletes a word")
+    expectEqual(KeySession.intent(forKeyCode: 51, characters: nil, hasQuery: false, optionOnly: true),
+                .passthrough, "Option–Backspace on an empty query falls through")
+    expectEqual(KeySession.intent(forKeyCode: 0, characters: "å", hasQuery: true, optionOnly: true),
+                .passthrough, "Option-letter stays unconsumed")
+    expectEqual(KeySession.intent(forKeyCode: 36, characters: nil, hasQuery: true, optionOnly: true),
+                .passthrough, "Option–Return stays unconsumed")
     func intent(_ code: UInt16, _ characters: String? = nil, hasQuery: Bool = false) -> KeySession.Intent {
         KeySession.intent(forKeyCode: code, characters: characters, hasQuery: hasQuery)
     }

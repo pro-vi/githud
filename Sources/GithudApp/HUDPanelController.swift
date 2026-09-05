@@ -1,6 +1,17 @@
 import AppKit
 import GithudCore
 
+extension JumpQuery {
+    /// AppKit's word boundary rule matches native Option–Backspace, including
+    /// punctuation and UTF-16 indexing. The query's insertion point is always its end.
+    mutating func deleteWordBackward() {
+        let string = NSAttributedString(string: text)
+        guard string.length > 0 else { return }
+        let boundary = string.nextWord(from: string.length, forward: false)
+        text = (text as NSString).substring(to: boundary)
+    }
+}
+
 /// Positions, shows, and renders the HUD overlay panel and its glass island.
 ///
 /// WP-6a shape: this controller is LIFECYCLE + RENDER COORDINATION only. All app state
@@ -673,14 +684,14 @@ final class HUDPanelController {
     /// editable responder and falls through harmlessly; a card's keystrokes never
     /// reach here — its field editor is first responder). Selection moves are 0ms;
     /// the peek toggle inherits the chevron click's own motion sanction (the same
-    /// onPeekToggle → reflow seam). MODIFIED chords (⌘↓, ⌥⏎, …) fall through: the
-    /// ratified map is plain ↑/↓/⏎/esc/space — consuming surplus chords would be
-    /// unratified capture (review panel: AppKit LOW / trust note 5).
+    /// onPeekToggle → reflow seam). Option–Backspace deletes the previous word;
+    /// other modified chords fall through (paste has its own panel route).
     private func handleSessionKey(_ event: NSEvent) -> Bool {
         guard keySelection != nil, var query = jumpQuery else { return false }
-        guard event.modifierFlags.intersection(.deviceIndependentFlagsMask).isEmpty else { return false }
+        let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+        guard modifiers.isEmpty || modifiers == .option else { return false }
         switch KeySession.intent(forKeyCode: event.keyCode, characters: event.characters,
-                                 hasQuery: !query.isEmpty) {
+                                 hasQuery: !query.text.isEmpty, optionOnly: modifiers == .option) {
         case .moveUp:
             keySelection?.moveUp()
             (contentView as? IslandContentView)?.setKeyFocus(id: keySelection?.selectedID)
@@ -718,6 +729,12 @@ final class HUDPanelController {
             if !query.text.isEmpty { query.text.removeLast() }
             jumpQuery = query
             debugJumpQuery("delete")
+            renderNow()
+            return true
+        case .deleteWordBackward:
+            query.deleteWordBackward()
+            jumpQuery = query
+            debugJumpQuery("delete word")
             renderNow()
             return true
         case .clearQuery:

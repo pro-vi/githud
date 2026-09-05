@@ -100,4 +100,11 @@ for themeID in [ThemeID.github, .color] {
         window.contentView = nil
     }
 }
+for (input, expected) in [("fix review", "fix "), ("review", ""), ("", ""),
+                          ("fix review   ", "fix "), ("feat/review", "feat/"),
+                          ("café résumé", "café "), ("👩🏽‍💻 review", "👩🏽‍💻 ")] {
+    var query = JumpQuery(input)
+    query.deleteWordBackward()
+    check(query.text == expected, "native word deletion: \(input.debugDescription) → \(query.text.debugDescription)")
+}
 exit(failures == 0 ? 0 : 1)

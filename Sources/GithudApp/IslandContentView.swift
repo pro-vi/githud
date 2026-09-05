@@ -135,14 +135,18 @@ final class IslandContentView: NSView {
         // Reading-freshness banner (the sanctioned `caution` use): ONLY when degraded —
         // a stalled/failing poll leaves last-good data on screen, so say so. Quiet otherwise.
         if let banner = freshnessBanner(freshness) { headerViews.append(banner) }
-        headerViews.append(makeHeader(count: rows.count, caughtUpPhrase: caughtUpPhrase,
-                                      jump: jump, jumpCount: jumpCount))
+        let headerRow = makeHeader(count: rows.count, caughtUpPhrase: caughtUpPhrase,
+                                   jump: jump, jumpCount: jumpCount)
+        headerViews.append(headerRow)
         let header = NSStackView(views: headerViews)
         header.orientation = .vertical
         header.alignment = .leading
         header.spacing = 8
         header.translatesAutoresizingMaskIntoConstraints = false
         headerStack = header
+        if jump != nil {
+            headerRow.widthAnchor.constraint(equalTo: header.widthAnchor).isActive = true
+        }
 
         // TWO independent scroll panes — the H1 "Needs you" radar and the H2 "Your PRs"
         // pulse each scroll WITHIN their own pane, so a long notification list never pushes
@@ -378,7 +382,7 @@ final class IslandContentView: NSView {
         var nothingMatches: NSView?
         if queryActive, rows.isEmpty, inbound.isEmpty, pulse.isEmpty {
             let block = affirmationBlock(line1: PlainWords.jumpNothingMatches,
-                                         line2: PlainWords.jumpNothingMatchesDetail)
+                                         line2: nil)
             nothingMatches = block
             middle.append(block)
         }
@@ -733,7 +737,7 @@ final class IslandContentView: NSView {
         // (live PRs below, confirmed first poll) — otherwise the bare wordmark, exactly as
         // before a confirmed poll or beside the full affirmation block (one treatment only).
         var views: [NSView]
-        if let jump, !jump.isEmpty {
+        if let jump {
             let line = JumpLineView(text: jump.text, count: jumpCount, theme: theme)
             line.setContentHuggingPriority(.defaultLow, for: .horizontal)
             line.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
@@ -924,9 +928,9 @@ final class IslandContentView: NSView {
 /// a field editor or second responder—so the panel keeps one keyboard router.
 final class JumpLineView: NSStackView {
     init(text: String, count: String?, theme: Theme) {
-        let label = NSTextField(labelWithString: text)
+        let label = NSTextField(labelWithString: text.isEmpty ? PlainWords.jumpPlaceholder : text)
         label.font = .systemFont(ofSize: 13, weight: .medium)
-        label.textColor = theme.inkPrimary
+        label.textColor = text.isEmpty ? theme.inkSecondary : theme.inkPrimary
         label.lineBreakMode = .byTruncatingTail
         label.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 
@@ -943,7 +947,7 @@ final class JumpLineView: NSStackView {
         spacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
         spacer.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 
-        var views: [NSView] = [label, caret, spacer]
+        var views: [NSView] = text.isEmpty ? [caret, label, spacer] : [label, caret, spacer]
         if let count {
             let countLabel = NSTextField(labelWithString: count)
             countLabel.font = .monospacedDigitSystemFont(ofSize: 11, weight: .regular)
@@ -957,9 +961,10 @@ final class JumpLineView: NSStackView {
         orientation = .horizontal
         alignment = .centerY
         spacing = 6
+        setCustomSpacing(2, after: text.isEmpty ? caret : label)
         setAccessibilityElement(true)
         setAccessibilityRole(.staticText)
-        setAccessibilityLabel(count.map { "\(text), \($0)" } ?? text)
+        setAccessibilityLabel(text.isEmpty ? PlainWords.jumpPlaceholder : count.map { "\(text), \($0)" } ?? text)
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
@@ -1670,7 +1675,6 @@ final class JumpDestinationRowView: PeekableRowView {
         super.init(url: URL(string: url), onPeekToggle: nil)
 
         keyFocusFill = theme.hoverFill
-        keyFocusBarColor = theme.inkPrimary
         hoverFill = theme.hoverFill
         wantsLayer = true
         layer?.cornerRadius = 6
@@ -1748,10 +1752,9 @@ final class RadarRowView: PeekableRowView {
     init(row: RadarRow, theme: Theme, peeked: Bool = false, onPeekToggle: ((Bool) -> Void)? = nil) {
         super.init(url: row.url.flatMap(URL.init(string:)), onPeekToggle: onPeekToggle)
 
-        // WP-6k ink-bar focus tokens (base class executes): hoverFill + inkPrimary bar.
+        // Keyboard selection uses the shared held-hover fill.
         // Set unconditionally — a nil-url row is still selectable (⏎ just no-ops on it).
         keyFocusFill = theme.hoverFill
-        keyFocusBarColor = theme.inkPrimary
 
         // The subtitle's age is formatted AT RENDER from the row's timestamp (never a baked
         // "· 2h") — so every rebuild (poll tick, expand) shows the correct age. `Date()` is the
@@ -1910,8 +1913,8 @@ final class PulseRowView: PeekableRowView {
     /// argued; the revert is this one predicate.
     ///
     /// The demotion is applied PER ELEMENT, never as `alphaValue` on the row: this view's layer
-    /// is where `setKeyFocused` paints the selection fill, and the 3pt ink bar is added as its
-    /// SUBVIEW (see HUDPanel.setKeyFocused) — a row-level alpha composites both, leaving the
+    /// is where `setKeyFocused` paints the selection fill — a row-level alpha dims it,
+    /// leaving the
     /// ⌃⌥G cursor dimmest exactly where the keyboard walk ends, and dimming the hover band that
     /// says "this is clickable". Ink and weight only; the peek, the hover band, the click
     /// target and the a11y form are untouched (VoiceOver already speaks "draft" — the subtitle
@@ -1922,9 +1925,8 @@ final class PulseRowView: PeekableRowView {
         let subdued = row.isDraft || row.isStale
         super.init(url: URL(string: row.url), onPeekToggle: onPeekToggle)
 
-        // WP-6k ink-bar focus tokens — mirrors RadarRowView (see its comment).
+        // Keyboard selection uses the shared held-hover fill.
         keyFocusFill = theme.hoverFill
-        keyFocusBarColor = theme.inkPrimary
 
         // Age formatted AT RENDER from the row's timestamp (never baked) — mirrors RadarRowView.
         // Owner lens: `elideOwner` drops the prefix a title already carries (or the
@@ -2059,7 +2061,6 @@ final class InboundRowView: PeekableRowView {
         super.init(url: URL(string: row.url), onPeekToggle: onPeekToggle)
 
         keyFocusFill = theme.hoverFill
-        keyFocusBarColor = theme.inkPrimary
 
         // Waiting-age formatted AT RENDER from the row's opened-at timestamp (never baked).
         let subtitleText = InboundPresenter.displaySubtitle(for: row, now: Date())

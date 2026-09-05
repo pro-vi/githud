@@ -641,6 +641,8 @@ final class HUDPanelController {
             endKeySummonSession()
             return
         }
+        // The session now owns the keyboard: draw its empty jump line immediately.
+        renderNow()
         debugKeyLog("session begin — isKeyWindow=true selected=\(keySelection?.selectedID ?? "none")")
     }
 

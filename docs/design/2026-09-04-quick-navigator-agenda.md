@@ -126,7 +126,7 @@ line puts the island away as today. `↑ ↓ ⏎` walk and open the narrowed row
 
 ## Build-time spec amendments (recorded, not silent)
 
-*(none yet — a builder who overturns D1–D7 records the amendment here, with the reason)*
+After the U4 pause, the owner reported “the white thing looks ugly on open and no inline input on invoke” and requested screenshots and fixes. This amends AC9 for keyboard summons: the header shows an empty “Type to jump…” line as soon as the session acquires key; mouse summons keep the ordinary header. Selection uses a stronger background highlight instead of the white edge strip. D1 still holds: no editable field. The no-match state keeps one sentence; its extra paragraph was removed after a native render showed horizontal overflow. Native AppKit view renders cover mouse, empty-session, number, no-match, and long-query states in two themes. They do not prove global shortcut delivery or foreground-app focus return. The computer-use runtime failed before capture with `process is not defined`. D4 and the per-keystroke rebuild remain unchanged pending the keyboard exercise.
 
 ## Plan
 

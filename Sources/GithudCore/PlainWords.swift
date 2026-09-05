@@ -14,10 +14,8 @@ import Foundation
 public enum PlainWords {
     // MARK: Quick navigator — one home for jump-line and destination-row words.
 
-    public static let jumpPlaceholder = "Type to jump · #214, a repo, a branch"
+    public static let jumpPlaceholder = "Type to jump…"
     public static let jumpNothingMatches = "Nothing on the island matches."
-    public static let jumpNothingMatchesDetail =
-        "The island only knows your PRs, inbound PRs and issues, and what needs you. Everything else is the row below."
 
     public static func jumpCount(matched: Int, admitted: Int) -> String {
         "\(matched) of \(admitted)"

@@ -179,58 +179,34 @@ class IslandClickableView: NSView {
     override func mouseEntered(with event: NSEvent) {
         guard let hoverFill else { return }
         wantsLayer = true
-        setHoverBackground(hoverFill.cgColor)
+        if !keyFocused { setHoverBackground(hoverFill.cgColor) }
         NSCursor.pointingHand.set()
     }
     override func mouseExited(with event: NSEvent) {
         guard hoverFill != nil else { return }   // inert views were never highlighted → nothing to fade
         NSCursor.arrow.set()
-        // WP-6k one-vocabulary rule: key focus is "a persistent hover you steer" — while
-        // the ink bar sits here, the pointer leaving must not fade the held fill.
+        // Pointer exit must not fade the keyboard selection.
         guard !keyFocused else { return }
         setHoverBackground(NSColor.clear.cgColor)
     }
 
-    // MARK: - WP-6k ink-bar key focus (the ⌃⌥G list session's selection treatment)
+    // MARK: - Keyboard row selection
 
-    /// Set by the actionable rows only (theme.hoverFill / theme.inkPrimary); nil on
-    /// every other clickable (pill, buttons, footer) — those can never wear the bar.
+    /// Set by actionable rows only; other clickable views never take row focus.
     var keyFocusFill: NSColor?
-    var keyFocusBarColor: NSColor?
-    private var keyFocusBar: NSView?
     private(set) var keyFocused = false
 
-    /// The ratified selection treatment: theme.hoverFill background + a 3px ×
-    /// (rowHeight−8) left bar in inkPrimary, radius 1.5, at x=0 — applied in 0ms (the
-    /// bar is a steered cursor, not motion; Reduce Motion has nothing to reduce). The
-    /// bar's top/bottom insets ride Auto Layout, so a peeked row's taller frame keeps
-    /// the bar spanning rowHeight−8 for free.
+    /// A stronger held hover fill distinguishes keyboard selection from pointer
+    /// hover without placing a bright strip against the status glyph.
+    /// The row's own layer follows its bounds through peek reflow, with no animation.
     func setKeyFocused(_ focused: Bool) {
-        guard focused != keyFocused, let fill = keyFocusFill, let barColor = keyFocusBarColor else { return }
+        guard focused != keyFocused, let fill = keyFocusFill else { return }
         keyFocused = focused
         wantsLayer = true
         layer?.removeAnimation(forKey: "hoverFill")   // 0ms — never ride a hover fade out/in
         if focused {
-            layer?.backgroundColor = fill.cgColor
-            if keyFocusBar == nil {
-                let bar = NSView()
-                bar.translatesAutoresizingMaskIntoConstraints = false
-                bar.wantsLayer = true
-                bar.layer?.backgroundColor = barColor.cgColor
-                bar.layer?.cornerRadius = 1.5
-                bar.layer?.cornerCurve = .continuous
-                addSubview(bar)
-                NSLayoutConstraint.activate([
-                    bar.leadingAnchor.constraint(equalTo: leadingAnchor),           // at x=0
-                    bar.widthAnchor.constraint(equalToConstant: 3),
-                    bar.topAnchor.constraint(equalTo: topAnchor, constant: 4),      // height =
-                    bar.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -4), // rowHeight−8
-                ])
-                keyFocusBar = bar
-            }
+            layer?.backgroundColor = fill.withAlphaComponent(min(1, fill.alphaComponent * 1.8)).cgColor
         } else {
-            keyFocusBar?.removeFromSuperview()
-            keyFocusBar = nil
             // Hand-back keeps the one vocabulary: a row the pointer still rests on
             // stays hovered (fill only); otherwise the ink retires completely.
             let stillHovered: NSColor? = (hoverFill != nil && pointerInside()) ? hoverFill : nil

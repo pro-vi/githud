@@ -56,6 +56,8 @@ final class IslandContentView: NSView {
     private var headerStack: NSStackView!   // pinned (count/gear/collapse stay put while the lanes scroll)
     private var bodyStack: NSStackView!     // the lanes (morph body ink — fades as one block)
     private var footerView: NSView!         // the trust-audit inbox link (fades with the body)
+    private var bodyParentConstraints: [NSLayoutConstraint] = []
+    private weak var jumpLine: JumpLineView?
     private var radarScroll: CappedLaneScrollView?  // "Needs you" pane — scrolls independently
     private var inboundScroll: CappedLaneScrollView? // "Inbound" pane (WP 2026-07-09-001)
     private var pulseScroll: CappedLaneScrollView?  // "Your PRs" pane — scrolls independently
@@ -98,7 +100,10 @@ final class IslandContentView: NSView {
          onToggleDrafts: (() -> Void)? = nil,
          lensPreferences: LensPreferences = .default, selfLogin: String? = nil,
          lensLastOpened: [String: Date] = [:],
-         onToggleFoldedOwner: ((String) -> Void)? = nil, onOpenLensCard: (() -> Void)? = nil) {
+         onToggleFoldedOwner: ((String) -> Void)? = nil, onOpenLensCard: (() -> Void)? = nil,
+         jumpSessionID: UUID? = nil,
+         onJumpTextChange: @escaping (String) -> Void = { _ in },
+         onJumpCommand: @escaping (KeySession.Intent) -> Bool = { _ in false }) {
         self.theme = theme
         self.onGearTap = onGearTap
         self.onCollapse = onCollapse
@@ -136,7 +141,10 @@ final class IslandContentView: NSView {
         // a stalled/failing poll leaves last-good data on screen, so say so. Quiet otherwise.
         if let banner = freshnessBanner(freshness) { headerViews.append(banner) }
         let headerRow = makeHeader(count: rows.count, caughtUpPhrase: caughtUpPhrase,
-                                   jump: jump, jumpCount: jumpCount)
+                                   jump: jump, jumpCount: jumpCount,
+                                   jumpSessionID: jumpSessionID,
+                                   onJumpTextChange: onJumpTextChange,
+                                   onJumpCommand: onJumpCommand)
         headerViews.append(headerRow)
         let header = NSStackView(views: headerViews)
         header.orientation = .vertical
@@ -147,270 +155,15 @@ final class IslandContentView: NSView {
         if jump != nil {
             headerRow.widthAnchor.constraint(equalTo: header.widthAnchor).isActive = true
         }
-
-        // TWO independent scroll panes — the H1 "Needs you" radar and the H2 "Your PRs"
-        // pulse each scroll WITHIN their own pane, so a long notification list never pushes
-        // your PRs off-screen (and vice-versa). When a lane is EMPTY it simply doesn't render
-        // (no "all clear" placeholder) — the island shows only what's actually there.
-        var radarPane: NSView? = nil
-        // The "Just cleared" departure receipt (plan 2026-07-21-001, caption B1): one
-        // reveal-line in the caption family, riding the radar lane — collapsed → the
-        // caption button; revealed → header + dimmed one-line rows with a reason suffix
-        // ONLY where the reading actually knew one. Display-only: these views never
-        // enter `rows`, so the affirmation/pill/glyph never see them.
-        var radarViews: [NSView] = rows.map { radarRowView($0) }
-        if !queryActive, showJustCleared {
-            if !clearedRows.isEmpty {
-                radarViews.append(revealedHeader(PlainWords.justClearedHeader, onHide: onToggleJustCleared))
-            }
-            radarViews += clearedRows.map { clearedRowView($0) }
-        } else if !queryActive, !clearedRows.isEmpty {
-            radarViews.append(captionButton(
-                text: PlainWords.justClearedCaption(clearedRows.count),
-                spoken: PlainWords.justClearedCaptionSpoken(clearedRows.count),
-                onClick: onToggleJustCleared))
-        }
-        if !radarViews.isEmpty {
-            let (s, hc) = makeScrollPane(radarViews)
-            radarScroll = s; radarHeightC = hc
-            radarPane = s
-        }
-
-        // The INBOUND lane (WP 2026-07-09-001): the standing "at your door" queue —
-        // issues/PRs OTHERS opened on repos the user owns, waiting-longest first (a
-        // triage queue, not a feed; a new arrival's announcement is the radar's event
-        // row). Bot/draft items hold back to a quiet caption (default-off reveal via
-        // the gear), the same demotion doctrine as the pulse's stale/drafts split.
-        var inboundRowViews: [NSView] = inboundSections.active.map { inboundRowView($0) }
-        // Held-back (bot/draft) arrivals: a default-off subsection. Collapsed → the plain-words
-        // caption button (full-lane click target, flips `showHeldBackInbound`); revealed → a
-        // header that gains a right-edge (hide) control folding it back (the two-way handle the
-        // gear alone used to be). The header renders only WITH its rows — never a lone control.
-        if showHeldBackInbound {
-            if !inboundSections.heldBack.isEmpty {
-                inboundRowViews.append(revealedHeader(PlainWords.heldBackHeader, onHide: onToggleHeldBackInbound))
-            }
-            inboundRowViews += inboundSections.heldBack.map { inboundRowView($0) }
-        } else if !inboundSections.heldBack.isEmpty {
-            inboundRowViews.append(captionButton(
-                text: PlainWords.heldBackCaption(inboundSections.heldBack.count),
-                spoken: PlainWords.heldBackCaptionSpoken(inboundSections.heldBack.count),
-                onClick: onToggleHeldBackInbound))
-        }
-        let inboundLabel: NSView? = inboundRowViews.isEmpty ? nil : sectionHeader("Inbound")
-        inboundLabel?.setContentHuggingPriority(.required, for: .vertical)
-        if !inboundRowViews.isEmpty {
-            let (s, hc) = makeScrollPane(inboundRowViews)
-            inboundScroll = s; inboundHeightC = hc
-        }
-
-        // H2 — the ambient pulse lane: "how's my work doing?" The state of your open PRs
-        // (CI · review · merge). Two facts pull PRs OUT of the live glance into default-off
-        // subsections, so a rotting or WIP PR never crowds it: `isStale` (untouched 14d+ —
-        // the rotting backlog) and `isDraft` ("ignore me, WIP"). The just-raised ones lead
-        // the live list (the presenter floats them up — by position, not by chrome).
-        // The live/stale/drafts split comes from the ONE presenter home of the live-work
-        // rule (WP-6a dedupe) — the same `PulseSections` the collapsed pill + its spoken
-        // a11y value consume, so the three surfaces can never drift apart.
-        let sections = PulsePresenter.sections(for: pulse)
-        // OWNER LENS (WP 2026-07-14-001): the active region renders through the lens
-        // layout — titled owner groups (grouped shape), the one flat run (flat shape), and
-        // folded owners compressed to counted ledger lines that sink to the region's foot.
-        // Fold, not filter: a ledger line always prints its count (RUBRIC #11). Under a
-        // title, rows elide the owner prefix (the title said it); in the flat run, A's
-        // quiet typography applies once the login is known — the viewer's own prefix
-        // elides, a foreign org's token gets one ink step (position + ink, no chrome).
-        // PER-ORG TAILS (WP 2026-07-26-001 for drafts, 2026-07-29-001 for quiet): the lens takes
-        // all three regions, so a group ends with its own WIP and then its own rotting backlog
-        // instead of the lane ending with everyone's.
-        //
-        // THE TWO PREFS GATE AT DIFFERENT LAYERS, and that is the load-bearing asymmetry. The
-        // `showDrafts` gate is HERE, on the lens's input: hidden drafts leave no caption behind, so
-        // hidden and absent mean the same thing and `[]` is honest. `showStale` gates BELOW, at
-        // render: quiet's whole grammar is that it leaves a count behind, so gating its input would
-        // take a quiet-only owner's count off screen with its rows. See `lensRegions`.
-        let lensDrafts = sections.lensRegions(showDrafts: showDrafts).drafts
-        let lensLayout = PulsePresenter.lensLayout(live: sections.active, drafts: lensDrafts,
-                                                   quiet: sections.stale, prefs: lensPreferences,
-                                                   selfLogin: selfLogin, lastOpened: lensLastOpened)
-        // Grouped shape tails its groups; flat shape keeps both terminal regions. Both sets come
-        // from `LensLayout` so the key walk cannot disagree with the render — and so neither can
-        // be rendered while the other is silently forgotten.
-        let terminalDrafts = lensLayout.terminalDrafts
-        let terminalQuiet = lensLayout.terminalQuiet
-        var pulseRowViews: [NSView] = []
-        for entry in lensLayout.entries {
-            switch entry {
-            case .rows(let lensRows):
-                pulseRowViews += lensRows.map { row in
-                    let owner = PulsePresenter.owner(of: row)
-                    guard let selfLogin else { return pulseRowView(row) }
-                    return owner.lowercased() == selfLogin.lowercased()
-                        ? pulseRowView(row, elideOwner: true)
-                        : pulseRowView(row, emphasizeOwner: owner)
-                }
-            case .group(_, let title, let groupRows, let drafts, let quiet):
-                pulseRowViews.append(ownerSubHeader(title))
-                pulseRowViews += groupRows.map { pulseRowView($0, elideOwner: true) }
-                // The tails: subordinate, never peers, drafts then quiet (descending relevance,
-                // ratified). Their rows elide the owner the group title already said, and the ink
-                // demotion is derived inside PulseRowView from the row's own facts — nothing to
-                // pass, nothing to forget.
-                //
-                // The CHROME differs per tail, which is why these are two branches and not a loop:
-                // drafts wear a bare count label (the ratified no-caption asymmetry keeps their
-                // hide control in the gear), while quiet's collapsed caption IS its affordance.
-                if !drafts.isEmpty {
-                    pulseRowViews.append(tailLabel(PlainWords.draftTailLabel(drafts.count)))
-                    pulseRowViews += drafts.map { pulseRowView($0, elideOwner: true) }
-                }
-                if !quiet.isEmpty {
-                    // ONE OBJECT, TWO STATES. The quiet tail is the ratified caption scoped to this
-                    // org, and revealing it flips the verb rather than swapping the control for a
-                    // different kind of thing: "2 gone quiet (show)" ⇄ "2 gone quiet (hide)".
-                    //
-                    // ONE LANE-WIDE PREF — any group's verb toggles every group's quiet, exactly as
-                    // the gear does. Per-owner reveal state is a named non-goal: a second persisted
-                    // set nobody asked for.
-                    pulseRowViews.append(captionButton(
-                        text: showStale ? PlainWords.staleRevealedCaption(quiet.count)
-                                        : PlainWords.staleCaption(quiet.count),
-                        spoken: showStale ? PlainWords.staleRevealedCaptionSpoken(quiet.count)
-                                          : PlainWords.staleCaptionSpoken(quiet.count),
-                        verb: showStale ? PlainWords.hideControl : PlainWords.showVerb,
-                        indent: Self.tailIndent,
-                        onClick: onToggleStale))
-                    if showStale { pulseRowViews += quiet.map { pulseRowView($0, elideOwner: true) } }
-                }
-            case .ledger(let owner, let title, let count, let draftCount, let quietCount, let fresh):
-                pulseRowViews.append(lensLedgerLine(owner: owner, title: title, count: count,
-                                                    draftCount: draftCount, quietCount: quietCount,
-                                                    fresh: fresh))
-            }
-        }
-        // ── The terminal regions: FLAT SHAPE ONLY ────────────────────────────────────────────
-        // When the lane wears owner titles each group carries its own tails, and a terminal region
-        // would be a second, contradictory home for the same rows. Both sets are empty in grouped
-        // shape by `LensLayout`'s post-condition, and fold-filtered in flat shape so a folded
-        // owner's WIP and backlog hide with the rest of its work.
-        //
-        // ORDER: drafts, then quiet — matching the ratified per-group tail order. Before V3 quiet
-        // sat above drafts, inherited from `PulseSections`' field order rather than chosen, so the
-        // flat lane and a grouped lane disagreed about which tail came first. One mental model.
-        //
-        // Drafts (WIP PRs): a default-off subsection of the revealed-header family (WP
-        // 2026-07-12-001 addendum) — the plain-words "Draft PRs" header with a right-edge (hide)
-        // flipping the same `showDrafts` pref the gear flips. PRESERVED ASYMMETRY: no collapsed
-        // caption; hidden drafts stay fully invisible. The header renders only WITH its rows (the
-        // lone-header guard — a hide control over zero rows is a dangling affordance).
-        if showDrafts, !terminalDrafts.isEmpty {
-            pulseRowViews.append(revealedHeader(PlainWords.draftsHeader, onHide: onToggleDrafts))
-            pulseRowViews += terminalDrafts.map { pulseRowView($0) }
-        }
-        // Quiet: collapsed by default to ONE count line — honest (you see it's there + why) without
-        // a 4-month-old conflicted PR dominating the glance. Reveal via the caption button or
-        // gear → "Show PRs gone quiet" (both flip the one `showStale` pref).
-        if showStale {
-            if !terminalQuiet.isEmpty {
-                pulseRowViews.append(revealedHeader(PlainWords.staleHeader, onHide: onToggleStale))
-                pulseRowViews += terminalQuiet.map { pulseRowView($0) }
-            }
-        } else if !terminalQuiet.isEmpty {
-            pulseRowViews.append(captionButton(
-                text: PlainWords.staleCaption(terminalQuiet.count),
-                spoken: PlainWords.staleCaptionSpoken(terminalQuiet.count),
-                onClick: onToggleStale))
-        }
-        // "Your PRs" label is PINNED above its pane (so it stays put while the PRs scroll).
-        // With ≥2 owners present (or anything folded) it carries the lens EYE on its right
-        // edge — hover-revealed within the header band (chrome only when it carries a
-        // control someone might reach for; the single-owner lane never grows one).
-        // The eye's owner set spans ALL THREE regions the lens governs, derived from the SAME
-        // partition the lane and the card use — so "which owners exist" cannot drift between
-        // the eye and the card behind it (it used to be a hand-rolled Set here). A quiet-only
-        // owner joins with no edit beyond the third argument, which is the extraction paying off.
-        //
-        // SCOPE, honestly: with `showDrafts` off the lens gets no drafts (gated lane-wide), so a
-        // folded draft-only owner leaves this set and the eye stops counting it while the card
-        // still lists it unchecked via the folded-remnant rule. Correct — the owner genuinely has
-        // nothing in the lane — but its fold is then reachable only through the gear. Recorded in
-        // the WP plan's open questions. `showStale` has no such effect: quiet is never gated here,
-        // so a quiet-only owner is in this set whether or not its rows are on screen.
-        let presentOwners = Set(PulsePresenter.ownerBuckets(live: sections.active,
-                                                            drafts: lensDrafts,
-                                                            quiet: sections.stale)
-                                    .map(\.key))
-        let foldedPresentCount = presentOwners.filter { lensPreferences.isFolded($0) }.count
-        let lensFolding = lensLayout.entries.contains { if case .ledger = $0 { return true }; return false }
-        let wantsEye = presentOwners.count >= 2 || foldedPresentCount > 0
-        let pulseLabel: NSView?
-        if pulse.isEmpty {
-            pulseLabel = nil
-        } else if wantsEye {
-            let eye = IconButton(symbol: lensFolding ? "eye.slash" : "eye",
-                                 tooltip: PlainWords.lensEyeLabel(foldedCount: foldedPresentCount),
-                                 tint: theme.inkTertiary, hover: theme.hoverFill) { [weak self] in
-                self?.onOpenLensCard?()
-            }
-            pulseLabel = LensEyeHeaderView(title: sectionHeader("Your PRs"), eye: eye)
-        } else {
-            pulseLabel = sectionHeader("Your PRs")
-        }
-        pulseLabel?.setContentHuggingPriority(.required, for: .vertical)
-        if !pulse.isEmpty {
-            let (s, hc) = makeScrollPane(pulseRowViews)
-            pulseScroll = s; pulseHeightC = hc
-        }
-
-        // The middle: radar pane, then the "Your PRs" label, then the pulse pane — each lane
-        // sized to its content (reactive), capped + scrollable when busy. Fully caught up →
-        // the affirmation BLOCK leads instead of the (absent) radar pane; any default-off
-        // pulse subsections (the stale caption, opted-in stale/draft rows) still render
-        // below it — real content, not filler (the per-lane placeholder stays banned).
-        var middle: [NSView] = []
-        var affirmation: NSView?
-        if !queryActive, case .block(let line1, let line2) = caughtUp {
-            let block = affirmationBlock(line1: line1, line2: line2)
-            affirmation = block
-            middle.append(block)
-        }
-        if let radarPane { middle.append(radarPane) }
-        if let inboundLabel { middle.append(inboundLabel) }
-        if let inboundScroll { middle.append(inboundScroll) }
-        if let pulseLabel { middle.append(pulseLabel) }
-        if let pulseScroll { middle.append(pulseScroll) }
-        var nothingMatches: NSView?
-        if queryActive, rows.isEmpty, inbound.isEmpty, pulse.isEmpty {
-            let block = affirmationBlock(line1: PlainWords.jumpNothingMatches,
-                                         line2: nil)
-            nothingMatches = block
-            middle.append(block)
-        }
-        var destinationRow: JumpDestinationRowView?
-        if queryActive, let jumpHandle, let jumpDestination {
-            middle.append(sectionHeader("GitHub"))
-            let row = JumpDestinationRowView(
-                title: PlainWords.jumpDestinationTitle(for: jumpHandle),
-                subtitle: PlainWords.jumpDestinationSubtitle(
-                    for: jumpHandle, offline: pollFailed),
-                url: jumpDestination,
-                failed: pollFailed,
-                theme: theme)
-            keyRows[KeySession.destinationID] = row
-            destinationRow = row
-            middle.append(row)
-        }
-        let body = NSStackView(views: middle)
-        body.orientation = .vertical
-        body.alignment = .leading
-        body.distribution = .fill
-        body.spacing = 8
-        body.translatesAutoresizingMaskIntoConstraints = false
-        // The eyed lane header must span the lane (the eye rides the RIGHT edge; a
-        // leading-aligned stack would otherwise hug it beside the title).
-        if let pulseLabel, pulseLabel is LensEyeHeaderView {
-            pulseLabel.widthAnchor.constraint(equalTo: body.widthAnchor).isActive = true
-        }
+        let body = makeBody(
+            rows: rows, pulse: pulse, inbound: inbound, jump: jump ?? JumpQuery(),
+            jumpHandle: jumpHandle, jumpDestination: jumpDestination,
+            showDrafts: showDrafts, showStale: showStale,
+            showHeldBackInbound: showHeldBackInbound, freshness: freshness,
+            radarConfirmed: radarConfirmed, inboundConfirmed: inboundConfirmed,
+            reviewsConfirmed: reviewsConfirmed, clearedRows: clearedRows,
+            showJustCleared: showJustCleared, lensPreferences: lensPreferences,
+            selfLogin: selfLogin, lensLastOpened: lensLastOpened)
         bodyStack = body
 
         // The trust audit, in-product (consult 004): one click to the full inbox to check
@@ -422,36 +175,26 @@ final class IslandContentView: NSView {
         addSubview(header)
         addSubview(body)
         addSubview(footer)
-        var cons: [NSLayoutConstraint] = [
-            header.topAnchor.constraint(equalTo: topAnchor, constant: 16),
-            header.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 18),
-            header.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -18),
-
+        let bodyParent: [NSLayoutConstraint] = [
             body.topAnchor.constraint(equalTo: header.bottomAnchor, constant: 8),
             body.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 18),
             body.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -18),
             body.bottomAnchor.constraint(equalTo: footer.topAnchor, constant: -8),
-
+        ]
+        var cons: [NSLayoutConstraint] = [
+            header.topAnchor.constraint(equalTo: topAnchor, constant: 16),
+            header.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 18),
+            header.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -18),
+        ]
+        cons += bodyParent
+        cons += [
             footer.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 18),
             footer.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -18),
             footer.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -16),
         ]
-        // Panes span the full body width (no horizontal scroll, rows align with the header).
-        for pane in [radarScroll, inboundScroll, pulseScroll].compactMap({ $0 }) {
-            cons.append(pane.widthAnchor.constraint(equalTo: body.widthAnchor))
-        }
-        // The affirmation block spans the full body width too, so its text CENTERS on the
-        // island (the leading-aligned body stack would otherwise hug it left).
-        if let affirmation {
-            cons.append(affirmation.widthAnchor.constraint(equalTo: body.widthAnchor))
-        }
-        if let nothingMatches {
-            cons.append(nothingMatches.widthAnchor.constraint(equalTo: body.widthAnchor))
-        }
-        if let destinationRow {
-            cons.append(destinationRow.widthAnchor.constraint(equalTo: body.widthAnchor))
-        }
         NSLayoutConstraint.activate(cons)
+        bodyParentConstraints = bodyParent
+        bodyParentConstraints = bodyParent
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
@@ -461,7 +204,7 @@ final class IslandContentView: NSView {
     /// under the cap it shows every row; over it, the lane scrolls (rows stay full height — the
     /// documentView keeps its intrinsic size, only the scroll FRAME is capped). Controller clamps
     /// the total to the screen.
-    func fittingHeight() -> CGFloat {
+    func fittingHeight(maxHeight: CGFloat? = nil) -> CGFloat {
         let w = widthAnchor.constraint(equalToConstant: IslandContentView.width)
         w.isActive = true
         layoutSubtreeIfNeeded()
@@ -480,6 +223,38 @@ final class IslandContentView: NSView {
             scroll.setBottomFade(active: content > hc.constant + 0.5)
         }
         layoutSubtreeIfNeeded()
+        if let maxHeight {
+            var excess = max(0, ceil(fittingSize.height) - maxHeight)
+            // A short display may require more than the normal 240pt per-lane cap.
+            // Distribute the reduction so each nonempty lane keeps its first row while
+            // that is geometrically possible; only then may an extreme cap shrink one
+            // pane below that floor. Document views, selection and offsets stay intact.
+            let panes = [(radarScroll, radarHeightC), (inboundScroll, inboundHeightC),
+                         (pulseScroll, pulseHeightC)].compactMap { scroll, constraint -> (CappedLaneScrollView, NSLayoutConstraint, CGFloat)? in
+                guard let scroll, let constraint, let doc = scroll.documentView,
+                      let first = (doc as? NSStackView)?.arrangedSubviews.first else { return nil }
+                let floor = min(constraint.constant, max(1, ceil(first.fittingSize.height)))
+                return (scroll, constraint, floor)
+            }
+            let protectedReduction = panes.reduce(CGFloat(0)) { total, item in
+                total + max(0, item.1.constant - item.2)
+            }
+            let floorsArePossible = excess <= protectedReduction
+            for (index, item) in panes.enumerated() {
+                guard excess > 0 else { break }
+                let remainingPanes = CGFloat(panes.count - index)
+                let floor = floorsArePossible ? item.2 : 0
+                let reducible = max(0, item.1.constant - floor)
+                let reduction = min(reducible, ceil(excess / remainingPanes))
+                item.1.constant -= reduction
+                excess -= reduction
+            }
+            for (scroll, constraint) in panes.map({ ($0.0, $0.1) }) {
+                guard let doc = scroll.documentView else { continue }
+                scroll.setBottomFade(active: ceil(doc.fittingSize.height) > constraint.constant + 0.5)
+            }
+            layoutSubtreeIfNeeded()
+        }
         let h = ceil(fittingSize.height)
         w.isActive = false   // measurement only — present() drives the real frame
         return h
@@ -493,6 +268,10 @@ final class IslandContentView: NSView {
         ScrollOffsets(radar: radarScroll?.contentView.bounds.origin.y ?? 0,
                       pulse: pulseScroll?.contentView.bounds.origin.y ?? 0,
                       inbound: inboundScroll?.contentView.bounds.origin.y ?? 0)
+    }
+
+    func paneHeightsForTesting() -> [CGFloat] {
+        [radarScroll, inboundScroll, pulseScroll].compactMap { $0?.frame.height }
     }
 
     /// Restore captured offsets into the REBUILT panes (call after the island is framed + laid
@@ -581,6 +360,231 @@ final class IslandContentView: NSView {
         (footerView as? InboxLinkView)?.setHintVisible(visible, hasQuery: hasQuery)
     }
 
+    func jumpLineView() -> JumpLineView? { jumpLine }
+
+    func activeJumpEditor() -> JumpFieldEditor? {
+        guard let line = jumpLine,
+              let editor = line.field.window?.firstResponder as? JumpFieldEditor,
+              editor.sessionID == line.sessionID else { return nil }
+        return editor
+    }
+
+    func endJumpSession() {
+        jumpLine?.endEditingSession()
+    }
+
+    /// The native editor keeps the header attached while the result subtree is
+    /// replaced from the session snapshot. This is the only in-session layout
+    /// mutation; ordinary renders continue through the initializer above.
+    @discardableResult
+    func updateJump(rows: [RadarRow], pulse: [PulseRow], inbound: [InboundRow],
+                    jump: JumpQuery, jumpCount: String?, jumpHandle: JumpQuery.Handle?,
+                    jumpDestination: String?, showDrafts: Bool, showStale: Bool,
+                    showHeldBackInbound: Bool, freshness: Freshness,
+                    radarConfirmed: Bool = false, inboundConfirmed: Bool = false,
+                    reviewsConfirmed: Bool = false, clearedRows: [ClearedRow] = [],
+                    showJustCleared: Bool = false,
+                    lensPreferences: LensPreferences, selfLogin: String?,
+                    lensLastOpened: [String: Date]) -> CGFloat {
+        guard let line = jumpLine else { return fittingHeight() }
+        let offsets = scrollOffsets()
+        if let old = keyFocusedID { keyRows[old]?.setKeyFocused(false) }
+        line.updateCount(jumpCount)
+        keyRows.removeAll(keepingCapacity: true)
+        // The lane references belong to the body being replaced. Clear them before
+        // construction so an empty lane cannot leave fittingHeight() measuring a
+        // detached scroll view.
+        radarScroll = nil; radarHeightC = nil
+        inboundScroll = nil; inboundHeightC = nil
+        pulseScroll = nil; pulseHeightC = nil
+        let oldBody = bodyStack
+        let newBody = makeBody(rows: rows, pulse: pulse, inbound: inbound, jump: jump,
+                               jumpHandle: jumpHandle, jumpDestination: jumpDestination,
+                               showDrafts: showDrafts, showStale: showStale,
+                               showHeldBackInbound: showHeldBackInbound, freshness: freshness,
+                               radarConfirmed: radarConfirmed, inboundConfirmed: inboundConfirmed,
+                               reviewsConfirmed: reviewsConfirmed, clearedRows: clearedRows,
+                               showJustCleared: showJustCleared, lensPreferences: lensPreferences,
+                               selfLogin: selfLogin, lensLastOpened: lensLastOpened)
+        NSLayoutConstraint.deactivate(bodyParentConstraints)
+        oldBody?.removeFromSuperview()
+        bodyStack = newBody
+        addSubview(newBody)
+        let parent = [
+            newBody.topAnchor.constraint(equalTo: headerStack.bottomAnchor, constant: 8),
+            newBody.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 18),
+            newBody.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -18),
+            newBody.bottomAnchor.constraint(equalTo: footerView.topAnchor, constant: -8),
+        ]
+        bodyParentConstraints = parent
+        NSLayoutConstraint.activate(parent)
+        layoutSubtreeIfNeeded()
+        let height = fittingHeight()
+        applyScrollOffsets(offsets)
+        if let keyFocusedID { setKeyFocus(id: keyFocusedID) }
+        return height
+    }
+
+    /// Build only the mutable lane subtree for a live native session. It mirrors the
+    /// initializer's lane assembly and deliberately reads only the values passed by
+    /// the controller (which are the summon-time JumpSnapshot).
+    private func makeBody(rows: [RadarRow], pulse: [PulseRow], inbound: [InboundRow],
+                          jump: JumpQuery, jumpHandle: JumpQuery.Handle?,
+                          jumpDestination: String?, showDrafts: Bool, showStale: Bool,
+                          showHeldBackInbound: Bool, freshness: Freshness,
+                          radarConfirmed: Bool, inboundConfirmed: Bool, reviewsConfirmed: Bool,
+                          clearedRows: [ClearedRow], showJustCleared: Bool,
+                          lensPreferences: LensPreferences, selfLogin: String?,
+                          lensLastOpened: [String: Date]) -> NSStackView {
+        let queryActive = !jump.isEmpty
+        let pollFailed: Bool = { if case .failing = freshness { return true }; return false }()
+        let caughtUp = CaughtUpPresenter.display(rows: rows, pulse: pulse,
+                                                 radarConfirmed: radarConfirmed, freshness: freshness,
+                                                 inboundActive: InboundPresenter.sections(for: inbound).active.count,
+                                                 inboundConfirmed: inboundConfirmed,
+                                                 reviewsConfirmed: reviewsConfirmed)
+
+        var radarViews: [NSView] = rows.map { radarRowView($0) }
+        if !queryActive, showJustCleared {
+            if !clearedRows.isEmpty {
+                radarViews.append(revealedHeader(PlainWords.justClearedHeader, onHide: onToggleJustCleared))
+            }
+            radarViews += clearedRows.map { clearedRowView($0) }
+        } else if !queryActive, !clearedRows.isEmpty {
+            radarViews.append(captionButton(text: PlainWords.justClearedCaption(clearedRows.count),
+                                             spoken: PlainWords.justClearedCaptionSpoken(clearedRows.count),
+                                             onClick: onToggleJustCleared))
+        }
+        var radarPane: NSView?
+        if !radarViews.isEmpty {
+            let (scroll, height) = makeScrollPane(radarViews)
+            radarScroll = scroll; radarHeightC = height; radarPane = scroll
+        }
+
+        let inboundSections = InboundPresenter.sections(for: inbound)
+        var inboundViews: [NSView] = inboundSections.active.map { inboundRowView($0) }
+        if showHeldBackInbound {
+            if !inboundSections.heldBack.isEmpty {
+                inboundViews.append(revealedHeader(PlainWords.heldBackHeader,
+                                                   onHide: onToggleHeldBackInbound))
+            }
+            inboundViews += inboundSections.heldBack.map { inboundRowView($0) }
+        } else if !inboundSections.heldBack.isEmpty {
+            inboundViews.append(captionButton(
+                text: PlainWords.heldBackCaption(inboundSections.heldBack.count),
+                spoken: PlainWords.heldBackCaptionSpoken(inboundSections.heldBack.count),
+                onClick: onToggleHeldBackInbound))
+        }
+        var inboundPane: NSView?
+        if !inboundViews.isEmpty {
+            let (scroll, height) = makeScrollPane(inboundViews)
+            inboundScroll = scroll; inboundHeightC = height; inboundPane = scroll
+        }
+
+        let sections = PulsePresenter.sections(for: pulse)
+        let lensDrafts = sections.lensRegions(showDrafts: showDrafts).drafts
+        let lensLayout = PulsePresenter.lensLayout(live: sections.active, drafts: lensDrafts,
+                                                   quiet: sections.stale, prefs: lensPreferences,
+                                                   selfLogin: selfLogin, lastOpened: lensLastOpened)
+        var pulseViews: [NSView] = []
+        for entry in lensLayout.entries {
+            switch entry {
+            case .rows(let lensRows):
+                pulseViews += lensRows.map { row in
+                    let owner = PulsePresenter.owner(of: row)
+                    guard let selfLogin else { return pulseRowView(row) }
+                    return owner.lowercased() == selfLogin.lowercased()
+                        ? pulseRowView(row, elideOwner: true)
+                        : pulseRowView(row, emphasizeOwner: owner)
+                }
+            case .group(_, let title, let groupRows, let drafts, let quiet):
+                pulseViews.append(ownerSubHeader(title))
+                pulseViews += groupRows.map { pulseRowView($0, elideOwner: true) }
+                if !drafts.isEmpty {
+                    pulseViews.append(tailLabel(PlainWords.draftTailLabel(drafts.count)))
+                    pulseViews += drafts.map { pulseRowView($0, elideOwner: true) }
+                }
+                if !quiet.isEmpty {
+                    pulseViews.append(captionButton(
+                        text: showStale ? PlainWords.staleRevealedCaption(quiet.count)
+                                        : PlainWords.staleCaption(quiet.count),
+                        spoken: showStale ? PlainWords.staleRevealedCaptionSpoken(quiet.count)
+                                          : PlainWords.staleCaptionSpoken(quiet.count),
+                        verb: showStale ? PlainWords.hideControl : PlainWords.showVerb,
+                        indent: Self.tailIndent, onClick: onToggleStale))
+                    if showStale { pulseViews += quiet.map { pulseRowView($0, elideOwner: true) } }
+                }
+            case .ledger(let owner, let title, let count, let draftCount, let quietCount, let fresh):
+                pulseViews.append(lensLedgerLine(owner: owner, title: title, count: count,
+                                                 draftCount: draftCount, quietCount: quietCount, fresh: fresh))
+            }
+        }
+        if showDrafts, !lensLayout.terminalDrafts.isEmpty {
+            pulseViews.append(revealedHeader(PlainWords.draftsHeader, onHide: onToggleDrafts))
+            pulseViews += lensLayout.terminalDrafts.map { pulseRowView($0) }
+        }
+        if showStale, !lensLayout.terminalQuiet.isEmpty {
+            pulseViews.append(revealedHeader(PlainWords.staleHeader, onHide: onToggleStale))
+            pulseViews += lensLayout.terminalQuiet.map { pulseRowView($0) }
+        } else if !lensLayout.terminalQuiet.isEmpty {
+            pulseViews.append(captionButton(
+                text: PlainWords.staleCaption(lensLayout.terminalQuiet.count),
+                spoken: PlainWords.staleCaptionSpoken(lensLayout.terminalQuiet.count),
+                onClick: onToggleStale))
+        }
+
+        let owners = Set(PulsePresenter.ownerBuckets(live: sections.active, drafts: lensDrafts,
+                                                     quiet: sections.stale).map(\.key))
+        let folded = owners.filter { lensPreferences.isFolded($0) }.count
+        let wantsEye = owners.count >= 2 || folded > 0
+        let pulseLabel: NSView? = pulse.isEmpty ? nil : wantsEye
+            ? LensEyeHeaderView(title: sectionHeader("Your PRs"), eye: IconButton(
+                symbol: lensLayout.entries.contains { if case .ledger = $0 { return true }; return false }
+                    ? "eye.slash" : "eye",
+                tooltip: PlainWords.lensEyeLabel(foldedCount: folded), tint: theme.inkTertiary,
+                hover: theme.hoverFill) { [weak self] in self?.onOpenLensCard?() })
+            : sectionHeader("Your PRs")
+        pulseLabel?.setContentHuggingPriority(.required, for: .vertical)
+        var pulsePane: NSView?
+        if !pulse.isEmpty {
+            let (scroll, height) = makeScrollPane(pulseViews)
+            pulseScroll = scroll; pulseHeightC = height; pulsePane = scroll
+        }
+
+        var middle: [NSView] = []
+        if !queryActive, case .block(let line1, let line2) = caughtUp {
+            middle.append(affirmationBlock(line1: line1, line2: line2))
+        }
+        if let radarPane { middle.append(radarPane) }
+        if let inboundPane {
+            middle.append(sectionHeader("Inbound"))
+            middle.append(inboundPane)
+        }
+        if let pulseLabel { middle.append(pulseLabel) }
+        if let pulsePane { middle.append(pulsePane) }
+        if queryActive, rows.isEmpty, inbound.isEmpty, pulse.isEmpty {
+            middle.append(affirmationBlock(line1: PlainWords.jumpNothingMatches, line2: nil))
+        }
+        if queryActive, let jumpHandle, let jumpDestination {
+            middle.append(sectionHeader("GitHub"))
+            let destination = JumpDestinationRowView(
+                title: PlainWords.jumpDestinationTitle(for: jumpHandle),
+                subtitle: PlainWords.jumpDestinationSubtitle(for: jumpHandle, offline: pollFailed),
+                url: jumpDestination, failed: pollFailed, theme: theme)
+            keyRows[KeySession.destinationID] = destination
+            middle.append(destination)
+        }
+        let body = NSStackView(views: middle)
+        body.orientation = .vertical
+        body.alignment = .leading
+        body.distribution = .fill
+        body.spacing = 8
+        body.translatesAutoresizingMaskIntoConstraints = false
+        for child in middle { child.widthAnchor.constraint(equalTo: body.widthAnchor).isActive = true }
+        bodyStack = body
+        return body
+    }
+
     /// Move the ink bar to `id` (nil retires it). 0ms — the bar is a steered cursor, not
     /// motion. The focused row is scrolled fully visible (whole-row, unanimated —
     /// `scrollToVisible` is minimal-scroll, so under the lane cap the lane walks row by
@@ -592,16 +596,17 @@ final class IslandContentView: NSView {
         guard let id, let row = keyRows[id] else { return }
         row.setKeyFocused(true)
         row.scrollToVisible(row.bounds)
-        NSAccessibility.post(element: row, notification: .focusedUIElementChanged)
+        // Result selection is announced separately from the native editor's AX focus.
+        // The row never claims to be the field editor that currently owns key focus.
+        NSAccessibility.post(element: self, notification: .selectedChildrenChanged)
     }
 
     /// The view wearing the bar — the panel's AX-focus mirror reads this.
     func keyFocusedRowView() -> NSView? { keyFocusedID.flatMap { keyRows[$0] } }
 
-    /// ⏎ — the focused row's own Open-on-GitHub path (nil-url guard included).
-    @discardableResult func openKeyFocusedRow() -> Bool {
-        guard let id = keyFocusedID, let row = keyRows[id] else { return false }
-        return row.performOpen()
+    func keyFocusedDestinationURL() -> URL? {
+        guard let id = keyFocusedID else { return nil }
+        return (keyRows[id] as? PeekableRowView)?.url
     }
 
     /// Space — the focused row's own chevron toggle (no-op without a chevron).
@@ -732,13 +737,20 @@ final class IslandContentView: NSView {
     }
 
     private func makeHeader(count: Int, caughtUpPhrase: String? = nil,
-                            jump: JumpQuery? = nil, jumpCount: String? = nil) -> NSView {
+                            jump: JumpQuery? = nil, jumpCount: String? = nil,
+                            jumpSessionID: UUID? = nil,
+                            onJumpTextChange: @escaping (String) -> Void = { _ in },
+                            onJumpCommand: @escaping (KeySession.Intent) -> Bool = { _ in false }) -> NSView {
         // Radar empty: the slot carries the caught-up phrase when the presenter granted one
         // (live PRs below, confirmed first poll) — otherwise the bare wordmark, exactly as
         // before a confirmed poll or beside the full affirmation block (one treatment only).
         var views: [NSView]
         if let jump {
-            let line = JumpLineView(text: jump.text, count: jumpCount, theme: theme)
+            let line = JumpLineView(text: jump.text, count: jumpCount, theme: theme,
+                                    sessionID: jumpSessionID ?? UUID(),
+                                    onTextChange: onJumpTextChange,
+                                    onCommand: onJumpCommand)
+            jumpLine = line
             line.setContentHuggingPriority(.defaultLow, for: .horizontal)
             line.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
             views = [line]
@@ -924,50 +936,176 @@ final class IslandContentView: NSView {
 
 }
 
-/// The query drawn in the existing header slot. It is labels and ink only—never
-/// a field editor or second responder—so the panel keeps one keyboard router.
-final class JumpLineView: NSStackView {
-    init(text: String, count: String?, theme: Theme) {
-        let label = NSTextField(labelWithString: text.isEmpty ? PlainWords.jumpPlaceholder : text)
-        label.font = .systemFont(ofSize: 13, weight: .medium)
-        label.textColor = text.isEmpty ? theme.inkSecondary : theme.inkPrimary
-        label.lineBreakMode = .byTruncatingTail
-        label.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+/// A field editor whose undo manager belongs to exactly one jump session. The panel
+final class JumpFieldEditor: NSTextView {
+    private(set) var sessionID: UUID
+    private let sessionUndoManager = UndoManager()
 
-        let caret = NSView()
-        caret.wantsLayer = true
-        caret.layer?.backgroundColor = theme.inkSecondary.cgColor
-        caret.translatesAutoresizingMaskIntoConstraints = false
-        NSLayoutConstraint.activate([
-            caret.widthAnchor.constraint(equalToConstant: 1),
-            caret.heightAnchor.constraint(equalToConstant: 14),
-        ])
+    override var undoManager: UndoManager? { sessionUndoManager }
+
+    init(sessionID: UUID) {
+        self.sessionID = UUID()
+        super.init(frame: .zero)
+        self.sessionID = sessionID
+        configure()
+    }
+
+    override init(frame frameRect: NSRect, textContainer container: NSTextContainer?) {
+        self.sessionID = UUID()
+        super.init(frame: frameRect, textContainer: container)
+        configure()
+    }
+
+    private func configure() {
+        isFieldEditor = true
+        isEditable = true
+        isSelectable = true
+        allowsUndo = true
+        isRichText = false
+        usesFontPanel = false
+        isAutomaticQuoteSubstitutionEnabled = false
+        isAutomaticDashSubstitutionEnabled = false
+        isAutomaticSpellingCorrectionEnabled = false
+        drawsBackground = false
+    }
+
+    /// NSTextView exposes its undo manager but does not publish an `undo:` action
+    /// on every field-editor configuration. These are responder actions only; the
+    /// native UndoManager still owns the edit history and text mutation.
+    @objc func undo(_ sender: Any?) { undoManager?.undo() }
+    @objc func redo(_ sender: Any?) { undoManager?.redo() }
+
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+}
+
+final class JumpLineView: NSStackView, NSTextFieldDelegate {
+    let sessionID: UUID
+    let field: NSTextField
+    private let countLabel: NSTextField
+    private let onTextChange: (String) -> Void
+    private let onCommand: (KeySession.Intent) -> Bool
+    private var editingActive = true
+
+    init(text: String, count: String?, theme: Theme, sessionID: UUID = UUID(),
+        onTextChange: @escaping (String) -> Void = { _ in },
+         onCommand: @escaping (KeySession.Intent) -> Bool = { _ in false }) {
+        self.sessionID = sessionID
+        self.field = NSTextField(frame: .zero)
+        self.countLabel = NSTextField(labelWithString: count ?? "")
+        self.onTextChange = onTextChange
+        self.onCommand = onCommand
+        super.init(frame: .zero)
+
+        field.font = .systemFont(ofSize: 13, weight: .medium)
+        field.textColor = theme.inkPrimary
+        field.placeholderAttributedString = NSAttributedString(
+            string: PlainWords.jumpPlaceholder,
+            attributes: [.font: NSFont.systemFont(ofSize: 13, weight: .medium),
+                         .foregroundColor: theme.inkSecondary])
+        field.stringValue = text
+        field.isEditable = true
+        field.isSelectable = true
+        field.isBordered = false
+        field.drawsBackground = false
+        field.focusRingType = .none
+        field.alignment = .left
+        field.usesSingleLineMode = true
+        field.cell?.wraps = false
+        field.cell?.isScrollable = true
+        field.delegate = self
+        field.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        field.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+
+        countLabel.font = .monospacedDigitSystemFont(ofSize: 11, weight: .regular)
+        countLabel.textColor = theme.inkTertiary
+        countLabel.setContentHuggingPriority(.required, for: .horizontal)
+        countLabel.setContentCompressionResistancePriority(.required, for: .horizontal)
+        countLabel.isHidden = count == nil
 
         let spacer = NSView()
         spacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
         spacer.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
-
-        var views: [NSView] = text.isEmpty ? [caret, label, spacer] : [label, caret, spacer]
-        if let count {
-            let countLabel = NSTextField(labelWithString: count)
-            countLabel.font = .monospacedDigitSystemFont(ofSize: 11, weight: .regular)
-            countLabel.textColor = theme.inkTertiary
-            countLabel.setContentHuggingPriority(.required, for: .horizontal)
-            views.append(countLabel)
-        }
-
-        super.init(frame: .zero)
-        views.forEach(addArrangedSubview)
+        addArrangedSubview(field)
+        addArrangedSubview(spacer)
+        addArrangedSubview(countLabel)
         orientation = .horizontal
         alignment = .centerY
         spacing = 6
-        setCustomSpacing(2, after: text.isEmpty ? caret : label)
         setAccessibilityElement(true)
-        setAccessibilityRole(.staticText)
-        setAccessibilityLabel(text.isEmpty ? PlainWords.jumpPlaceholder : count.map { "\(text), \($0)" } ?? text)
+        setAccessibilityRole(.group)
+        setAccessibilityLabel("Jump to a row")
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+    func updateCount(_ count: String?) {
+        countLabel.stringValue = count ?? ""
+        countLabel.isHidden = count == nil
+        setAccessibilityLabel(count.map { "Jump to a row, \($0)" } ?? "Jump to a row")
+    }
+
+    /// Stop callbacks before the controller retires the session. The field is removed
+    /// by the enclosing render, but this also makes late editor notifications inert.
+    func endEditingSession() {
+        editingActive = false
+        field.delegate = nil
+        field.isEditable = false
+    }
+
+    func controlTextDidChange(_ notification: Notification) {
+        guard editingActive, let control = notification.object as? NSTextField,
+              control === field else { return }
+        onTextChange(field.stringValue)
+    }
+
+    /// Exposed to the native runner so command routing can be tested without a global
+    /// event monitor. Production calls this through NSControlTextEditingDelegate.
+    @discardableResult
+    func performCommand(_ selector: Selector,
+                        modifiers: NSEvent.ModifierFlags = [],
+                        editor providedEditor: NSTextView? = nil) -> Bool {
+        guard editingActive else { return false }
+        guard let editor = providedEditor
+                ?? (field.currentEditor() as? NSTextView)
+                ?? (field.window?.firstResponder as? NSTextView)
+                ?? (field.window?.fieldEditor(false, for: field) as? NSTextView) else { return false }
+        let meaningful = modifiers.intersection([.shift, .control, .option, .command])
+        let name = NSStringFromSelector(selector)
+        let marked = editor.markedRange()
+        let composing = marked.location != NSNotFound && marked.length > 0
+        if composing { return false }
+
+        switch name {
+        case "moveUp:":
+            guard meaningful.isEmpty else { return false }
+            return onCommand(.moveUp)
+        case "moveDown:":
+            guard meaningful.isEmpty else { return false }
+            return onCommand(.moveDown)
+        case "insertNewline:", "insertNewlineIgnoringFieldEditor:",
+             "insertParagraphSeparator:", "insertLineBreak:":
+            if meaningful == .option { return onCommand(.peek) }
+            guard meaningful.isEmpty else { return false }
+            return onCommand(.open)
+        case "cancelOperation:":
+            guard meaningful.isEmpty else { return false }
+            if field.stringValue.isEmpty {
+                return onCommand(.dismiss)
+            }
+            editor.selectAll(nil)
+            editor.deleteBackward(nil)
+            return true
+        default:
+            return false
+        }
+    }
+
+    func control(_ control: NSControl, textView: NSTextView,
+                 doCommandBy commandSelector: Selector) -> Bool {
+        guard control === field else { return false }
+        let modifiers = NSApp.currentEvent?.modifierFlags ?? []
+        return performCommand(commandSelector, modifiers: modifiers, editor: textView)
+    }
 }
 
 /// The plain-words caption rendered as a button (WP 2026-07-12-001): the whole line is

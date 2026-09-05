@@ -4552,6 +4552,48 @@ suite("Quick navigator — narrowed draw set and keyboard walk stay in agreement
                 "a removed selection clamps to the remaining drawn destination")
 }
 
+suite("JumpSnapshot — session rows and context stay fixed after model changes") {
+    let row = try! JSONDecoder().decode(PulseRow.self, from: Data("""
+    {"id":"pro-vi/githud#214","repo":"pro-vi/githud #214","title":"Filter the island","subtitle":"CI passing","timestamp":"2026-06-16T08:00:00Z","state":"ready","symbolName":"checkmark.circle.fill","url":"https://github.com/pro-vi/githud/pull/214","isDraft":false,"isStale":false,"isFresh":true,"merge":"mergeable","headBranch":"feat/jump","changeSignature":"sig"}
+    """.utf8))
+    let snapshot = JumpSnapshot(radar: [], inbound: [], pulse: [row], selfLogin: nil)
+    expectEqual(snapshot.narrow(JumpQuery("214")).pulse.map(\.id), [row.id],
+                "summon snapshot narrows its admitted row")
+    expectEqual(snapshot.knownRepos, ["pro-vi/githud"], "snapshot owns known repositories")
+    expectEqual(JumpQuery("feat/jump").narrow(radar: snapshot.radar,
+                                                inbound: snapshot.inbound,
+                                                pulse: snapshot.pulse).pulse.map(\.id),
+                [row.id], "snapshot branch context remains available")
+    expectEqual(JumpQuery("214").destination(selfLogin: snapshot.selfLogin,
+                                               knownRepos: snapshot.knownRepos),
+                "https://github.com/search?q=214+is:pr",
+                "a nil login captured at summon stays nil")
+    let laterRows: [PulseRow] = []
+    expectEqual(snapshot.pulse.map(\.id), [row.id],
+                "later model rows cannot mutate the session snapshot")
+    expect(laterRows.isEmpty, "fixture makes the later model replacement explicit")
+}
+
+suite("Topology laws — narrowing discloses the admitted set and walks only drawn rows") {
+    let rows = try! JSONDecoder().decode([PulseRow].self, from: Data("""
+    [{"id":"o/r#1","repo":"o/r #1","title":"Match","subtitle":"ready","timestamp":"2026-06-16T08:00:00Z","state":"ready","symbolName":"checkmark.circle.fill","url":"https://github.com/o/r/pull/1","isDraft":false,"isStale":false,"isFresh":true,"merge":"mergeable","headBranch":"feat/match","changeSignature":"1"},{"id":"o/r#2","repo":"o/r #2","title":"Other","subtitle":"ready","timestamp":"2026-06-16T08:00:00Z","state":"ready","symbolName":"checkmark.circle.fill","url":"https://github.com/o/r/pull/2","isDraft":false,"isStale":false,"isFresh":true,"merge":"mergeable","headBranch":"feat/other","changeSignature":"2"}]
+    """.utf8))
+    let narrowed = JumpQuery("match").narrow(radar: [], inbound: [], pulse: rows)
+    let walk = KeySession.actionableIDs(radar: narrowed.radar, pulse: narrowed.pulse,
+                                        showDrafts: false, showStale: false,
+                                        includeDestination: true)
+    let drawn = Set(narrowed.pulse.map(\.id) + [KeySession.destinationID])
+    expectEqual(narrowed.admitted, 2, "L1 narrowing retains the admitted total")
+    expectEqual(narrowed.matched, 1, "one matching row is disclosed")
+    expect(Set(walk).isSubset(of: drawn), "L3 walk is a subset of drawn rows")
+    expectEqual(PlainWords.jumpCount(matched: narrowed.matched, admitted: narrowed.admitted),
+                "1 of 2", "L2 header discloses narrowed versus admitted")
+    expect(narrowed.matched > 0, "L4 caller emits a count only for a nonzero match")
+    let none = JumpQuery("no-such-row").narrow(radar: [], inbound: [], pulse: rows)
+    expectEqual(none.matched, 0, "no-match narrowing has zero matches in data")
+    expect(none.pulse.isEmpty, "no-match rows are removed from the drawn lane")
+}
+
 // MARK: - KeySession (WP-6k — the ⌃⌥G scoped key session's pure brain)
 
 suite("KeySession — flattened actionable list: radar then pulse, structure skipped") {
@@ -4610,39 +4652,6 @@ suite("KeySession — flattened actionable list: radar then pulse, structure ski
                 sections.active.map(\.id), "pulse-only island flattens to the live pulse ids")
     expectEqual(KeySession.actionableIDs(radar: [], pulse: [], showDrafts: true, showStale: true),
                 [], "empty lanes → empty list (a caught-up island has nothing to select)")
-}
-
-suite("KeySession — the query-aware key map") {
-    expectEqual(KeySession.intent(forKeyCode: 51, characters: nil, hasQuery: true, optionOnly: true),
-                .deleteWordBackward, "Option–Backspace deletes a word")
-    expectEqual(KeySession.intent(forKeyCode: 51, characters: nil, hasQuery: false, optionOnly: true),
-                .passthrough, "Option–Backspace on an empty query falls through")
-    expectEqual(KeySession.intent(forKeyCode: 0, characters: "å", hasQuery: true, optionOnly: true),
-                .passthrough, "Option-letter stays unconsumed")
-    expectEqual(KeySession.intent(forKeyCode: 36, characters: nil, hasQuery: true, optionOnly: true),
-                .passthrough, "Option–Return stays unconsumed")
-    func intent(_ code: UInt16, _ characters: String? = nil, hasQuery: Bool = false) -> KeySession.Intent {
-        KeySession.intent(forKeyCode: code, characters: characters, hasQuery: hasQuery)
-    }
-    expectEqual(intent(126), .moveUp, "126 → moveUp")
-    expectEqual(intent(125), .moveDown, "125 → moveDown")
-    expectEqual(intent(36), .open, "36 ⏎ → open")
-    expectEqual(intent(36, hasQuery: true), .open, "36 ⏎ still opens with text")
-    expectEqual(intent(53), .dismiss, "53 esc dismisses an empty query")
-    expectEqual(intent(53, hasQuery: true), .clearQuery, "53 esc clears a live query")
-    expectEqual(intent(51), .passthrough, "51 delete falls through with no query")
-    expectEqual(intent(51, hasQuery: true), .deleteBackward, "51 deletes from a live query")
-    expectEqual(intent(49, " "), .peek, "49 space keeps the ratified empty-query peek")
-    expectEqual(intent(49, " ", hasQuery: true), .type(" "), "49 types a space into a live query")
-    expectEqual(intent(124), .passthrough, "124 → falls through with no query")
-    expectEqual(intent(124, hasQuery: true), .peek, "124 → peeks while text is present")
-    expectEqual(intent(0, "a"), .type("a"), "a printable letter starts a query")
-    expectEqual(intent(18, "1", hasQuery: true), .type("1"), "a printable digit extends a query")
-    expectEqual(intent(0, "ab"), .passthrough, "multi-character dead-key or IME text falls through")
-    expectEqual(intent(0, "\u{7f}"), .passthrough, "control characters fall through")
-    expectEqual(intent(76, "\r"), .passthrough, "76 keypad-enter stays unmapped")
-    expectEqual(intent(48, "\t", hasQuery: true), .passthrough, "48 tab falls through with text")
-    expectEqual(intent(123), .passthrough, "123 ← falls through")
 }
 
 suite("KeySelection — initial selection, clamped movement, no wrap") {

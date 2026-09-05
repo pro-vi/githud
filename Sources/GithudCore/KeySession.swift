@@ -17,10 +17,9 @@ import Foundation
 ///    peek stash's own identity rule), and a rebuild that drops the selected row clamps
 ///    to the nearest index instead of resetting to the top.
 ///
-/// 3. **The key map.** Which keyCodes the session consumes — navigation plus printable
-///    single characters, delete, and the query-aware esc/space/right-arrow rules. Modified
-///    chords are rejected by the controller except Option, whose Backspace rule lives
-///    here; ⌘V has its explicit panel route.
+/// 3. **The result-command vocabulary.** Native text editing belongs to AppKit. The
+///    field delegate translates only navigation and result actions into these intents;
+///    every other text command stays in the native responder chain.
 public enum KeySession {
     public static let destinationID = "jump:github"
 
@@ -86,38 +85,7 @@ public enum KeySession {
         case open          // 36  — open the selected row (Open-on-GitHub ceiling), end + collapse
         case dismiss       // 53  — end session + collapse
         case peek          // 49  — toggle the focused row's chevron peek (no-op without one)
-        case type(Character)
-        case deleteBackward
-        case deleteWordBackward
-        case clearQuery
         case passthrough   // everything else
-    }
-
-    /// The ratified query-aware key map. Keypad Enter (76) and Tab (48) remain
-    /// passthrough even though their character strings contain control characters.
-    public static func intent(forKeyCode code: UInt16, characters: String?,
-                              hasQuery: Bool, optionOnly: Bool = false) -> Intent {
-        if optionOnly {
-            return code == 51 && hasQuery ? .deleteWordBackward : .passthrough
-        }
-        switch code {
-        case 126: return .moveUp
-        case 125: return .moveDown
-        case 36:  return .open
-        case 53:  return hasQuery ? .clearQuery : .dismiss
-        case 51:  return hasQuery ? .deleteBackward : .passthrough
-        case 49:  return hasQuery ? .type(" ") : .peek
-        case 124: return hasQuery ? .peek : .passthrough
-        case 76, 48: return .passthrough
-        default: break
-        }
-
-        guard let characters, characters.count == 1,
-              let character = characters.first,
-              character.unicodeScalars.allSatisfy({
-                  !CharacterSet.controlCharacters.contains($0)
-              }) else { return .passthrough }
-        return .type(character)
     }
 }
 

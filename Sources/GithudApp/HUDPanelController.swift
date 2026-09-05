@@ -1,17 +1,6 @@
 import AppKit
 import GithudCore
 
-extension JumpQuery {
-    /// AppKit's word boundary rule matches native Option–Backspace, including
-    /// punctuation and UTF-16 indexing. The query's insertion point is always its end.
-    mutating func deleteWordBackward() {
-        let string = NSAttributedString(string: text)
-        guard string.length > 0 else { return }
-        let boundary = string.nextWord(from: string.length, forward: false)
-        text = (text as NSString).substring(to: boundary)
-    }
-}
-
 /// Positions, shows, and renders the HUD overlay panel and its glass island.
 ///
 /// WP-6a shape: this controller is LIFECYCLE + RENDER COORDINATION only. All app state
@@ -80,7 +69,6 @@ final class HUDPanelController {
         // where it actually lives, instead of a structurally-late mouseDown makeKey().
         // `canBecomeKey` (gated on `keySessionActive`) still walls it off entirely unless a
         // field-bearing card is showing.
-        panel.becomesKeyOnlyIfNeeded = true
 
         buildSurface()                                       // themed island surface + panel.contentView
 
@@ -114,13 +102,13 @@ final class HUDPanelController {
             }
         }
 
-        // WP-6k: list-session key routing + the VoiceOver focus mirror. Both are inert
-        // outside a session (`keySelection == nil` → passthrough / nil).
-        panel.onSessionKeyDown = { [weak self] event in self?.handleSessionKey(event) ?? false }
-        panel.onSessionPaste = { [weak self] text in self?.handleSessionPaste(text) ?? false }
+        // Native editing owns text and command routing. The panel only mirrors the
+        // actual field editor for accessibility; result selection stays separate.
         panel.sessionFocusElement = { [weak self] in
-            guard let self, self.keySelection != nil else { return nil }
-            return (self.contentView as? IslandContentView)?.keyFocusedRowView()
+            guard let self, self.keySelection != nil,
+                  let line = (self.contentView as? IslandContentView)?.jumpLineView() else { return nil }
+            return (self.contentView as? IslandContentView)?.activeJumpEditor()
+                ?? line.field.currentEditor() ?? line.field
         }
 
         // Render on model change — each change kind maps onto the SAME render path its old
@@ -137,7 +125,7 @@ final class HUDPanelController {
         screenParamsObserver = NotificationCenter.default.addObserver(
             forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main
         ) { [weak self] _ in
-            self?.setNeedsRender()
+            self?.handleScreenParametersChange()
         }
     }
 
@@ -160,12 +148,21 @@ final class HUDPanelController {
             // guaranteed repaint for the inbound tier's stale prefix (a 304-ing poll clock,
             // an unchanged lane key, and a collapsed pill are all otherwise render-silent);
             // exactly one per crossing, coalesced here like every data change.
-            setNeedsRender()   // coalesced with any sibling changes this runloop turn
+            if jumpSessionLive {
+                deferredRenderOwed = true
+            } else {
+                setNeedsRender()   // coalesced with any sibling changes this runloop turn
+            }
         case .theme, .reduceTransparency, .increaseContrast:
             // Surface rebuild (material/border/grain are baked into the surface) + instant
             // re-render — a menu theme switch / a11y setting flip must apply immediately.
-            buildSurface()
-            renderNow()
+            if jumpSessionLive {
+                deferredRenderOwed = true
+                deferredSurfaceRebuildOwed = true
+            } else {
+                buildSurface()
+                renderNow()
+            }
         case .ledger:
             // The WP-4d ledger card is a state the user must see NOW → force visible +
             // immediate. Route the force-show through the SAME cancellation `show()` does, so a
@@ -181,6 +178,7 @@ final class HUDPanelController {
             // 0.2,0,0,1) so the product speaks ONE morph vocabulary — and inherits its
             // Reduce-Motion / hidden-panel hard-cut gates for free.
             if model.ledger != nil {
+                endKeySummonSession()
                 isVisible = true
                 cancelWindowHideFx()
                 renderNow()
@@ -217,7 +215,27 @@ final class HUDPanelController {
             // No island render — fresh H1 rows arrive via the scheduler's recompute →
             // `.radar` (the two-step flow). But the SETTINGS CARD shows the reason set
             // live: while it is up, a toggle re-renders the card in place.
-            if model.settingsCard != nil { setNeedsRender() }
+            if jumpSessionLive {
+                deferredRenderOwed = true
+            } else if model.settingsCard != nil { setNeedsRender() }
+        }
+    }
+
+    private var jumpSessionLive: Bool {
+        keySelection != nil && jumpQuery != nil && jumpSnapshot != nil
+    }
+
+    private func handleScreenParametersChange() {
+        if jumpSessionLive, expanded, let island = contentView as? IslandContentView {
+            let height = min(island.fittingHeight(maxHeight: screenHeightCap()), screenHeightCap())
+            let size = NSSize(width: IslandContentView.width, height: height)
+            panel.setContentSize(size)
+            island.frame = NSRect(origin: .zero, size: size)
+            if let target = resolvedScreen().map({ IslandGeometry.frame(size: size, in: $0.visibleFrame) }) {
+                snapPanelFrame(target)
+            }
+        } else {
+            setNeedsRender()
         }
     }
 
@@ -241,6 +259,7 @@ final class HUDPanelController {
                                     siblingShowing: Bool,
                                     backToIsland: ReferenceWritableKeyPath<HUDPanelController, Bool>,
                                     outgoingIsThisCard: Bool) {
+        if isShowing, jumpSessionLive { endKeySummonSession() }
         if isShowing {
             isVisible = true
             cancelWindowHideFx()
@@ -323,6 +342,11 @@ final class HUDPanelController {
     /// the EXISTING coalesced path so its own baked colors (the count badge's accent)
     /// re-resolve too. No new render mechanism, per WP-5i's contract.
     private func handleAppearanceChange() {
+        if jumpSessionLive {
+            deferredRenderOwed = true
+            deferredSurfaceRebuildOwed = true
+            return
+        }
         IslandSurfaceFactory.rebakeAppearanceColors(
             on: surface,
             theme: .named(model.themeID),
@@ -362,6 +386,7 @@ final class HUDPanelController {
     var onToggleFoldedOwner: ((String) -> Void)?
     /// The lens eye's (and the merged "elsewhere" line's) destination — the lens card.
     var onOpenLensCard: (() -> Void)?
+    var openURLForTesting: ((URL) -> Void)?
     /// The ledger card's token submission (WP-4d) — externally owned, like `onGearTap`:
     /// AppDelegate wires it to `submitToken` (the WP-4e intake wire this card was built for).
     var onTokenSubmit: ((String) -> Void)?
@@ -437,6 +462,13 @@ final class HUDPanelController {
     /// dirty and schedule ONE next-runloop flush; user actions (expand, theme) flush immediately.
     /// No repeating timer — a one-shot `DispatchQueue.main.async` per burst (idle-footprint clean).
     private var renderScheduled = false
+    var renderObserverForTesting: (() -> Void)?
+
+    /// While a native jump editor owns the header, model-driven refreshes are held
+    /// until its enclosing transition retires the session. Only a fact that work is
+    /// owed is retained; the newest rows/appearance remain in AppModel.
+    private var deferredRenderOwed = false
+    private var deferredSurfaceRebuildOwed = false
 
     /// A passive global mouse-down monitor, live ONLY while expanded (click-away collapse).
     /// `nil` while collapsed — never a permanent monitor (idle-footprint).
@@ -571,6 +603,10 @@ final class HUDPanelController {
     /// the burst idempotent) — so a changed poll's radar + pulse + freshness, all delivered
     /// in one main-queue block, produce a single teardown/rebuild instead of two or three.
     private func setNeedsRender() {
+        if jumpSessionLive {
+            deferredRenderOwed = true
+            return
+        }
         guard !renderScheduled else { return }
         renderScheduled = true
         DispatchQueue.main.async { [weak self] in
@@ -582,8 +618,15 @@ final class HUDPanelController {
     /// Immediate render — for user-initiated changes (expand/collapse, theme switch, first show)
     /// that must feel instant. Supersedes any pending coalesced render so the burst never
     /// double-rebuilds. `orderFrontRegardless` (never `makeKeyAndOrderFront`) only when visible.
-    private func renderNow() {
+    private func renderNow(allowDuringJumpSession: Bool = false) {
         renderScheduled = false
+        if jumpSessionLive, !allowDuringJumpSession { return }
+        if !jumpSessionLive {
+            let rebuildSurface = deferredSurfaceRebuildOwed
+            deferredSurfaceRebuildOwed = false
+            deferredRenderOwed = false
+            if rebuildSurface { buildSurface() }
+        }
         // A hide tuck owns the window (frame + alpha animating to hidden). A data render that
         // is NOT re-asserting visibility must not fight it: the hard cut would snapPanelFrame
         // the pill back to rest while the tuck's alpha keeps fading to 0 (the split-supersede
@@ -610,6 +653,8 @@ final class HUDPanelController {
     /// Non-nil exactly while `keySelection` is non-nil. The controller owns
     /// both transient values for the lifetime of one ⌃⌥G session.
     private var jumpQuery: JumpQuery?
+    private var jumpSnapshot: JumpSnapshot?
+    private var jumpSessionID: UUID?
 
     /// Begin the list session. The ⌃⌥G summon path (AppDelegate) is the ONLY caller —
     /// mouse paths (pill click, status-item click, "Show island") never reach this, so
@@ -620,78 +665,167 @@ final class HUDPanelController {
     /// the foreground app keeps its menu bar, and key snaps back to it on resign
     /// because githud never activated (the Spotlight pattern, same as WP-4d).
     func beginKeySummonSession() {
-        guard expanded, isVisible, model.ledger == nil,
-              let island = contentView as? IslandContentView else { return }
-        if keySelection == nil {
-            let query = JumpQuery()
-            let narrowed = query.narrow(radar: model.radarRows,
-                                        inbound: model.inboundRows,
-                                        pulse: model.pulseRows)
-            jumpQuery = query
-            keySelection = KeySelection(ids: KeySession.actionableIDs(
-                radar: narrowed.radar, pulse: narrowed.pulse,
-                showDrafts: model.pulsePreferences.showDrafts,
-                showStale: model.pulsePreferences.showStale,
-                inbound: narrowed.inbound,
-                showHeldBackInbound: model.inboundPreferences.showHeldBack,
-                lens: model.lensPreferences))   // folded rows are off-screen → never in the walk
-        }
-        if jumpQuery == nil { jumpQuery = JumpQuery() }
-        panel.keySessionActive = true            // eligibility flips with the session
-        island.setKeySessionHint(true, hasQuery: false)   // session-only chrome
-        island.setKeyFocus(id: keySelection?.selectedID)   // initial selection = first actionable row
-        panel.makeFirstResponder(nil)
-        panel.makeKey()
-        // Chrome follows REAL key state, not the attempt (the WP-4d fix-round rule: a
-        // "keys land here" hint wired to nothing is a fabricated interaction state).
-        // If the window server declined key (e.g. a secure-input session elsewhere),
-        // retire everything now — no `didResignKey` will ever come to do it, because
-        // key was never gained. Review panel: trust minor 1 / AppKit (c).
-        guard panel.isKeyWindow else {
-            debugKeyLog("session begin REFUSED — makeKey() did not take (secure input?)")
-            endKeySummonSession()
+        guard expanded, isVisible, model.ledger == nil, keySelection == nil else { return }
+        let snapshot = JumpSnapshot(
+            radar: model.radarRows, inbound: model.inboundRows, pulse: model.pulseRows,
+            pulsePreferences: model.pulsePreferences,
+            inboundPreferences: model.inboundPreferences,
+            lensPreferences: model.lensPreferences, selfLogin: model.selfLogin,
+            lensLastOpened: model.lensLastOpened, freshness: model.freshness,
+            radarConfirmed: model.radarConfirmed, inboundConfirmed: model.inboundConfirmed,
+            reviewsConfirmed: model.reviewsConfirmed, clearedRows: model.clearedRows,
+            showJustCleared: model.showJustCleared)
+        let query = JumpQuery()
+        let narrowed = snapshot.narrow(query)
+        jumpSnapshot = snapshot
+        jumpQuery = query
+        jumpSessionID = UUID()
+        keySelection = KeySelection(ids: KeySession.actionableIDs(
+            radar: narrowed.radar, pulse: narrowed.pulse,
+            showDrafts: snapshot.pulsePreferences.showDrafts,
+            showStale: snapshot.pulsePreferences.showStale,
+            inbound: narrowed.inbound,
+            showHeldBackInbound: snapshot.inboundPreferences.showHeldBack,
+            lens: snapshot.lensPreferences))
+        panel.keySessionActive = true
+        // One full render installs the native field. It is the only full render while
+        // the session is alive; subsequent edits replace rows in place.
+        renderNow(allowDuringJumpSession: true)
+        guard let island = contentView as? IslandContentView,
+              let line = island.jumpLineView() else {
+            retireRefusedJumpSession(reason: "native field unavailable")
             return
         }
-        // The session now owns the keyboard: draw its empty jump line immediately.
-        renderNow()
+        if let jumpSessionID { panel.activateJumpField(sessionID: jumpSessionID, field: line.field) }
+        panel.makeKey()
+        line.field.selectText(nil)
+        guard panel.isKeyWindow,
+              panel.firstResponder is JumpFieldEditor,
+              (panel.firstResponder as? JumpFieldEditor)?.sessionID == jumpSessionID else {
+            retireRefusedJumpSession(reason: "makeKey/editor acquisition refused")
+            return
+        }
+        island.setKeySessionHint(true, hasQuery: false)
+        island.setKeyFocus(id: keySelection?.selectedID)
         debugKeyLog("session begin — isKeyWindow=true selected=\(keySelection?.selectedID ?? "none")")
     }
 
-    /// End the list session: the flag dies, the ink retires (bar + hint), eligibility
-    /// drops, and the key moment ends through the SAME order-out pulse WP-4d ratified
-    /// (`endKeySession` — key snaps back to the still-active foreground app; never
-    /// `resignKey()`, per the recorded spec amendment). Safe to call with no session
-    /// live (no-op) — every choke point calls it unconditionally.
+    private func retireRefusedJumpSession(reason: String) {
+        debugKeyLog("session begin REFUSED — \(reason)")
+        endKeySummonSession()
+        renderNow()
+    }
+
+    private func handleJumpTextChange(_ text: String) {
+        guard jumpSessionLive, let snapshot = jumpSnapshot,
+              let island = contentView as? IslandContentView else { return }
+        let query = JumpQuery(text)
+        jumpQuery = query
+        let narrowed = snapshot.narrow(query)
+        let active = !query.isEmpty
+        let knownRepos = snapshot.knownRepos
+        let handle = active ? query.handle(knownRepos: knownRepos) : nil
+        let destination = active
+            ? query.destination(selfLogin: snapshot.selfLogin, knownRepos: knownRepos)
+            : nil
+        if var selection = keySelection {
+            selection.rebuild(ids: KeySession.actionableIDs(
+                radar: narrowed.radar, pulse: narrowed.pulse,
+                showDrafts: snapshot.pulsePreferences.showDrafts,
+                showStale: snapshot.pulsePreferences.showStale,
+                inbound: narrowed.inbound,
+                showHeldBackInbound: snapshot.inboundPreferences.showHeldBack,
+                lens: snapshot.lensPreferences, includeDestination: active))
+            keySelection = selection
+        }
+        let height = island.updateJump(
+            rows: narrowed.radar, pulse: narrowed.pulse, inbound: narrowed.inbound,
+            jump: query,
+            jumpCount: active && narrowed.matched > 0
+                ? PlainWords.jumpCount(matched: narrowed.matched, admitted: narrowed.admitted) : nil,
+            jumpHandle: handle, jumpDestination: destination,
+            showDrafts: snapshot.pulsePreferences.showDrafts,
+            showStale: snapshot.pulsePreferences.showStale,
+            showHeldBackInbound: snapshot.inboundPreferences.showHeldBack,
+            freshness: snapshot.freshness,
+            radarConfirmed: snapshot.radarConfirmed,
+            inboundConfirmed: snapshot.inboundConfirmed,
+            reviewsConfirmed: snapshot.reviewsConfirmed,
+            clearedRows: snapshot.clearedRows,
+            showJustCleared: snapshot.showJustCleared,
+            lensPreferences: snapshot.lensPreferences,
+            selfLogin: snapshot.selfLogin,
+            lensLastOpened: snapshot.lensLastOpened)
+        let size = NSSize(width: IslandContentView.width,
+                          height: min(island.fittingHeight(maxHeight: screenHeightCap()), screenHeightCap()))
+        panel.setContentSize(size)
+        island.frame = NSRect(origin: .zero, size: size)
+        if let target = resolvedScreen().map({ IslandGeometry.frame(size: size, in: $0.visibleFrame) }) {
+            snapPanelFrame(target)
+        }
+        island.setKeySessionHint(true, hasQuery: !query.text.isEmpty)
+        island.setKeyFocus(id: keySelection?.selectedID)
+        debugJumpQuery(action: "edit", query: query)
+    }
+
+    private func preferenceAction(_ action: (() -> Void)?) -> (() -> Void)? {
+        guard let action else { return nil }
+        return { [weak self] in
+            guard let self else { return }
+            let wasJumping = self.jumpSessionLive
+            if wasJumping { self.endKeySummonSession() }
+            action()
+            if wasJumping { self.renderNow() }
+        }
+    }
+
+    private func preferenceAction(_ action: ((String) -> Void)?) -> ((String) -> Void)? {
+        guard let action else { return nil }
+        return { [weak self] value in
+            guard let self else { return }
+            let wasJumping = self.jumpSessionLive
+            if wasJumping { self.endKeySummonSession() }
+            action(value)
+            if wasJumping { self.renderNow() }
+        }
+    }
+
+    private func sessionAction(_ action: (() -> Void)?) -> (() -> Void)? {
+        guard let action else { return nil }
+        return { [weak self] in
+            if self?.jumpSessionLive == true { self?.endKeySummonSession() }
+            action()
+        }
+    }
+
+    /// End the list session: clear ownership and detach the native editor. Teardown
+    /// never renders; its enclosing transition consumes any owed model work.
     private func endKeySummonSession() {
-        guard keySelection != nil || jumpQuery != nil else { return }
-        keySelection = nil
-        jumpQuery = nil
-        panel.keySessionActive = false           // the never-key resting state (no card can
-                                                 // coexist with a list session — the card
-                                                 // branch re-derives its own eligibility)
+        guard keySelection != nil || jumpQuery != nil || jumpSnapshot != nil else { return }
+        let sessionID = jumpSessionID
         if let island = contentView as? IslandContentView {
+            island.endJumpSession()
             island.setKeySessionHint(false)
             island.setKeyFocus(id: nil)
         }
+        keySelection = nil
+        jumpQuery = nil
+        jumpSnapshot = nil
+        jumpSessionID = nil
+        panel.keySessionActive = false           // the never-key resting state (no card can
+                                                 // coexist with a list session — the card
+                                                 // branch re-derives its own eligibility)
+        panel.becomesKeyOnlyIfNeeded = true
+        if let sessionID { panel.discardJumpFieldEditor(sessionID: sessionID) }
         endKeySession()
         debugKeyLog("session end — isKeyWindow=\(panel.isKeyWindow)")
     }
 
-    /// WP-6k key handling (↑126 ↓125 ⏎36 esc53 space49 — the map is
-    /// `GithudCore.KeySession.intent`, tested). Everything else falls through to the
-    /// existing behavior (the ⌘-edit routing is `isKeyWindow`-scoped in
-    /// `performKeyEquivalent` — during a list session its V/C/X/A/Z probe finds no
-    /// editable responder and falls through harmlessly; a card's keystrokes never
-    /// reach here — its field editor is first responder). Selection moves are 0ms;
-    /// the peek toggle inherits the chevron click's own motion sanction (the same
-    /// onPeekToggle → reflow seam). Option–Backspace deletes the previous word;
-    /// other modified chords fall through (paste has its own panel route).
-    private func handleSessionKey(_ event: NSEvent) -> Bool {
-        guard keySelection != nil, var query = jumpQuery else { return false }
-        let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
-        guard modifiers.isEmpty || modifiers == .option else { return false }
-        switch KeySession.intent(forKeyCode: event.keyCode, characters: event.characters,
-                                 hasQuery: !query.text.isEmpty, optionOnly: modifiers == .option) {
+    /// Execute a result command translated by the native field delegate. Text,
+    /// selection, clipboard and undo never enter this switch.
+    private func handleJumpCommand(_ intent: KeySession.Intent) -> Bool {
+        guard keySelection != nil else { return false }
+        switch intent {
         case .moveUp:
             keySelection?.moveUp()
             (contentView as? IslandContentView)?.setKeyFocus(id: keySelection?.selectedID)
@@ -703,12 +837,15 @@ final class HUDPanelController {
             debugKeyLog("move down → \(keySelection?.selectedID ?? "none")")
             return true
         case .open:
-            // The existing row-open path (Open-on-GitHub ceiling), incl. its nil-url
-            // no-op guard — then the session ends and the island collapses (spec F5).
-            let opened = (contentView as? IslandContentView)?.openKeyFocusedRow() ?? false
+            // Capture the URL before teardown. The session owns collapse/replay first;
+            // opening the browser afterward prevents a synchronous resign callback from
+            // rendering an expanded island between teardown and collapse.
+            let url = (contentView as? IslandContentView)?.keyFocusedDestinationURL()
+            let opened = url != nil
             debugKeyLog("return — opened=\(opened)")
             endKeySummonSession()
             setExpanded(false)
+            if let url { (openURLForTesting ?? { NSWorkspace.shared.open($0) })(url) }
             return true
         case .dismiss:
             debugKeyLog("esc — dismiss")
@@ -719,60 +856,12 @@ final class HUDPanelController {
             let toggled = (contentView as? IslandContentView)?.togglePeekOnKeyFocusedRow() ?? false
             debugKeyLog("space — peek toggled=\(toggled)")
             return true
-        case .type(let character):
-            query.text.append(character)
-            jumpQuery = query
-            debugJumpQuery("type")
-            renderNow()
-            return true
-        case .deleteBackward:
-            if !query.text.isEmpty { query.text.removeLast() }
-            jumpQuery = query
-            debugJumpQuery("delete")
-            renderNow()
-            return true
-        case .deleteWordBackward:
-            query.deleteWordBackward()
-            jumpQuery = query
-            debugJumpQuery("delete word")
-            renderNow()
-            return true
-        case .clearQuery:
-            jumpQuery = JumpQuery()
-            debugJumpQuery("clear")
-            renderNow()
-            return true
         case .passthrough:
             return false
         }
     }
 
-    /// ⌘V's list-session route. Pasteboard text is flattened to one line and
-    /// control characters are dropped so the label cannot change header geometry.
-    private func handleSessionPaste(_ pasted: String?) -> Bool {
-        guard keySelection != nil, var query = jumpQuery else { return false }
-        guard let pasted else {
-            debugKeyLog("paste skipped — queryLength=\(query.text.count) handle=\(jumpHandleKind(query))")
-            return true
-        }
-        let oneLine = pasted
-            .replacingOccurrences(of: "\r\n", with: " ")
-            .replacingOccurrences(of: "\r", with: " ")
-            .replacingOccurrences(of: "\n", with: " ")
-        let printable = oneLine.filter { character in
-            character.unicodeScalars.allSatisfy { !CharacterSet.controlCharacters.contains($0) }
-        }.trimmingCharacters(in: .whitespacesAndNewlines)
-        query.text.append(contentsOf: printable)
-        jumpQuery = query
-        debugJumpQuery("paste")
-        renderNow()
-        return true
-    }
-
-    /// O3: query contents structurally cannot enter this log line. Only its
-    /// length and the associated-value-free handle case are interpolated.
-    private func debugJumpQuery(_ action: String) {
-        guard let query = jumpQuery else { return }
+    private func debugJumpQuery(action: String, query: JumpQuery) {
         debugKeyLog("\(action) — queryLength=\(query.text.count) handle=\(jumpHandleKind(query))")
     }
 
@@ -909,6 +998,17 @@ final class HUDPanelController {
         if let screenParamsObserver { NotificationCenter.default.removeObserver(screenParamsObserver) }
     }
 
+    // Native runner seams. They expose only non-secret state needed to prove the
+    // production controller's session lifecycle; normal app code does not use them.
+    func jumpLineForTesting() -> JumpLineView? { (contentView as? IslandContentView)?.jumpLineView() }
+    func islandForTesting() -> IslandContentView? { contentView as? IslandContentView }
+    func surfaceForTesting() -> NSView? { surface }
+    func panelForTesting() -> HUDPanel { panel }
+    func jumpSessionIsLiveForTesting() -> Bool { jumpSessionLive }
+    func deferredStateForTesting() -> (render: Bool, surface: Bool) {
+        (deferredRenderOwed, deferredSurfaceRebuildOwed)
+    }
+
     /// The screen to anchor the island to (WP-5i): the injected provider (status item's
     /// screen → screen under the mouse → main, per AppDelegate's wiring), falling back to
     /// `NSScreen.main` when unset — never a hardcoded assumption about which monitor is
@@ -939,6 +1039,7 @@ final class HUDPanelController {
     }
 
     private func render() {
+        renderObserverForTesting?()
         // Increase-Contrast's rendering-only adjustments (border opacity, hover fill,
         // tertiary ink) flow through every content view via this ONE call site — never the
         // raw theme — so a11y state can't be forgotten at a future call site.
@@ -1147,28 +1248,40 @@ final class HUDPanelController {
             // One narrowing result feeds both the drawn island and its keyboard walk.
             // With no live query this is the identity operation, preserving today's island.
             let query = jumpQuery ?? JumpQuery()
-            let narrowed = query.narrow(radar: model.radarRows,
-                                        inbound: model.inboundRows,
-                                        pulse: model.pulseRows)
+            let snapshot = jumpSnapshot
+            let radarRows = snapshot?.radar ?? model.radarRows
+            let inboundRows = snapshot?.inbound ?? model.inboundRows
+            let pulseRows = snapshot?.pulse ?? model.pulseRows
+            let narrowed = query.narrow(radar: radarRows, inbound: inboundRows, pulse: pulseRows)
             let queryActive = jumpQuery?.isEmpty == false
-            let knownRepos = JumpQuery.knownRepos(radar: model.radarRows,
-                                                  inbound: model.inboundRows,
-                                                  pulse: model.pulseRows)
+            let knownRepos = JumpQuery.knownRepos(radar: radarRows, inbound: inboundRows, pulse: pulseRows)
             let jumpHandle = queryActive ? query.handle(knownRepos: knownRepos) : nil
             let jumpDestination = queryActive
-                ? query.destination(selfLogin: model.selfLogin, knownRepos: knownRepos)
+                ? query.destination(selfLogin: snapshot.map(\.selfLogin) ?? model.selfLogin,
+                                    knownRepos: knownRepos)
                 : nil
+            let pulsePreferences = snapshot?.pulsePreferences ?? model.pulsePreferences
+            let inboundPreferences = snapshot?.inboundPreferences ?? model.inboundPreferences
+            let lensPreferences = snapshot?.lensPreferences ?? model.lensPreferences
+            let selfLogin = snapshot.map(\.selfLogin) ?? model.selfLogin
+            let lensLastOpened = snapshot?.lensLastOpened ?? model.lensLastOpened
+            let freshness = snapshot?.freshness ?? model.freshness
+            let radarConfirmed = snapshot?.radarConfirmed ?? model.radarConfirmed
+            let inboundConfirmed = snapshot?.inboundConfirmed ?? model.inboundConfirmed
+            let reviewsConfirmed = snapshot?.reviewsConfirmed ?? model.reviewsConfirmed
+            let clearedRows = snapshot?.clearedRows ?? model.clearedRows
+            let showJustCleared = snapshot?.showJustCleared ?? model.showJustCleared
             // WP-6k: the selection survives a data rebuild keyed on the STABLE row id
             // (the ink bar's PeekStash-analog) — a rebuild that drops the selected row
             // clamps to the nearest index (pure rule, tested in Core).
             if var selection = keySelection {
                 selection.rebuild(ids: KeySession.actionableIDs(
                     radar: narrowed.radar, pulse: narrowed.pulse,
-                    showDrafts: model.pulsePreferences.showDrafts,
-                    showStale: model.pulsePreferences.showStale,
+                    showDrafts: pulsePreferences.showDrafts,
+                    showStale: pulsePreferences.showStale,
                     inbound: narrowed.inbound,
-                    showHeldBackInbound: model.inboundPreferences.showHeldBack,
-                    lens: model.lensPreferences,
+                    showHeldBackInbound: inboundPreferences.showHeldBack,
+                    lens: lensPreferences,
                     includeDestination: queryActive))   // folded rows are off-screen → out of the walk
                 keySelection = selection
             }
@@ -1181,29 +1294,34 @@ final class HUDPanelController {
                                             : nil,
                                          jumpHandle: jumpHandle,
                                          jumpDestination: jumpDestination,
-                                         showDrafts: model.pulsePreferences.showDrafts,
-                                         showStale: model.pulsePreferences.showStale,
-                                         showHeldBackInbound: model.inboundPreferences.showHeldBack,
-                                         freshness: model.freshness,
-                                         radarConfirmed: model.radarConfirmed,   // the affirmation's gate — a
-                                         inboundConfirmed: model.inboundConfirmed,
-                                         reviewsConfirmed: model.reviewsConfirmed,
-                                         clearedRows: model.clearedRows,
-                                         showJustCleared: model.showJustCleared,
-                                         onToggleJustCleared: onToggleJustCleared,
+                                         showDrafts: pulsePreferences.showDrafts,
+                                         showStale: pulsePreferences.showStale,
+                                         showHeldBackInbound: inboundPreferences.showHeldBack,
+                                         freshness: freshness,
+                                         radarConfirmed: radarConfirmed,   // the affirmation's gate — a
+                                         inboundConfirmed: inboundConfirmed,
+                                         reviewsConfirmed: reviewsConfirmed,
+                                         clearedRows: clearedRows,
+                                         showJustCleared: showJustCleared,
+                                         onToggleJustCleared: preferenceAction(onToggleJustCleared),
                                                                                  // CONFIRMED inbox read, never the
                                                                                  // looser hasData (fix round, 1a)
                                          peeks: previousPeeks ?? PeekStash(),
                                          theme: theme, onGearTap: onGearTap,
                                          onCollapse: { [weak self] in self?.setExpanded(false) },
-                                         onToggleStale: onToggleStale,
-                                         onToggleHeldBackInbound: onToggleHeldBackInbound,
-                                         onToggleDrafts: onToggleDrafts,
-                                         lensPreferences: model.lensPreferences,
-                                         selfLogin: model.selfLogin,
-                                         lensLastOpened: model.lensLastOpened,
-                                         onToggleFoldedOwner: onToggleFoldedOwner,
-                                         onOpenLensCard: onOpenLensCard)
+                                         onToggleStale: preferenceAction(onToggleStale),
+                                         onToggleHeldBackInbound: preferenceAction(onToggleHeldBackInbound),
+                                         onToggleDrafts: preferenceAction(onToggleDrafts),
+                                         lensPreferences: lensPreferences,
+                                         selfLogin: selfLogin,
+                                         lensLastOpened: lensLastOpened,
+                                         onToggleFoldedOwner: preferenceAction(onToggleFoldedOwner),
+                                         onOpenLensCard: sessionAction(onOpenLensCard),
+                                         jumpSessionID: jumpSessionID,
+                                         onJumpTextChange: { [weak self] text in self?.handleJumpTextChange(text) },
+                                         onJumpCommand: { [weak self] command in
+                                             self?.handleJumpCommand(command) ?? false
+                                         })
             // A chevron peek changed a row's height → re-measure and ease the panel frame
             // on the WP-3d machinery (see animatePeekReflow — never a second animation system).
             view.onPeekChange = { [weak self] in self?.animatePeekReflow() }
@@ -1433,8 +1551,9 @@ final class HUDPanelController {
     /// one-shot, nothing repeats (idle-footprint).
     private func animatePeekReflow() {
         guard expanded, let island = contentView as? IslandContentView else { return }
+        let cap = screenHeightCap()
         let size = NSSize(width: IslandContentView.width,
-                          height: min(island.fittingHeight(), screenHeightCap()))
+                          height: min(island.fittingHeight(maxHeight: cap), cap))
         guard let target = resolvedScreen().map({ IslandGeometry.frame(size: size, in: $0.visibleFrame) })
         else { return }
         if reduceMotion || !panel.isVisible || outgoingMorphView != nil || windowFxInFlight {

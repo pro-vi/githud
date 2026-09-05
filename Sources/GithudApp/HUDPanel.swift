@@ -37,27 +37,53 @@ final class HUDPanel: NSPanel {
     override var canBecomeKey: Bool { keySessionActive }
     override var canBecomeMain: Bool { false }
 
-    /// WP-6k list-session key routing — externally owned by the controller. Returns
-    /// true when the session consumed the key (↑/↓/⏎/esc/space per
-    /// `GithudCore.KeySession.intent`); false/nil falls through to the existing
-    /// responder behavior. Card key moments are untouched: their keystrokes live in the
-    /// field editor, which sits ahead of the window in the responder chain.
-    var onSessionKeyDown: ((NSEvent) -> Bool)?
-    /// The list session's one allowed command chord. The controller returns false
-    /// outside a list session, preserving the ledger field's existing responder path.
-    var onSessionPaste: ((String?) -> Bool)?
-    override func keyDown(with event: NSEvent) {
-        if onSessionKeyDown?(event) == true { return }
-        super.keyDown(with: event)
+    private var jumpFieldEditor: JumpFieldEditor?
+    private var activeJumpSessionID: UUID?
+    private var activeJumpField: NSTextField?
+
+    func activateJumpField(sessionID: UUID, field: NSTextField) {
+        activeJumpSessionID = sessionID
+        activeJumpField = field
+        if jumpFieldEditor == nil {
+            let editor = JumpFieldEditor(sessionID: sessionID)
+            editor.string = field.stringValue
+            editor.selectedRange = NSRange(location: editor.string.utf16.count, length: 0)
+            jumpFieldEditor = editor
+        }
     }
 
-    /// WP-6k VoiceOver mirror: while a list session is live, the panel's AX focus is
-    /// the ink-bar row (the controller supplies it; nil outside a session). This is
-    /// AppKit's designed override point — "Returns the UI Element that has the focus …
-    /// Override this method to do a deeper search" (NSAccessibility.h) — so assistive
-    /// tech asking the key window "what has focus?" gets the same answer the bar
-    /// paints. Selection MOVES additionally post `.focusedUIElementChanged` (the island
-    /// does it beside the bar), so a listening client is nudged, not just queryable.
+    /// Provide a session-owned editor only to the exact jump field. Every other
+    /// control, including the secure ledger, follows NSWindow's ordinary path.
+    override func fieldEditor(_ createFlag: Bool, for object: Any?) -> NSText? {
+        guard (object as? NSTextField).map({ $0 === activeJumpField }) == true
+                || (object == nil && activeJumpField != nil),
+              let field = activeJumpField else {
+            return super.fieldEditor(createFlag, for: object)
+        }
+        guard field.window === self, let sessionID = activeJumpSessionID else { return nil }
+        if let editor = jumpFieldEditor, editor.sessionID == sessionID {
+            return editor
+        }
+        guard createFlag else { return nil }
+        let editor = JumpFieldEditor(sessionID: sessionID)
+        editor.string = field.stringValue
+        editor.selectedRange = NSRange(location: editor.string.utf16.count, length: 0)
+        jumpFieldEditor = editor
+        return editor
+    }
+
+    /// Drop the editor and its undo history at session teardown. The identity check
+    /// prevents a late callback from retiring a newer session's editor.
+    func discardJumpFieldEditor(sessionID: UUID) {
+        guard activeJumpSessionID == sessionID else { return }
+        jumpFieldEditor = nil
+        activeJumpSessionID = nil
+        activeJumpField = nil
+    }
+
+
+    /// While a list session is live, accessibility focus follows the actual native
+    /// text editor. Result selection is separate state and never impersonates it.
     var sessionFocusElement: (() -> Any?)?
     override var accessibilityFocusedUIElement: Any {
         // (double-unwrap: nil closure and nil answer both fall through to super)
@@ -87,10 +113,9 @@ final class HUDPanel: NSPanel {
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
         let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
         let key = event.charactersIgnoringModifiers?.lowercased()
-        if isKeyWindow, modifiers == .command, key == "v",
-           onSessionPaste?(NSPasteboard.general.string(forType: .string)) == true {
-            return true
-        }
+        let responder = firstResponder
+        if isKeyWindow, modifiers == [.command, .shift], key == "z",
+           NSApp.sendAction(Selector(("redo:")), to: responder, from: self) { return true }
         if isKeyWindow,
            modifiers == .command,
            let key {
@@ -103,7 +128,7 @@ final class HUDPanel: NSPanel {
             case "z": action = Selector(("undo:"))
             default:  action = nil
             }
-            if let action, NSApp.sendAction(action, to: nil, from: self) { return true }
+            if let action, NSApp.sendAction(action, to: responder, from: self) { return true }
         }
         return super.performKeyEquivalent(with: event)
     }

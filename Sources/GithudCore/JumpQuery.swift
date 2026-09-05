@@ -248,3 +248,55 @@ public struct JumpQuery: Equatable, Sendable {
         return "https://github.com/search?q=\(encoded)"
     }
 }
+
+/// The immutable rows and display context owned by one native jump-editing session.
+/// A poll may replace the model's live arrays while the editor is focused, but the
+/// session continues to narrow the rows the user saw when the island was summoned.
+public struct JumpSnapshot: Equatable, Sendable {
+    public let radar: [RadarRow]
+    public let inbound: [InboundRow]
+    public let pulse: [PulseRow]
+    public let pulsePreferences: PulsePreferences
+    public let inboundPreferences: InboundPreferences
+    public let lensPreferences: LensPreferences
+    public let selfLogin: String?
+    public let lensLastOpened: [String: Date]
+    public let freshness: Freshness
+    public let radarConfirmed: Bool
+    public let inboundConfirmed: Bool
+    public let reviewsConfirmed: Bool
+    public let clearedRows: [ClearedRow]
+    public let showJustCleared: Bool
+
+    public init(radar: [RadarRow], inbound: [InboundRow], pulse: [PulseRow],
+                pulsePreferences: PulsePreferences = .default,
+                inboundPreferences: InboundPreferences = InboundPreferences(),
+                lensPreferences: LensPreferences = .default, selfLogin: String? = nil,
+                lensLastOpened: [String: Date] = [:], freshness: Freshness = .fresh,
+                radarConfirmed: Bool = false, inboundConfirmed: Bool = false,
+                reviewsConfirmed: Bool = false, clearedRows: [ClearedRow] = [],
+                showJustCleared: Bool = false) {
+        self.radar = radar
+        self.inbound = inbound
+        self.pulse = pulse
+        self.pulsePreferences = pulsePreferences
+        self.inboundPreferences = inboundPreferences
+        self.lensPreferences = lensPreferences
+        self.selfLogin = selfLogin
+        self.lensLastOpened = lensLastOpened
+        self.freshness = freshness
+        self.radarConfirmed = radarConfirmed
+        self.inboundConfirmed = inboundConfirmed
+        self.reviewsConfirmed = reviewsConfirmed
+        self.clearedRows = clearedRows
+        self.showJustCleared = showJustCleared
+    }
+
+    public func narrow(_ query: JumpQuery) -> JumpQuery.Narrowed {
+        query.narrow(radar: radar, inbound: inbound, pulse: pulse)
+    }
+
+    public var knownRepos: [String] {
+        JumpQuery.knownRepos(radar: radar, inbound: inbound, pulse: pulse)
+    }
+}

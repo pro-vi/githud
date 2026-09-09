@@ -67,6 +67,10 @@ for themeID in [ThemeID.github, .color] {
         check(lines.count == (query == nil ? 0 : 1), "\(themeID.rawValue)/\(name): jump line follows session presence")
         for line in lines {
             check(line.frame.width <= 484 && line.frame.width > 100, "query fits header width")
+            check(line.field.frame.width > 200,
+                  "editable field retains available header width")
+            check(line.field.stringValue == (query?.text ?? ""),
+                  "native field value remains complete")
         }
         for button in descendants(view).compactMap({ $0 as? IconButton }) {
             let rect = button.convert(button.bounds, to: view)
@@ -131,6 +135,30 @@ check(acquired && nativeEditor != nil,
 if let nativeEditor {
     check(nativeLine.field.currentEditor() === nativeEditor,
           "native field reports its attached editor")
+    func key(_ flags: NSEvent.ModifierFlags, characters: String,
+             ignoring: String, code: UInt16) {
+        let event = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: flags,
+                                     timestamp: 0, windowNumber: nativePanel.windowNumber,
+                                     context: nil, characters: characters,
+                                     charactersIgnoringModifiers: ignoring, isARepeat: false,
+                                     keyCode: code)!
+        nativeEditor.keyDown(with: event)
+    }
+    key(.shift, characters: "!", ignoring: "1", code: 18)
+    key(.shift, characters: "A", ignoring: "a", code: 0)
+    check(nativeEditor.string == "!A", "native key path accepts Shift punctuation and uppercase")
+    key([], characters: "l", ignoring: "l", code: 37)
+    key([], characters: "p", ignoring: "p", code: 35)
+    key([], characters: "h", ignoring: "h", code: 4)
+    key([], characters: "a", ignoring: "a", code: 0)
+    key([], characters: " ", ignoring: " ", code: 49)
+    key([], characters: "b", ignoring: "b", code: 11)
+    key([], characters: "e", ignoring: "e", code: 14)
+    key([], characters: "t", ignoring: "t", code: 17)
+    key([], characters: "a", ignoring: "a", code: 0)
+    key(.option, characters: "\u{7f}", ignoring: "\u{7f}", code: 51)
+    check(nativeEditor.string == "!Alpha ",
+          "native Option–Backspace deletes the previous word from the caret")
     nativeEditor.setMarkedText("漢", selectedRange: NSRange(location: 1, length: 0),
                                replacementRange: NSRange(location: 0, length: 0))
     let commandCount = nativeCommands.count
@@ -279,6 +307,62 @@ if controller.jumpSessionIsLiveForTesting(), let controllerLine = controller.jum
             attachedAfterUndo?.keyDown(with: typedAgain)
             check(attachedAfterUndo?.string == "1",
               "the next native key edits after undo")
+        }
+    }
+    if let controllerEditor {
+        for (query, expectedCount, expectsNoMatch) in [
+            ("", "", false), ("   ", "", false),
+            ("no-such-fixture-row", "", true), ("214", "1 of 3", false)
+        ] {
+            controllerEditor.insertText(query, replacementRange:
+                NSRange(location: 0, length: controllerEditor.string.utf16.count))
+            let visibleCountLabels = descendants(controllerLine).compactMap { $0 as? NSTextField }
+                .filter { $0 !== controllerLine.field && !$0.isHiddenOrHasHiddenAncestor }
+            check(visibleCountLabels.map(\.stringValue) == (expectedCount.isEmpty ? [] : [expectedCount]),
+                  "controller count visibility for query \(query.debugDescription)")
+            let noMatchVisible = controller.islandForTesting().map { island in
+                descendants(island).compactMap { $0 as? NSTextField }.contains {
+                    !$0.isHiddenOrHasHiddenAncestor && $0.stringValue == PlainWords.jumpNothingMatches
+                }
+            } ?? false
+            check(noMatchVisible == expectsNoMatch,
+                  "controller no-match visibility for query \(query.debugDescription)")
+            check(controllerLine.field.frame.width > 200,
+                  "controller field keeps width with count \(expectedCount.isEmpty ? "hidden" : "shown")")
+            check(controllerLine.field.stringValue == query,
+                  "controller field keeps complete query \(query.debugDescription)")
+        }
+
+        // Keyboard result selection is a separate AXSelected state. Moving the selection
+        // through the actual field delegate must update the two rows without moving native
+        // focus away from the editor.
+        if let island = controller.islandForTesting(),
+           let oldRow = island.keyFocusedRowView(),
+           let fieldEditor = controllerLine.field.currentEditor() as? JumpFieldEditor,
+           let panel = controllerLine.field.window as? HUDPanel {
+            let movedUp = controllerLine.control(controllerLine.field, textView: fieldEditor,
+                                                 doCommandBy: Selector(("moveUp:")))
+            var newRow = island.keyFocusedRowView()
+            var moved = movedUp && newRow !== oldRow
+            if !moved {
+                let movedDown = controllerLine.control(controllerLine.field, textView: fieldEditor,
+                                                       doCommandBy: Selector(("moveDown:")))
+                newRow = island.keyFocusedRowView()
+                moved = movedDown && newRow !== oldRow
+            }
+            if moved, let newRow {
+                let selected = newRow.isAccessibilitySelected()
+                let formerSelected = oldRow.isAccessibilitySelected()
+                check(selected && !formerSelected,
+                      "keyboard selection exposes AXSelected on only the current row")
+                check(panel.firstResponder === fieldEditor
+                      && controllerLine.field.currentEditor() === fieldEditor,
+                      "row selection leaves native editor focus attached")
+            } else {
+                check(false, "keyboard selection moves to a different controller row")
+            }
+        } else {
+            check(false, "keyboard selection moves to a different controller row")
         }
     }
     if let appearanceSurface = controller.surfaceForTesting() as? IslandEffectView {

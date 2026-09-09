@@ -4588,10 +4588,23 @@ suite("Topology laws — narrowing discloses the admitted set and walks only dra
     expect(Set(walk).isSubset(of: drawn), "L3 walk is a subset of drawn rows")
     expectEqual(PlainWords.jumpCount(matched: narrowed.matched, admitted: narrowed.admitted),
                 "1 of 2", "L2 header discloses narrowed versus admitted")
+    let admittedPill = PillMorph.resolve(style: .standingCounted, rows: [], pulse: rows,
+                                         loading: false, inboundActive: 0,
+                                         clearConfirmed: false)
+    if case .gauge(let segments) = admittedPill.value {
+        expectEqual(segments.reduce(0) { $0 + (Int($1.count) ?? 0) }, 2,
+                    "collapsed gauge continues to count the admitted rows")
+    } else {
+        expect(false, "collapsed gauge keeps an admitted pulse count")
+    }
     expect(narrowed.matched > 0, "L4 caller emits a count only for a nonzero match")
     let none = JumpQuery("no-such-row").narrow(radar: [], inbound: [], pulse: rows)
     expectEqual(none.matched, 0, "no-match narrowing has zero matches in data")
     expect(none.pulse.isEmpty, "no-match rows are removed from the drawn lane")
+    expectEqual(KeySession.actionableIDs(radar: none.radar, pulse: none.pulse,
+                                         showDrafts: false, showStale: false,
+                                         includeDestination: true),
+                [KeySession.destinationID], "no-match walk keeps only the destination row")
 }
 
 // MARK: - KeySession (WP-6k — the ⌃⌥G scoped key session's pure brain)

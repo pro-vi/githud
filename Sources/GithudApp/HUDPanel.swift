@@ -226,6 +226,8 @@ class IslandClickableView: NSView {
     func setKeyFocused(_ focused: Bool) {
         guard focused != keyFocused, let fill = keyFocusFill else { return }
         keyFocused = focused
+        // Selection is queryable independently of the native editor's key focus.
+        setAccessibilitySelected(focused)
         wantsLayer = true
         layer?.removeAnimation(forKey: "hoverFill")   // 0ms — never ride a hover fade out/in
         if focused {

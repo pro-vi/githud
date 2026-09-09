@@ -588,8 +588,8 @@ final class IslandContentView: NSView {
     /// Move the ink bar to `id` (nil retires it). 0ms — the bar is a steered cursor, not
     /// motion. The focused row is scrolled fully visible (whole-row, unanimated —
     /// `scrollToVisible` is minimal-scroll, so under the lane cap the lane walks row by
-    /// row), and VoiceOver is told the focus moved (the panel's
-    /// `accessibilityFocusedUIElement` mirror answers with this same row).
+    /// row). The selected row is announced separately from the panel's native text-editor
+    /// focus, which remains the field editor for the duration of the session.
     func setKeyFocus(id: String?) {
         if let old = keyFocusedID, old != id { keyRows[old]?.setKeyFocused(false) }
         keyFocusedID = id
@@ -601,7 +601,7 @@ final class IslandContentView: NSView {
         NSAccessibility.post(element: self, notification: .selectedChildrenChanged)
     }
 
-    /// The view wearing the bar — the panel's AX-focus mirror reads this.
+    /// The view wearing the keyboard-selection bar; the panel's AX focus remains the editor.
     func keyFocusedRowView() -> NSView? { keyFocusedID.flatMap { keyRows[$0] } }
 
     func keyFocusedDestinationURL() -> URL? {
@@ -1022,11 +1022,7 @@ final class JumpLineView: NSStackView, NSTextFieldDelegate {
         countLabel.setContentCompressionResistancePriority(.required, for: .horizontal)
         countLabel.isHidden = count == nil
 
-        let spacer = NSView()
-        spacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
-        spacer.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         addArrangedSubview(field)
-        addArrangedSubview(spacer)
         addArrangedSubview(countLabel)
         orientation = .horizontal
         alignment = .centerY

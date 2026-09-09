@@ -169,7 +169,14 @@ that existed at summon, until the session ends. That is not "a few seconds stale
 a session left open stays at its summon-time state for as long as it is open. This
 explicitly replaces AC8 (a poll tick re-narrows against new rows mid-query). What it
 buys: no change to how the island renders for mouse summons, the collapsed pill, cards,
-or theme switches, and no persistent-root refactor.
+or theme switches, and no persistent-root refactor. **Build record (2026-09-08).** U6 uses the native field/editor and row-only updates
+over `JumpSnapshot`. U5 live input checks exposed and corrected a competing header
+spacer that clipped the editor when the count appeared, and missing accessible row
+selection. The final 60-second recording exercises global summon, native editing,
+result selection, Escape hand-back, mouse non-key behavior, and Return/browser exit.
+The evidence record is `loop/evidence/wp6k-native-input.manifest.json`; it pins the
+source and artifacts and distinguishes local tests from live observations. Real IME
+candidate UI, VoiceOver speech, and a human-hand recut remain explicitly unwitnessed.
 
 #### Background and evidence
 

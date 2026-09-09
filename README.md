@@ -187,10 +187,11 @@ Avoid `-w 'ghp_…'` with the token inline. That leaks it into shell history and
 | | |
 |---|---|
 | **Summon from anywhere** | <kbd>⌃</kbd><kbd>⌥</kbd><kbd>G</kbd>, or click the menu-bar item |
+| **Jump to a row** | After <kbd>⌃</kbd><kbd>⌥</kbd><kbd>G</kbd>, type normally; rows stay as they were at summon until the session ends |
 | **Move through rows** | <kbd>↑</kbd> <kbd>↓</kbd> |
 | **Open on GitHub** | <kbd>⏎</kbd> or click the row |
-| **Peek at a row** | <kbd>space</kbd> |
-| **Put it away** | <kbd>esc</kbd>, or click anywhere else |
+| **Peek at a row** | <kbd>⌥</kbd><kbd>⏎</kbd>, or click the row chevron |
+| **Clear or put away** | <kbd>esc</kbd> clears typed text; press it again to put the island away, or click anywhere else |
 | **Settings** | right-click the menu-bar item → *Settings…* |
 
 The global hotkey uses no Accessibility permission, so macOS never asks you to approve

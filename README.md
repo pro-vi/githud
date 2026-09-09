@@ -262,10 +262,10 @@ file**](.github/ISSUE_TEMPLATE/missed-notification.md).
   `NSVisualEffectView` island, `PollScheduler` for live polling, and the status item.
 - **`Tests/`**: a zero-dependency runner. XCTest and swift-testing need full Xcode,
   which this project does not use, so the tests are a plain executable that exits
-  non-zero on failure. **1704 assertions**, no network, no PAT, no GitHub account.
+  non-zero on failure. No network, no PAT, no GitHub account.
 
 ```sh
-scripts/test.sh          # the whole suite
+scripts/test.sh          # Core suite
 scripts/leak-check.sh    # fails if private data reaches a tracked file
 scripts/screenshots.sh   # regenerate the images in this README from fixtures
 ```
@@ -276,6 +276,10 @@ obey, and the exemptions. Read it before changing behaviour. This README lists
 features, which change every release; the topology holds the rules underneath, which do
 not.
 
+
+The [living prototype suite](docs/design/prototypes/README.md) keeps selected designs
+interactive, with synthetic fixtures, metadata, decision history and separate browser
+checks. Native tests remain the authority for app behavior.
 ## How it was built
 
 githud was written by an autonomous AI build loop, from an empty directory to the app in

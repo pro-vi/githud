@@ -10,6 +10,7 @@ SNAPSHOT_BIN_DIR=$(swift build -c release --show-bin-path)
 SNAPSHOT_SOURCES=(Sources/GithudApp/*.swift)
 SNAPSHOT_SOURCES=("${(@)SNAPSHOT_SOURCES:#Sources/GithudApp/main.swift}")
 swiftc -I "$SNAPSHOT_BIN_DIR/Modules" "${SNAPSHOT_SOURCES[@]}" \
+    Tests/GithudAppSnapshots/PrototypeFixture.swift \
     Tests/GithudAppSnapshots/main.swift "$SNAPSHOT_BIN_DIR"/GithudCore.build/*.o \
     -o "$SNAPSHOT_OUTPUT/render"
 "$SNAPSHOT_OUTPUT/render" "$SNAPSHOT_OUTPUT"

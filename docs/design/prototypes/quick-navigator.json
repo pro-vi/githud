@@ -1,0 +1,1286 @@
+{
+  "schema_version": 1,
+  "id": "quick-navigator",
+  "title": "Quick navigator",
+  "status": "selected",
+  "selected_variant": "A",
+  "plan": "../2026-09-04-quick-navigator-agenda.md#quick-navigator-build",
+  "fixture": "../../../Tests/Fixtures/quick-navigator-prototype.json",
+  "default_scenario": "quiet",
+  "implementation": null,
+  "superseded_by": null,
+  "history": [
+    {
+      "date": "2026-09-08",
+      "actor": "owner",
+      "change": "Selected A · direct results",
+      "why": "A is good.",
+      "reference": "Quoted conversation; canonical agenda records the selected behavior."
+    },
+    {
+      "date": "2026-09-08",
+      "actor": "architect",
+      "change": "Specified a living prototype suite",
+      "why": "Preserve an offline interaction reference with synthetic fixtures, stable cases and explicit implementation evidence.",
+      "reference": "../2026-09-04-quick-navigator-agenda.md#quick-navigator-build"
+    }
+  ],
+  "scenarios": [
+    {
+      "id": "quiet",
+      "label": "Quiet match · keeper",
+      "row_set": "populated",
+      "query": "keeper",
+      "session": "keyboard",
+      "freshness": "fresh",
+      "preferences": {
+        "showDrafts": false,
+        "showStale": false,
+        "showHeldBack": false,
+        "foldedOwners": [],
+        "groupByOwner": false,
+        "ownerOrder": []
+      },
+      "expected": {
+        "matched_ids": [
+          "sample/game#101"
+        ],
+        "local_ids": [
+          "sample/game#101"
+        ],
+        "count": "1 of 25",
+        "walk": [
+          "sample/game#101",
+          "jump:github"
+        ],
+        "selected_id": "sample/game#101",
+        "destination": "https://github.com/search?q=keeper",
+        "open_url": "https://github.com/sample/game/pull/101",
+        "browse_ids": [
+          "radar-1",
+          "radar-2",
+          "sample/inbox#401",
+          "sample/inbox#402",
+          "sample/game#210",
+          "sample/game#211",
+          "sample/game#212",
+          "sample/game#213",
+          "exampleorg/engine#214",
+          "exampleorg/engine#215",
+          "exampleorg/engine#216",
+          "exampleorg/engine#217",
+          "anotherorg/docs#218",
+          "anotherorg/docs#219",
+          "anotherorg/docs#220",
+          "anotherorg/docs#221",
+          "anotherorg/docs#222"
+        ]
+      }
+    },
+    {
+      "id": "draft",
+      "label": "Hidden draft",
+      "row_set": "populated",
+      "query": "draft-camera",
+      "session": "keyboard",
+      "freshness": "fresh",
+      "preferences": {
+        "showDrafts": false,
+        "showStale": false,
+        "showHeldBack": false,
+        "foldedOwners": [],
+        "groupByOwner": false,
+        "ownerOrder": []
+      },
+      "expected": {
+        "matched_ids": [
+          "sample/game#102"
+        ],
+        "local_ids": [
+          "sample/game#102"
+        ],
+        "count": "1 of 25",
+        "walk": [
+          "sample/game#102",
+          "jump:github"
+        ],
+        "selected_id": "sample/game#102",
+        "destination": "https://github.com/search?q=draft-camera",
+        "open_url": "https://github.com/sample/game/pull/102",
+        "browse_ids": [
+          "radar-1",
+          "radar-2",
+          "sample/inbox#401",
+          "sample/inbox#402",
+          "sample/game#210",
+          "sample/game#211",
+          "sample/game#212",
+          "sample/game#213",
+          "exampleorg/engine#214",
+          "exampleorg/engine#215",
+          "exampleorg/engine#216",
+          "exampleorg/engine#217",
+          "anotherorg/docs#218",
+          "anotherorg/docs#219",
+          "anotherorg/docs#220",
+          "anotherorg/docs#221",
+          "anotherorg/docs#222"
+        ]
+      }
+    },
+    {
+      "id": "held",
+      "label": "Held-back inbound",
+      "row_set": "populated",
+      "query": "robot",
+      "session": "keyboard",
+      "freshness": "fresh",
+      "preferences": {
+        "showDrafts": false,
+        "showStale": false,
+        "showHeldBack": false,
+        "foldedOwners": [],
+        "groupByOwner": false,
+        "ownerOrder": []
+      },
+      "expected": {
+        "matched_ids": [
+          "sample/inbox#403"
+        ],
+        "local_ids": [
+          "sample/inbox#403"
+        ],
+        "count": "1 of 25",
+        "walk": [
+          "sample/inbox#403",
+          "jump:github"
+        ],
+        "selected_id": "sample/inbox#403",
+        "destination": "https://github.com/search?q=robot",
+        "open_url": "https://github.com/sample/inbox/pull/403",
+        "browse_ids": [
+          "radar-1",
+          "radar-2",
+          "sample/inbox#401",
+          "sample/inbox#402",
+          "sample/game#210",
+          "sample/game#211",
+          "sample/game#212",
+          "sample/game#213",
+          "exampleorg/engine#214",
+          "exampleorg/engine#215",
+          "exampleorg/engine#216",
+          "exampleorg/engine#217",
+          "anotherorg/docs#218",
+          "anotherorg/docs#219",
+          "anotherorg/docs#220",
+          "anotherorg/docs#221",
+          "anotherorg/docs#222"
+        ]
+      }
+    },
+    {
+      "id": "fold",
+      "label": "Folded owner",
+      "row_set": "populated",
+      "query": "engine",
+      "session": "keyboard",
+      "freshness": "fresh",
+      "preferences": {
+        "showDrafts": false,
+        "showStale": false,
+        "showHeldBack": false,
+        "foldedOwners": [
+          "exampleorg"
+        ],
+        "groupByOwner": false,
+        "ownerOrder": []
+      },
+      "expected": {
+        "matched_ids": [
+          "exampleorg/engine#214",
+          "exampleorg/engine#215",
+          "exampleorg/engine#216",
+          "exampleorg/engine#217",
+          "exampleorg/engine#120",
+          "exampleorg/engine#122"
+        ],
+        "local_ids": [
+          "exampleorg/engine#214",
+          "exampleorg/engine#215",
+          "exampleorg/engine#216",
+          "exampleorg/engine#217",
+          "exampleorg/engine#120",
+          "exampleorg/engine#122"
+        ],
+        "count": "6 of 25",
+        "walk": [
+          "exampleorg/engine#214",
+          "exampleorg/engine#215",
+          "exampleorg/engine#216",
+          "exampleorg/engine#217",
+          "exampleorg/engine#120",
+          "exampleorg/engine#122",
+          "jump:github"
+        ],
+        "selected_id": "exampleorg/engine#214",
+        "destination": "https://github.com/exampleorg/engine",
+        "open_url": "https://github.com/exampleorg/engine/pull/214",
+        "browse_ids": [
+          "radar-1",
+          "radar-2",
+          "sample/inbox#401",
+          "sample/inbox#402",
+          "sample/game#210",
+          "sample/game#211",
+          "sample/game#212",
+          "sample/game#213",
+          "anotherorg/docs#218",
+          "anotherorg/docs#219",
+          "anotherorg/docs#220",
+          "anotherorg/docs#221",
+          "anotherorg/docs#222"
+        ]
+      }
+    },
+    {
+      "id": "mixed",
+      "label": "Many matches / long titles",
+      "row_set": "populated",
+      "query": "update",
+      "session": "keyboard",
+      "freshness": "fresh",
+      "preferences": {
+        "showDrafts": false,
+        "showStale": false,
+        "showHeldBack": false,
+        "foldedOwners": [],
+        "groupByOwner": false,
+        "ownerOrder": []
+      },
+      "expected": {
+        "matched_ids": [
+          "radar-1",
+          "radar-2",
+          "sample/inbox#401",
+          "sample/inbox#402",
+          "sample/inbox#403",
+          "sample/inbox#404",
+          "sample/game#210",
+          "sample/game#211",
+          "sample/game#212",
+          "sample/game#213",
+          "exampleorg/engine#214",
+          "exampleorg/engine#215",
+          "exampleorg/engine#216",
+          "exampleorg/engine#217",
+          "anotherorg/docs#218",
+          "anotherorg/docs#219",
+          "anotherorg/docs#220",
+          "anotherorg/docs#221",
+          "anotherorg/docs#222",
+          "sample/game#101",
+          "exampleorg/engine#120",
+          "anotherorg/docs#121",
+          "sample/game#102",
+          "exampleorg/engine#122",
+          "anotherorg/docs#123"
+        ],
+        "local_ids": [
+          "radar-1",
+          "radar-2",
+          "sample/inbox#401",
+          "sample/inbox#402",
+          "sample/inbox#403",
+          "sample/inbox#404",
+          "sample/game#210",
+          "sample/game#211",
+          "sample/game#212",
+          "sample/game#213",
+          "exampleorg/engine#214",
+          "exampleorg/engine#215",
+          "exampleorg/engine#216",
+          "exampleorg/engine#217",
+          "anotherorg/docs#218",
+          "anotherorg/docs#219",
+          "anotherorg/docs#220",
+          "anotherorg/docs#221",
+          "anotherorg/docs#222",
+          "sample/game#101",
+          "exampleorg/engine#120",
+          "anotherorg/docs#121",
+          "sample/game#102",
+          "exampleorg/engine#122",
+          "anotherorg/docs#123"
+        ],
+        "count": "25 of 25",
+        "walk": [
+          "radar-1",
+          "radar-2",
+          "sample/inbox#401",
+          "sample/inbox#402",
+          "sample/inbox#403",
+          "sample/inbox#404",
+          "sample/game#210",
+          "sample/game#211",
+          "sample/game#212",
+          "sample/game#213",
+          "exampleorg/engine#214",
+          "exampleorg/engine#215",
+          "exampleorg/engine#216",
+          "exampleorg/engine#217",
+          "anotherorg/docs#218",
+          "anotherorg/docs#219",
+          "anotherorg/docs#220",
+          "anotherorg/docs#221",
+          "anotherorg/docs#222",
+          "sample/game#101",
+          "exampleorg/engine#120",
+          "anotherorg/docs#121",
+          "sample/game#102",
+          "exampleorg/engine#122",
+          "anotherorg/docs#123",
+          "jump:github"
+        ],
+        "selected_id": "radar-1",
+        "destination": "https://github.com/search?q=update",
+        "open_url": "https://github.com/sample/game/pull/300",
+        "browse_ids": [
+          "radar-1",
+          "radar-2",
+          "sample/inbox#401",
+          "sample/inbox#402",
+          "sample/game#210",
+          "sample/game#211",
+          "sample/game#212",
+          "sample/game#213",
+          "exampleorg/engine#214",
+          "exampleorg/engine#215",
+          "exampleorg/engine#216",
+          "exampleorg/engine#217",
+          "anotherorg/docs#218",
+          "anotherorg/docs#219",
+          "anotherorg/docs#220",
+          "anotherorg/docs#221",
+          "anotherorg/docs#222"
+        ]
+      }
+    },
+    {
+      "id": "none",
+      "label": "Nothing matches",
+      "row_set": "populated",
+      "query": "not-a-real-result",
+      "session": "keyboard",
+      "freshness": "fresh",
+      "preferences": {
+        "showDrafts": false,
+        "showStale": false,
+        "showHeldBack": false,
+        "foldedOwners": [],
+        "groupByOwner": false,
+        "ownerOrder": []
+      },
+      "expected": {
+        "matched_ids": [],
+        "local_ids": [],
+        "count": null,
+        "walk": [
+          "jump:github"
+        ],
+        "selected_id": "jump:github",
+        "destination": "https://github.com/search?q=not-a-real-result",
+        "open_url": "https://github.com/search?q=not-a-real-result",
+        "browse_ids": [
+          "radar-1",
+          "radar-2",
+          "sample/inbox#401",
+          "sample/inbox#402",
+          "sample/game#210",
+          "sample/game#211",
+          "sample/game#212",
+          "sample/game#213",
+          "exampleorg/engine#214",
+          "exampleorg/engine#215",
+          "exampleorg/engine#216",
+          "exampleorg/engine#217",
+          "anotherorg/docs#218",
+          "anotherorg/docs#219",
+          "anotherorg/docs#220",
+          "anotherorg/docs#221",
+          "anotherorg/docs#222"
+        ]
+      }
+    },
+    {
+      "id": "empty",
+      "label": "Empty snapshot",
+      "row_set": "empty",
+      "query": "keeper",
+      "session": "keyboard",
+      "freshness": "fresh",
+      "preferences": {
+        "showDrafts": false,
+        "showStale": false,
+        "showHeldBack": false,
+        "foldedOwners": [],
+        "groupByOwner": false,
+        "ownerOrder": []
+      },
+      "expected": {
+        "matched_ids": [],
+        "local_ids": [],
+        "count": null,
+        "walk": [
+          "jump:github"
+        ],
+        "selected_id": "jump:github",
+        "destination": "https://github.com/search?q=keeper",
+        "open_url": "https://github.com/search?q=keeper",
+        "browse_ids": []
+      }
+    },
+    {
+      "id": "loading",
+      "label": "Loading · no snapshot",
+      "row_set": "empty",
+      "query": "keeper",
+      "session": "keyboard",
+      "freshness": "loading",
+      "preferences": {
+        "showDrafts": false,
+        "showStale": false,
+        "showHeldBack": false,
+        "foldedOwners": [],
+        "groupByOwner": false,
+        "ownerOrder": []
+      },
+      "expected": {
+        "matched_ids": [],
+        "local_ids": [],
+        "count": null,
+        "walk": [
+          "jump:github"
+        ],
+        "selected_id": "jump:github",
+        "destination": "https://github.com/search?q=keeper",
+        "open_url": "https://github.com/search?q=keeper",
+        "browse_ids": []
+      }
+    },
+    {
+      "id": "offline",
+      "label": "Offline · cached match",
+      "row_set": "populated",
+      "query": "keeper",
+      "session": "keyboard",
+      "freshness": "offline",
+      "preferences": {
+        "showDrafts": false,
+        "showStale": false,
+        "showHeldBack": false,
+        "foldedOwners": [],
+        "groupByOwner": false,
+        "ownerOrder": []
+      },
+      "expected": {
+        "matched_ids": [
+          "sample/game#101"
+        ],
+        "local_ids": [
+          "sample/game#101"
+        ],
+        "count": "1 of 25",
+        "walk": [
+          "sample/game#101",
+          "jump:github"
+        ],
+        "selected_id": "sample/game#101",
+        "destination": "https://github.com/search?q=keeper",
+        "open_url": "https://github.com/sample/game/pull/101",
+        "browse_ids": [
+          "radar-1",
+          "radar-2",
+          "sample/inbox#401",
+          "sample/inbox#402",
+          "sample/game#210",
+          "sample/game#211",
+          "sample/game#212",
+          "sample/game#213",
+          "exampleorg/engine#214",
+          "exampleorg/engine#215",
+          "exampleorg/engine#216",
+          "exampleorg/engine#217",
+          "anotherorg/docs#218",
+          "anotherorg/docs#219",
+          "anotherorg/docs#220",
+          "anotherorg/docs#221",
+          "anotherorg/docs#222"
+        ]
+      }
+    },
+    {
+      "id": "browse",
+      "label": "Empty query / browse",
+      "row_set": "populated",
+      "query": "",
+      "session": "keyboard",
+      "freshness": "fresh",
+      "preferences": {
+        "showDrafts": false,
+        "showStale": false,
+        "showHeldBack": false,
+        "foldedOwners": [],
+        "groupByOwner": false,
+        "ownerOrder": []
+      },
+      "expected": {
+        "matched_ids": [
+          "radar-1",
+          "radar-2",
+          "sample/inbox#401",
+          "sample/inbox#402",
+          "sample/inbox#403",
+          "sample/inbox#404",
+          "sample/game#210",
+          "sample/game#211",
+          "sample/game#212",
+          "sample/game#213",
+          "exampleorg/engine#214",
+          "exampleorg/engine#215",
+          "exampleorg/engine#216",
+          "exampleorg/engine#217",
+          "anotherorg/docs#218",
+          "anotherorg/docs#219",
+          "anotherorg/docs#220",
+          "anotherorg/docs#221",
+          "anotherorg/docs#222",
+          "sample/game#101",
+          "exampleorg/engine#120",
+          "anotherorg/docs#121",
+          "sample/game#102",
+          "exampleorg/engine#122",
+          "anotherorg/docs#123"
+        ],
+        "local_ids": [
+          "radar-1",
+          "radar-2",
+          "sample/inbox#401",
+          "sample/inbox#402",
+          "sample/game#210",
+          "sample/game#211",
+          "sample/game#212",
+          "sample/game#213",
+          "exampleorg/engine#214",
+          "exampleorg/engine#215",
+          "exampleorg/engine#216",
+          "exampleorg/engine#217",
+          "anotherorg/docs#218",
+          "anotherorg/docs#219",
+          "anotherorg/docs#220",
+          "anotherorg/docs#221",
+          "anotherorg/docs#222"
+        ],
+        "count": null,
+        "walk": [
+          "radar-1",
+          "radar-2",
+          "sample/inbox#401",
+          "sample/inbox#402",
+          "sample/game#210",
+          "sample/game#211",
+          "sample/game#212",
+          "sample/game#213",
+          "exampleorg/engine#214",
+          "exampleorg/engine#215",
+          "exampleorg/engine#216",
+          "exampleorg/engine#217",
+          "anotherorg/docs#218",
+          "anotherorg/docs#219",
+          "anotherorg/docs#220",
+          "anotherorg/docs#221",
+          "anotherorg/docs#222"
+        ],
+        "selected_id": "radar-1",
+        "destination": null,
+        "open_url": "https://github.com/sample/game/pull/300",
+        "browse_ids": [
+          "radar-1",
+          "radar-2",
+          "sample/inbox#401",
+          "sample/inbox#402",
+          "sample/game#210",
+          "sample/game#211",
+          "sample/game#212",
+          "sample/game#213",
+          "exampleorg/engine#214",
+          "exampleorg/engine#215",
+          "exampleorg/engine#216",
+          "exampleorg/engine#217",
+          "anotherorg/docs#218",
+          "anotherorg/docs#219",
+          "anotherorg/docs#220",
+          "anotherorg/docs#221",
+          "anotherorg/docs#222"
+        ]
+      }
+    },
+    {
+      "id": "mouse",
+      "label": "Mouse summon",
+      "row_set": "populated",
+      "query": "",
+      "session": "mouse",
+      "freshness": "fresh",
+      "preferences": {
+        "showDrafts": false,
+        "showStale": false,
+        "showHeldBack": false,
+        "foldedOwners": [],
+        "groupByOwner": false,
+        "ownerOrder": []
+      },
+      "expected": {
+        "matched_ids": [
+          "radar-1",
+          "radar-2",
+          "sample/inbox#401",
+          "sample/inbox#402",
+          "sample/inbox#403",
+          "sample/inbox#404",
+          "sample/game#210",
+          "sample/game#211",
+          "sample/game#212",
+          "sample/game#213",
+          "exampleorg/engine#214",
+          "exampleorg/engine#215",
+          "exampleorg/engine#216",
+          "exampleorg/engine#217",
+          "anotherorg/docs#218",
+          "anotherorg/docs#219",
+          "anotherorg/docs#220",
+          "anotherorg/docs#221",
+          "anotherorg/docs#222",
+          "sample/game#101",
+          "exampleorg/engine#120",
+          "anotherorg/docs#121",
+          "sample/game#102",
+          "exampleorg/engine#122",
+          "anotherorg/docs#123"
+        ],
+        "local_ids": [
+          "radar-1",
+          "radar-2",
+          "sample/inbox#401",
+          "sample/inbox#402",
+          "sample/game#210",
+          "sample/game#211",
+          "sample/game#212",
+          "sample/game#213",
+          "exampleorg/engine#214",
+          "exampleorg/engine#215",
+          "exampleorg/engine#216",
+          "exampleorg/engine#217",
+          "anotherorg/docs#218",
+          "anotherorg/docs#219",
+          "anotherorg/docs#220",
+          "anotherorg/docs#221",
+          "anotherorg/docs#222"
+        ],
+        "count": null,
+        "walk": [],
+        "selected_id": null,
+        "destination": null,
+        "open_url": null,
+        "browse_ids": [
+          "radar-1",
+          "radar-2",
+          "sample/inbox#401",
+          "sample/inbox#402",
+          "sample/game#210",
+          "sample/game#211",
+          "sample/game#212",
+          "sample/game#213",
+          "exampleorg/engine#214",
+          "exampleorg/engine#215",
+          "exampleorg/engine#216",
+          "exampleorg/engine#217",
+          "anotherorg/docs#218",
+          "anotherorg/docs#219",
+          "anotherorg/docs#220",
+          "anotherorg/docs#221",
+          "anotherorg/docs#222"
+        ]
+      }
+    },
+    {
+      "id": "number",
+      "label": "PR number",
+      "row_set": "populated",
+      "query": "101",
+      "session": "keyboard",
+      "freshness": "fresh",
+      "preferences": {
+        "showDrafts": false,
+        "showStale": false,
+        "showHeldBack": false,
+        "foldedOwners": [],
+        "groupByOwner": false,
+        "ownerOrder": []
+      },
+      "expected": {
+        "matched_ids": [
+          "sample/game#101"
+        ],
+        "local_ids": [
+          "sample/game#101"
+        ],
+        "count": "1 of 25",
+        "walk": [
+          "sample/game#101",
+          "jump:github"
+        ],
+        "selected_id": "sample/game#101",
+        "destination": "https://github.com/search?q=101+is:pr+author:@me",
+        "open_url": "https://github.com/sample/game/pull/101",
+        "browse_ids": [
+          "radar-1",
+          "radar-2",
+          "sample/inbox#401",
+          "sample/inbox#402",
+          "sample/game#210",
+          "sample/game#211",
+          "sample/game#212",
+          "sample/game#213",
+          "exampleorg/engine#214",
+          "exampleorg/engine#215",
+          "exampleorg/engine#216",
+          "exampleorg/engine#217",
+          "anotherorg/docs#218",
+          "anotherorg/docs#219",
+          "anotherorg/docs#220",
+          "anotherorg/docs#221",
+          "anotherorg/docs#222"
+        ]
+      }
+    },
+    {
+      "id": "branch",
+      "label": "Head branch",
+      "row_set": "populated",
+      "query": "feat/keeper-rig",
+      "session": "keyboard",
+      "freshness": "fresh",
+      "preferences": {
+        "showDrafts": false,
+        "showStale": false,
+        "showHeldBack": false,
+        "foldedOwners": [],
+        "groupByOwner": false,
+        "ownerOrder": []
+      },
+      "expected": {
+        "matched_ids": [
+          "sample/game#101"
+        ],
+        "local_ids": [
+          "sample/game#101"
+        ],
+        "count": "1 of 25",
+        "walk": [
+          "sample/game#101",
+          "jump:github"
+        ],
+        "selected_id": "sample/game#101",
+        "destination": "https://github.com/search?q=is:pr+head:feat/keeper-rig",
+        "open_url": "https://github.com/sample/game/pull/101",
+        "browse_ids": [
+          "radar-1",
+          "radar-2",
+          "sample/inbox#401",
+          "sample/inbox#402",
+          "sample/game#210",
+          "sample/game#211",
+          "sample/game#212",
+          "sample/game#213",
+          "exampleorg/engine#214",
+          "exampleorg/engine#215",
+          "exampleorg/engine#216",
+          "exampleorg/engine#217",
+          "anotherorg/docs#218",
+          "anotherorg/docs#219",
+          "anotherorg/docs#220",
+          "anotherorg/docs#221",
+          "anotherorg/docs#222"
+        ]
+      }
+    },
+    {
+      "id": "repo-number",
+      "label": "Repository and number",
+      "row_set": "populated",
+      "query": "game#101",
+      "session": "keyboard",
+      "freshness": "fresh",
+      "preferences": {
+        "showDrafts": false,
+        "showStale": false,
+        "showHeldBack": false,
+        "foldedOwners": [],
+        "groupByOwner": false,
+        "ownerOrder": []
+      },
+      "expected": {
+        "matched_ids": [
+          "sample/game#101"
+        ],
+        "local_ids": [
+          "sample/game#101"
+        ],
+        "count": "1 of 25",
+        "walk": [
+          "sample/game#101",
+          "jump:github"
+        ],
+        "selected_id": "sample/game#101",
+        "destination": "https://github.com/sample/game/pull/101",
+        "open_url": "https://github.com/sample/game/pull/101",
+        "browse_ids": [
+          "radar-1",
+          "radar-2",
+          "sample/inbox#401",
+          "sample/inbox#402",
+          "sample/game#210",
+          "sample/game#211",
+          "sample/game#212",
+          "sample/game#213",
+          "exampleorg/engine#214",
+          "exampleorg/engine#215",
+          "exampleorg/engine#216",
+          "exampleorg/engine#217",
+          "anotherorg/docs#218",
+          "anotherorg/docs#219",
+          "anotherorg/docs#220",
+          "anotherorg/docs#221",
+          "anotherorg/docs#222"
+        ]
+      }
+    },
+    {
+      "id": "github-link",
+      "label": "GitHub link",
+      "row_set": "populated",
+      "query": "https://github.com/sample/game/pull/101",
+      "session": "keyboard",
+      "freshness": "fresh",
+      "preferences": {
+        "showDrafts": false,
+        "showStale": false,
+        "showHeldBack": false,
+        "foldedOwners": [],
+        "groupByOwner": false,
+        "ownerOrder": []
+      },
+      "expected": {
+        "matched_ids": [
+          "sample/game#101"
+        ],
+        "local_ids": [
+          "sample/game#101"
+        ],
+        "count": "1 of 25",
+        "walk": [
+          "sample/game#101",
+          "jump:github"
+        ],
+        "selected_id": "sample/game#101",
+        "destination": "https://github.com/sample/game/pull/101",
+        "open_url": "https://github.com/sample/game/pull/101",
+        "browse_ids": [
+          "radar-1",
+          "radar-2",
+          "sample/inbox#401",
+          "sample/inbox#402",
+          "sample/game#210",
+          "sample/game#211",
+          "sample/game#212",
+          "sample/game#213",
+          "exampleorg/engine#214",
+          "exampleorg/engine#215",
+          "exampleorg/engine#216",
+          "exampleorg/engine#217",
+          "anotherorg/docs#218",
+          "anotherorg/docs#219",
+          "anotherorg/docs#220",
+          "anotherorg/docs#221",
+          "anotherorg/docs#222"
+        ]
+      }
+    },
+    {
+      "id": "prefix-return",
+      "label": "No-match prefix → local result",
+      "row_set": "populated",
+      "query": "feat/keeper-rig",
+      "session": "keyboard",
+      "freshness": "fresh",
+      "preferences": {
+        "showDrafts": false,
+        "showStale": false,
+        "showHeldBack": false,
+        "foldedOwners": [],
+        "groupByOwner": false,
+        "ownerOrder": []
+      },
+      "expected": {
+        "matched_ids": [
+          "sample/game#101"
+        ],
+        "local_ids": [
+          "sample/game#101"
+        ],
+        "count": "1 of 25",
+        "walk": [
+          "sample/game#101",
+          "jump:github"
+        ],
+        "selected_id": "sample/game#101",
+        "destination": "https://github.com/search?q=is:pr+head:feat/keeper-rig",
+        "open_url": "https://github.com/sample/game/pull/101",
+        "browse_ids": [
+          "radar-1",
+          "radar-2",
+          "sample/inbox#401",
+          "sample/inbox#402",
+          "sample/game#210",
+          "sample/game#211",
+          "sample/game#212",
+          "sample/game#213",
+          "exampleorg/engine#214",
+          "exampleorg/engine#215",
+          "exampleorg/engine#216",
+          "exampleorg/engine#217",
+          "anotherorg/docs#218",
+          "anotherorg/docs#219",
+          "anotherorg/docs#220",
+          "anotherorg/docs#221",
+          "anotherorg/docs#222"
+        ]
+      }
+    },
+    {
+      "id": "clear-restore",
+      "label": "Clear restores browse preferences",
+      "row_set": "populated",
+      "query": "keeper",
+      "session": "keyboard",
+      "freshness": "fresh",
+      "preferences": {
+        "showDrafts": false,
+        "showStale": false,
+        "showHeldBack": false,
+        "foldedOwners": [
+          "exampleorg"
+        ],
+        "groupByOwner": false,
+        "ownerOrder": []
+      },
+      "expected": {
+        "matched_ids": [
+          "sample/game#101"
+        ],
+        "local_ids": [
+          "sample/game#101"
+        ],
+        "count": "1 of 25",
+        "walk": [
+          "sample/game#101",
+          "jump:github"
+        ],
+        "selected_id": "sample/game#101",
+        "destination": "https://github.com/search?q=keeper",
+        "open_url": "https://github.com/sample/game/pull/101",
+        "browse_ids": [
+          "radar-1",
+          "radar-2",
+          "sample/inbox#401",
+          "sample/inbox#402",
+          "sample/game#210",
+          "sample/game#211",
+          "sample/game#212",
+          "sample/game#213",
+          "anotherorg/docs#218",
+          "anotherorg/docs#219",
+          "anotherorg/docs#220",
+          "anotherorg/docs#221",
+          "anotherorg/docs#222"
+        ]
+      }
+    },
+    {
+      "id": "whitespace",
+      "label": "Whitespace query",
+      "row_set": "populated",
+      "query": "   ",
+      "session": "keyboard",
+      "freshness": "fresh",
+      "preferences": {
+        "showDrafts": false,
+        "showStale": false,
+        "showHeldBack": false,
+        "foldedOwners": [],
+        "groupByOwner": false,
+        "ownerOrder": []
+      },
+      "expected": {
+        "matched_ids": [
+          "radar-1",
+          "radar-2",
+          "sample/inbox#401",
+          "sample/inbox#402",
+          "sample/inbox#403",
+          "sample/inbox#404",
+          "sample/game#210",
+          "sample/game#211",
+          "sample/game#212",
+          "sample/game#213",
+          "exampleorg/engine#214",
+          "exampleorg/engine#215",
+          "exampleorg/engine#216",
+          "exampleorg/engine#217",
+          "anotherorg/docs#218",
+          "anotherorg/docs#219",
+          "anotherorg/docs#220",
+          "anotherorg/docs#221",
+          "anotherorg/docs#222",
+          "sample/game#101",
+          "exampleorg/engine#120",
+          "anotherorg/docs#121",
+          "sample/game#102",
+          "exampleorg/engine#122",
+          "anotherorg/docs#123"
+        ],
+        "local_ids": [
+          "radar-1",
+          "radar-2",
+          "sample/inbox#401",
+          "sample/inbox#402",
+          "sample/game#210",
+          "sample/game#211",
+          "sample/game#212",
+          "sample/game#213",
+          "exampleorg/engine#214",
+          "exampleorg/engine#215",
+          "exampleorg/engine#216",
+          "exampleorg/engine#217",
+          "anotherorg/docs#218",
+          "anotherorg/docs#219",
+          "anotherorg/docs#220",
+          "anotherorg/docs#221",
+          "anotherorg/docs#222"
+        ],
+        "count": null,
+        "walk": [
+          "radar-1",
+          "radar-2",
+          "sample/inbox#401",
+          "sample/inbox#402",
+          "sample/game#210",
+          "sample/game#211",
+          "sample/game#212",
+          "sample/game#213",
+          "exampleorg/engine#214",
+          "exampleorg/engine#215",
+          "exampleorg/engine#216",
+          "exampleorg/engine#217",
+          "anotherorg/docs#218",
+          "anotherorg/docs#219",
+          "anotherorg/docs#220",
+          "anotherorg/docs#221",
+          "anotherorg/docs#222"
+        ],
+        "selected_id": "radar-1",
+        "destination": null,
+        "open_url": "https://github.com/sample/game/pull/300",
+        "browse_ids": [
+          "radar-1",
+          "radar-2",
+          "sample/inbox#401",
+          "sample/inbox#402",
+          "sample/game#210",
+          "sample/game#211",
+          "sample/game#212",
+          "sample/game#213",
+          "exampleorg/engine#214",
+          "exampleorg/engine#215",
+          "exampleorg/engine#216",
+          "exampleorg/engine#217",
+          "anotherorg/docs#218",
+          "anotherorg/docs#219",
+          "anotherorg/docs#220",
+          "anotherorg/docs#221",
+          "anotherorg/docs#222"
+        ]
+      }
+    },
+    {
+      "id": "shared-owner-fold",
+      "label": "Fold owner shared by all lanes",
+      "row_set": "populated",
+      "query": "",
+      "session": "keyboard",
+      "freshness": "fresh",
+      "preferences": {
+        "showDrafts": false,
+        "showStale": false,
+        "showHeldBack": false,
+        "foldedOwners": [
+          "sample"
+        ],
+        "groupByOwner": false,
+        "ownerOrder": []
+      },
+      "expected": {
+        "matched_ids": [
+          "radar-1",
+          "radar-2",
+          "sample/inbox#401",
+          "sample/inbox#402",
+          "sample/inbox#403",
+          "sample/inbox#404",
+          "sample/game#210",
+          "sample/game#211",
+          "sample/game#212",
+          "sample/game#213",
+          "exampleorg/engine#214",
+          "exampleorg/engine#215",
+          "exampleorg/engine#216",
+          "exampleorg/engine#217",
+          "anotherorg/docs#218",
+          "anotherorg/docs#219",
+          "anotherorg/docs#220",
+          "anotherorg/docs#221",
+          "anotherorg/docs#222",
+          "sample/game#101",
+          "exampleorg/engine#120",
+          "anotherorg/docs#121",
+          "sample/game#102",
+          "exampleorg/engine#122",
+          "anotherorg/docs#123"
+        ],
+        "local_ids": [
+          "radar-1",
+          "radar-2",
+          "sample/inbox#401",
+          "sample/inbox#402",
+          "exampleorg/engine#214",
+          "exampleorg/engine#215",
+          "exampleorg/engine#216",
+          "exampleorg/engine#217",
+          "anotherorg/docs#218",
+          "anotherorg/docs#219",
+          "anotherorg/docs#220",
+          "anotherorg/docs#221",
+          "anotherorg/docs#222"
+        ],
+        "count": null,
+        "walk": [
+          "radar-1",
+          "radar-2",
+          "sample/inbox#401",
+          "sample/inbox#402",
+          "exampleorg/engine#214",
+          "exampleorg/engine#215",
+          "exampleorg/engine#216",
+          "exampleorg/engine#217",
+          "anotherorg/docs#218",
+          "anotherorg/docs#219",
+          "anotherorg/docs#220",
+          "anotherorg/docs#221",
+          "anotherorg/docs#222"
+        ],
+        "selected_id": "radar-1",
+        "destination": null,
+        "open_url": "https://github.com/sample/game/pull/300",
+        "browse_ids": [
+          "radar-1",
+          "radar-2",
+          "sample/inbox#401",
+          "sample/inbox#402",
+          "exampleorg/engine#214",
+          "exampleorg/engine#215",
+          "exampleorg/engine#216",
+          "exampleorg/engine#217",
+          "anotherorg/docs#218",
+          "anotherorg/docs#219",
+          "anotherorg/docs#220",
+          "anotherorg/docs#221",
+          "anotherorg/docs#222"
+        ]
+      }
+    },
+    {
+      "id": "grouped-restore",
+      "label": "Clear restores owner groups and tails",
+      "row_set": "populated",
+      "query": "keeper",
+      "session": "keyboard",
+      "freshness": "fresh",
+      "preferences": {
+        "showDrafts": true,
+        "showStale": true,
+        "showHeldBack": true,
+        "foldedOwners": [],
+        "groupByOwner": true,
+        "ownerOrder": [
+          "anotherorg",
+          "sample",
+          "exampleorg"
+        ]
+      },
+      "expected": {
+        "matched_ids": [
+          "sample/game#101"
+        ],
+        "local_ids": [
+          "sample/game#101"
+        ],
+        "count": "1 of 25",
+        "walk": [
+          "sample/game#101",
+          "jump:github"
+        ],
+        "selected_id": "sample/game#101",
+        "destination": "https://github.com/search?q=keeper",
+        "open_url": "https://github.com/sample/game/pull/101",
+        "browse_ids": [
+          "radar-1",
+          "radar-2",
+          "sample/inbox#401",
+          "sample/inbox#402",
+          "sample/inbox#403",
+          "sample/inbox#404",
+          "anotherorg/docs#218",
+          "anotherorg/docs#219",
+          "anotherorg/docs#220",
+          "anotherorg/docs#221",
+          "anotherorg/docs#222",
+          "anotherorg/docs#123",
+          "anotherorg/docs#121",
+          "sample/game#210",
+          "sample/game#211",
+          "sample/game#212",
+          "sample/game#213",
+          "sample/game#102",
+          "sample/game#101",
+          "exampleorg/engine#214",
+          "exampleorg/engine#215",
+          "exampleorg/engine#216",
+          "exampleorg/engine#217",
+          "exampleorg/engine#122",
+          "exampleorg/engine#120"
+        ]
+      }
+    }
+  ]
+}

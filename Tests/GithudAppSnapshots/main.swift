@@ -15,6 +15,40 @@ func check(_ condition: Bool, _ message: String) {
 func descendants(_ view: NSView) -> [NSView] {
     [view] + view.subviews.flatMap(descendants)
 }
+// The prototype may describe selected-but-not-yet-implemented UI. U12 locks its
+// independently authored query expectations to real Core matching/destinations;
+// U9/U10 add the actual controller visibility and selection assertions below.
+let prototype = try PrototypeFixture.load(repo: URL(fileURLWithPath: FileManager.default.currentDirectoryPath))
+let populated = prototype.fixture.rowSets["populated"]!
+check(populated.ids.count >= 25, "prototype fixture exercises production-sized overflow")
+check(prototype.metadata.scenarios.contains { $0.id == "quiet" && $0.expected.matchedIDs.contains { id in
+    populated.pulse.contains { $0.id == id && $0.isStale && !$0.isDraft }
+} }, "prototype quiet case actually contains a quiet row")
+check(prototype.metadata.scenarios.contains { $0.id == "draft" && $0.expected.matchedIDs.contains { id in
+    populated.pulse.contains { $0.id == id && $0.isDraft }
+} }, "prototype draft case actually contains a draft")
+check(prototype.metadata.scenarios.contains { $0.id == "held" && $0.expected.matchedIDs.contains { id in
+    populated.inbound.contains { $0.id == id && $0.isHeldBack }
+} }, "prototype held case actually contains held-back inbound")
+for scenario in prototype.metadata.scenarios {
+    let rows = prototype.fixture.rowSets[scenario.rowSet]!
+    let query = JumpQuery(scenario.query)
+    let narrowed = query.narrow(radar: rows.radar, inbound: rows.inbound, pulse: rows.pulse)
+    let ids = narrowed.radar.map(\.id) + narrowed.inbound.map(\.id) + narrowed.pulse.map(\.id)
+    check(ids == scenario.expected.matchedIDs, "prototype \(scenario.id): Core matches declared IDs in order")
+    let count = !query.isEmpty && narrowed.matched > 0
+        ? PlainWords.jumpCount(matched: narrowed.matched, admitted: narrowed.admitted) : nil
+    check(count == scenario.expected.count, "prototype \(scenario.id): Core count matches declaration")
+    let destination = query.isEmpty ? nil : query.destination(selfLogin: prototype.fixture.selfLogin,
+        knownRepos: JumpQuery.knownRepos(radar: rows.radar, inbound: rows.inbound, pulse: rows.pulse))
+    check(destination == scenario.expected.destination,
+          "prototype \(scenario.id): Core destination matches declaration")
+    check(KeySession.actionableIDs(radar: rows.radar, pulse: rows.pulse,
+        showDrafts: scenario.preferences.showDrafts, showStale: scenario.preferences.showStale,
+        inbound: rows.inbound, showHeldBackInbound: scenario.preferences.showHeldBack,
+        lens: scenario.preferences.lens) == scenario.expected.browseIDs,
+          "prototype \(scenario.id): declared browse restoration agrees with Core")
+}
 let now = Date()
 let stamp = ISO8601DateFormatter().string(from: now)
 let pulses = [182, 214, 215].map { number in

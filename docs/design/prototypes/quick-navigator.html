@@ -1,0 +1,844 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; connect-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src 'none'; base-uri 'none'; form-action 'none'">
+<title>githud — Quick navigator</title>
+<style>
+  :root {
+    --page: #0f1012;
+    --page-ink: rgba(255,255,255,.84);
+    --page-ink-2: rgba(255,255,255,.58);
+    --page-ink-3: rgba(255,255,255,.36);
+    --page-line: rgba(255,255,255,.12);
+    --surface: rgba(30,30,32,.9);
+    --border: rgba(255,255,255,.12);
+    --ink-1: rgba(255,255,255,.8470588);
+    --ink-2: rgba(255,255,255,.5490196);
+    --ink-3: rgba(255,255,255,.2470588);
+    --accent: #0a84ff;
+    --danger: rgb(255,66,69);
+    --success: #30d158;
+    --caution: #ffd60a;
+    --hover: rgba(255,255,255,.07);
+    --selected: rgba(255,255,255,.126);
+    --island-width: 520px;
+    --inset: 18px;
+    --row-radius: 6px;
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { margin: 0; min-height: 100%; background: var(--page); color: var(--page-ink);
+    font: 13px/1.45 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif; }
+  body { padding: 30px 32px 72px; }
+  h1 { margin: 0 0 4px; font-size: 18px; font-weight: 600; letter-spacing: -.01em; }
+  h2 { margin: 0 0 8px; font-size: 14px; font-weight: 600; }
+  p { margin: 0; }
+  .intro { max-width: 820px; color: var(--page-ink-2); }
+  .intro code, code { font: 11px/1.3 "SF Mono", Menlo, monospace; color: var(--page-ink); }
+  .meta { display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center; margin: 16px 0 18px;
+    color: var(--page-ink-3); font-size: 11px; }
+  .meta strong { color: var(--page-ink-2); font-weight: 600; }
+  .meta a { color: var(--page-ink-2); text-underline-offset: 2px; }
+  .status { border: 1px solid var(--page-line); border-radius: 999px; padding: 2px 8px; color: var(--page-ink-2); }
+  .fidelity { color: var(--page-ink-2); }
+  .history { margin: 0 0 18px; border-top: 1px solid var(--page-line); border-bottom: 1px solid var(--page-line);
+    padding: 8px 0; color: var(--page-ink-3); font-size: 11px; }
+  .history-row { display: grid; grid-template-columns: 86px 150px 1fr; gap: 12px; padding: 2px 0; }
+  .history-row b { color: var(--page-ink-2); font-weight: 500; }
+  .history-row small { display: block; margin-top: 2px; overflow-wrap: anywhere; }
+  .controls { display: flex; flex-wrap: wrap; align-items: end; gap: 12px 18px; margin: 16px 0; }
+  .control { display: flex; flex-direction: column; gap: 5px; }
+  .control label, .control-title { color: var(--page-ink-3); font-size: 10px; font-weight: 600; letter-spacing: .07em; text-transform: uppercase; }
+  select, input, button { font: inherit; }
+  select, .control button { min-height: 30px; border: 1px solid var(--page-line); border-radius: 7px; background: rgba(255,255,255,.06);
+    color: var(--page-ink); padding: 5px 9px; }
+  select { min-width: 236px; }
+  button { cursor: pointer; }
+  button:hover, select:hover { background: var(--hover); }
+  .height-toggle { display: flex; gap: 6px; }
+  .height-toggle button[aria-pressed="true"] { border-color: rgba(10,132,255,.75); background: rgba(10,132,255,.18); }
+  .error { margin: 16px 0; border-left: 3px solid var(--danger); padding: 8px 12px; color: #ffb4ae; background: rgba(255,69,58,.08); }
+  .error[hidden] { display: none; }
+  .desk { position: relative; overflow: hidden; border: 1px solid var(--page-line); border-radius: 9px;
+    background: radial-gradient(900px 520px at 90% 94%, #2b2f3b 0%, transparent 62%),
+      radial-gradient(1100px 580px at 16% 108%, #3a2a2f 0%, transparent 62%), #18191d; }
+  .menubar { height: 24px; display: flex; align-items: center; gap: 14px; padding: 0 12px; color: rgba(255,255,255,.74);
+    background: rgba(40,40,44,.76); font-size: 12px; }
+  .menubar .app { font-weight: 600; }
+  .menubar .right { display: flex; gap: 12px; align-items: center; margin-left: auto; }
+  .menubar .pill { font-variant-numeric: tabular-nums; font-weight: 600; }
+  .stage { display: flex; justify-content: center; min-height: 330px; padding: 8px 0 30px; }
+  .island { width: var(--island-width); align-self: flex-start; overflow: hidden; border: .5px solid var(--border); border-radius: 14px;
+    background: var(--surface); box-shadow: 0 12px 40px rgba(0,0,0,.45); color: var(--ink-1); }
+  .island[hidden] { display: none; }
+  .jump-header { display: flex; align-items: center; gap: 8px; padding: 16px var(--inset) 0; }
+  .jump-header input { min-width: 0; flex: 1; border: 0; outline: 0; background: transparent; color: var(--ink-1);
+    caret-color: #54b1e8; font-size: 13px; font-weight: 500; line-height: 18px; padding: 0; }
+  .jump-header input::placeholder { color: var(--ink-2); }
+  .header-button { width: 22px; height: 18px; padding: 0; border: 0; background: transparent;
+    color: var(--ink-2); display: grid; place-items: center; flex: none; }
+  .header-button svg { width: 14px; height: 14px; }
+  .collapsed-pill { width: 60px; height: 36px; border: .5px solid var(--border); border-radius: 14px;
+    background: var(--surface); color: var(--ink-2); }
+  .count { flex: none; color: var(--ink-3); font-size: 11px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .static-header { display: flex; gap: 8px; align-items: center; padding: 16px var(--inset) 0; color: var(--ink-2); font-size: 11px; font-weight: 600; line-height: 18px; }
+  #static-title { flex: 1; }
+  .banner { padding: 8px var(--inset) 0; color: var(--caution); font-size: 11px; }
+  #results { padding: 8px var(--inset) 0; display: flex; flex-direction: column; gap: 8px; }
+  .lane-title { line-height: 14px; color: var(--ink-2); font-size: 11px; font-weight: 600; }
+  .rows { display: flex; flex-direction: column; gap: 8px; max-height: 240px; overflow: auto;
+    scrollbar-width: thin; scrollbar-color: #ffffff28 transparent; overscroll-behavior: contain; }
+  .rows > :not(.row) { flex-shrink: 0; }
+  .stage[data-height="short"] .rows { max-height: 80px; }
+  .row { position: relative; display: flex; width: 100%; align-items: flex-start; gap: 8px; border: 0; border-radius: var(--row-radius);
+    background: transparent; color: var(--ink-1); padding: 0; min-height: 31px; flex-shrink: 0; text-align: left; }
+  .row:hover { background: var(--hover); }
+  .row[aria-selected="true"] { background: var(--selected); }
+  .row-icon { width: 20px; height: 18px; flex: none; color: var(--ink-2); display: grid; place-items: center; }
+  .row-icon svg { width: 16px; height: 16px; }
+  .row-icon.good { color: var(--success); }
+  .row-icon.critical { color: var(--danger); }
+  .row-copy { min-width: 0; display: flex; flex: 1; flex-direction: column; gap: 1px; }
+  .row-title, .row-subtitle { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .row-title { color: var(--ink-1); font-size: 13px; font-weight: 500; line-height: 16px; }
+  .row-subtitle { color: var(--ink-2); font-size: 11px; line-height: 14px; font-variant-numeric: tabular-nums; }
+  .subdued .row-title { color: var(--ink-2); font-weight: 400; }
+  .subdued .row-icon { opacity: .55; }
+  .row.peeked .row-title, .row.peeked .row-subtitle { white-space: normal; }
+  .empty { padding: 18px 0; text-align: center; color: var(--ink-1); font-size: 13px; font-weight: 500; }
+  .caption { padding: 4px 0; color: var(--ink-3); font-size: 11px; }
+  .fold-ledger { padding: 5px var(--inset); color: var(--ink-3); font-size: 11px; }
+  .footer { display: flex; gap: 10px; padding: 16px var(--inset); color: var(--ink-3); font-size: 11px; line-height: 15px; }
+  .footer .right { margin-left: auto; }
+  .receipt { min-height: 38px; padding: 10px 16px; color: var(--page-ink-2); background: rgba(0,0,0,.35); font-size: 12px; }
+  .receipt b { color: var(--page-ink); font-weight: 500; }
+  .legend { margin-top: 14px; color: var(--page-ink-3); font-size: 11px; }
+  @media (max-width: 620px) {
+    body { padding: 20px 12px 48px; }
+    .desk { margin: 0 -4px; }
+    .island { width: min(var(--island-width), calc(100vw - 28px)); }
+    .history-row { grid-template-columns: 70px 100px 1fr; gap: 8px; }
+  }
+</style>
+</head>
+<body>
+<h1 id="title">Quick navigator</h1>
+<p class="intro">Direct local results in the existing island. This page is an offline interaction reference, not the native app and not a live GitHub search.</p>
+<div id="metadata" class="meta" aria-live="polite"></div>
+<details id="history" class="history" hidden></details>
+<div id="error" class="error" role="alert" hidden></div>
+
+<div class="controls">
+  <div class="control">
+    <span class="control-title">Scenario</span>
+    <select id="scenario" aria-label="Prototype scenario"></select>
+  </div>
+  <div class="control">
+    <span class="control-title">Height</span>
+    <div class="height-toggle">
+      <button type="button" data-height="normal" data-height-choice="normal" aria-pressed="true">Normal</button>
+      <button type="button" data-height="short" data-height-choice="short" aria-pressed="false">Short</button>
+    </div>
+  </div>
+  <div class="control">
+    <span class="control-title">Session</span>
+    <div class="height-toggle">
+      <button type="button" id="summon">Summon keyboard session</button>
+      <button type="button" id="reset">Reset scenario</button>
+    </div>
+  </div>
+</div>
+
+<div class="desk">
+  <div class="menubar"><span class="app">TextEdit</span><span>File</span><span>Edit</span><span>View</span><span>Window</span>
+    <div class="right"><span>Fixture desktop</span></div></div>
+  <div id="stage" class="stage" data-height="normal">
+    <section id="island" class="island" aria-label="githud quick navigator"></section>
+    <button type="button" id="collapsed-pill" class="collapsed-pill" hidden aria-label="Mouse expand island">↳</button>
+  </div>
+  <div id="receipt" class="receipt" aria-live="polite">Select a scenario to begin.</div>
+</div>
+<p class="legend">Keyboard controls are scoped to the field above: ↑ ↓ select, Return previews a destination and collapses, Option–Return peeks, and Escape clears then collapses. AppKit vibrancy and SF Symbols are approximations. No browser navigation, network request, clipboard, or global shortcut is used.</p>
+
+<!-- The prototype CLI replaces this inert block with {metadata, fixture, provenance}. -->
+<script id="prototype-data" type="application/json">{"fixture":{"now":"2026-09-08T12:00:00Z","provenance":"synthetic","row_sets":{"empty":{"inbound":[],"pulse":[],"radar":[]},"populated":{"inbound":[{"changeSignature":"synthetic-inbound-401","id":"sample/inbox#401","isHeldBack":false,"isPR":true,"repo":"sample/inbox #401","subtitle":"@example-contributor","symbolName":"arrow.triangle.pull","timestamp":"2026-09-01T12:00:00Z","title":"Update contributor onboarding","url":"https://github.com/sample/inbox/pull/401"},{"changeSignature":"synthetic-inbound-402","id":"sample/inbox#402","isHeldBack":false,"isPR":false,"repo":"sample/inbox #402","subtitle":"@example-contributor","symbolName":"dot.circle","timestamp":"2026-09-01T12:00:00Z","title":"Update issue triage example","url":"https://github.com/sample/inbox/issues/402"},{"changeSignature":"synthetic-inbound-403","id":"sample/inbox#403","isHeldBack":true,"isPR":true,"repo":"sample/inbox #403","subtitle":"@example-bot","symbolName":"arrow.triangle.pull","timestamp":"2026-09-01T12:00:00Z","title":"Update robot dependency snapshot","url":"https://github.com/sample/inbox/pull/403"},{"changeSignature":"synthetic-inbound-404","id":"sample/inbox#404","isHeldBack":true,"isPR":true,"repo":"sample/inbox #404","subtitle":"@example-author · draft","symbolName":"arrow.triangle.pull","timestamp":"2026-09-01T12:00:00Z","title":"Update draft inbound proposal","url":"https://github.com/sample/inbox/pull/404"}],"pulse":[{"changeSignature":"synthetic-pulse-210","headBranch":"feat/work-210","id":"sample/game#210","isDraft":false,"isFresh":false,"isStale":false,"merge":"mergeable","repo":"sample/game #210","state":"ready","subtitle":"CI passing · approved","symbolName":"checkmark.circle.fill","timestamp":"2026-09-08T10:00:00Z","title":"Update collision tracing","url":"https://github.com/sample/game/pull/210"},{"changeSignature":"synthetic-pulse-211","headBranch":"feat/work-211","id":"sample/game#211","isDraft":false,"isFresh":false,"isStale":false,"merge":"mergeable","repo":"sample/game #211","state":"ready","subtitle":"CI passing · approved","symbolName":"checkmark.circle.fill","timestamp":"2026-09-08T10:00:00Z","title":"Update camera recovery","url":"https://github.com/sample/game/pull/211"},{"changeSignature":"synthetic-pulse-212","headBranch":"feat/work-212","id":"sample/game#212","isDraft":false,"isFresh":false,"isStale":false,"merge":"mergeable","repo":"sample/game #212","state":"ready","subtitle":"CI passing · approved","symbolName":"checkmark.circle.fill","timestamp":"2026-09-08T10:00:00Z","title":"Update scene loading","url":"https://github.com/sample/game/pull/212"},{"changeSignature":"synthetic-pulse-213","headBranch":"feat/work-213","id":"sample/game#213","isDraft":false,"isFresh":false,"isStale":false,"merge":"mergeable","repo":"sample/game #213","state":"ready","subtitle":"CI passing · approved","symbolName":"checkmark.circle.fill","timestamp":"2026-09-08T10:00:00Z","title":"Update input bindings","url":"https://github.com/sample/game/pull/213"},{"changeSignature":"synthetic-pulse-214","headBranch":"feat/work-214","id":"exampleorg/engine#214","isDraft":false,"isFresh":false,"isStale":false,"merge":"mergeable","repo":"exampleorg/engine #214","state":"ready","subtitle":"CI passing · approved","symbolName":"checkmark.circle.fill","timestamp":"2026-09-08T10:00:00Z","title":"Update engine batching","url":"https://github.com/exampleorg/engine/pull/214"},{"changeSignature":"synthetic-pulse-215","headBranch":"feat/work-215","id":"exampleorg/engine#215","isDraft":false,"isFresh":false,"isStale":false,"merge":"mergeable","repo":"exampleorg/engine #215","state":"ready","subtitle":"CI passing · approved","symbolName":"checkmark.circle.fill","timestamp":"2026-09-08T10:00:00Z","title":"Update cache invalidation","url":"https://github.com/exampleorg/engine/pull/215"},{"changeSignature":"synthetic-pulse-216","headBranch":"feat/work-216","id":"exampleorg/engine#216","isDraft":false,"isFresh":false,"isStale":false,"merge":"mergeable","repo":"exampleorg/engine #216","state":"ready","subtitle":"CI passing · approved","symbolName":"checkmark.circle.fill","timestamp":"2026-09-08T10:00:00Z","title":"Update renderer cleanup","url":"https://github.com/exampleorg/engine/pull/216"},{"changeSignature":"synthetic-pulse-217","headBranch":"feat/work-217","id":"exampleorg/engine#217","isDraft":false,"isFresh":false,"isStale":false,"merge":"mergeable","repo":"exampleorg/engine #217","state":"ready","subtitle":"CI passing · approved","symbolName":"checkmark.circle.fill","timestamp":"2026-09-08T10:00:00Z","title":"Update resource loading","url":"https://github.com/exampleorg/engine/pull/217"},{"changeSignature":"synthetic-pulse-218","headBranch":"feat/work-218","id":"anotherorg/docs#218","isDraft":false,"isFresh":false,"isStale":false,"merge":"mergeable","repo":"anotherorg/docs #218","state":"ready","subtitle":"CI passing · approved","symbolName":"checkmark.circle.fill","timestamp":"2026-09-08T10:00:00Z","title":"Update accessibility labels","url":"https://github.com/anotherorg/docs/pull/218"},{"changeSignature":"synthetic-pulse-219","headBranch":"feat/work-219","id":"anotherorg/docs#219","isDraft":false,"isFresh":false,"isStale":false,"merge":"mergeable","repo":"anotherorg/docs #219","state":"ready","subtitle":"CI passing · approved","symbolName":"checkmark.circle.fill","timestamp":"2026-09-08T10:00:00Z","title":"Update sample navigation","url":"https://github.com/anotherorg/docs/pull/219"},{"changeSignature":"synthetic-pulse-220","headBranch":"feat/work-220","id":"anotherorg/docs#220","isDraft":false,"isFresh":false,"isStale":false,"merge":"mergeable","repo":"anotherorg/docs #220","state":"ready","subtitle":"CI passing · approved","symbolName":"checkmark.circle.fill","timestamp":"2026-09-08T10:00:00Z","title":"Update long title truncation and inline expansion without displacing the native text editor or its selection","url":"https://github.com/anotherorg/docs/pull/220"},{"changeSignature":"synthetic-pulse-221","headBranch":"feat/work-221","id":"anotherorg/docs#221","isDraft":false,"isFresh":false,"isStale":false,"merge":"mergeable","repo":"anotherorg/docs #221","state":"ready","subtitle":"CI passing · approved","symbolName":"checkmark.circle.fill","timestamp":"2026-09-08T10:00:00Z","title":"Update test documentation","url":"https://github.com/anotherorg/docs/pull/221"},{"changeSignature":"synthetic-pulse-222","headBranch":"feat/work-222","id":"anotherorg/docs#222","isDraft":false,"isFresh":false,"isStale":false,"merge":"mergeable","repo":"anotherorg/docs #222","state":"ready","subtitle":"CI passing · approved","symbolName":"checkmark.circle.fill","timestamp":"2026-09-08T10:00:00Z","title":"Update offline examples","url":"https://github.com/anotherorg/docs/pull/222"},{"changeSignature":"synthetic-pulse-101","headBranch":"feat/keeper-rig","id":"sample/game#101","isDraft":false,"isFresh":false,"isStale":true,"merge":"conflicting","repo":"sample/game #101","state":"blocked","subtitle":"no checks · conflicts","symbolName":"exclamationmark.triangle.fill","timestamp":"2026-08-01T12:00:00Z","title":"Update keeper recovery after a diving save","url":"https://github.com/sample/game/pull/101"},{"changeSignature":"synthetic-pulse-120","headBranch":"feat/work-120","id":"exampleorg/engine#120","isDraft":false,"isFresh":false,"isStale":true,"merge":"conflicting","repo":"exampleorg/engine #120","state":"blocked","subtitle":"no checks · conflicts","symbolName":"exclamationmark.triangle.fill","timestamp":"2026-08-01T12:00:00Z","title":"Update dormant rendering task","url":"https://github.com/exampleorg/engine/pull/120"},{"changeSignature":"synthetic-pulse-121","headBranch":"feat/work-121","id":"anotherorg/docs#121","isDraft":false,"isFresh":false,"isStale":true,"merge":"conflicting","repo":"anotherorg/docs #121","state":"blocked","subtitle":"no checks · conflicts","symbolName":"exclamationmark.triangle.fill","timestamp":"2026-08-01T12:00:00Z","title":"Update quiet documentation receipt","url":"https://github.com/anotherorg/docs/pull/121"},{"changeSignature":"synthetic-pulse-102","headBranch":"feat/work-102","id":"sample/game#102","isDraft":true,"isFresh":false,"isStale":false,"merge":"mergeable","repo":"sample/game #102","state":"draft","subtitle":"draft · CI running","symbolName":"pencil.circle","timestamp":"2026-09-08T10:00:00Z","title":"Update draft-camera controls","url":"https://github.com/sample/game/pull/102"},{"changeSignature":"synthetic-pulse-122","headBranch":"feat/work-122","id":"exampleorg/engine#122","isDraft":true,"isFresh":false,"isStale":false,"merge":"mergeable","repo":"exampleorg/engine #122","state":"draft","subtitle":"draft · CI running","symbolName":"pencil.circle","timestamp":"2026-09-08T10:00:00Z","title":"Update draft renderer experiment","url":"https://github.com/exampleorg/engine/pull/122"},{"changeSignature":"synthetic-pulse-123","headBranch":"feat/work-123","id":"anotherorg/docs#123","isDraft":true,"isFresh":false,"isStale":false,"merge":"mergeable","repo":"anotherorg/docs #123","state":"draft","subtitle":"draft · CI running","symbolName":"pencil.circle","timestamp":"2026-09-08T10:00:00Z","title":"Update draft writing example","url":"https://github.com/anotherorg/docs/pull/123"}],"radar":[{"changeSignature":"synthetic-radar-1","excerpt":null,"id":"radar-1","isCritical":false,"repo":"sample/game","subtitle":"@example-reviewer · review requested","symbolName":"arrow.triangle.pull","timestamp":"2026-09-08T10:00:00Z","title":"Update review request for the collision detector","urgency":80,"url":"https://github.com/sample/game/pull/300"},{"changeSignature":"synthetic-radar-2","excerpt":null,"id":"radar-2","isCritical":false,"repo":"anotherorg/docs","subtitle":"@example-author · mentioned","symbolName":"at","timestamp":"2026-09-08T10:00:00Z","title":"Update documentation example for a very long keyboard navigation explanation that must truncate and remain peekable","urgency":60,"url":"https://github.com/anotherorg/docs/issues/301"}]}},"schema_version":1,"self_login":"sample"},"metadata":{"default_scenario":"quiet","fixture":"../../../Tests/Fixtures/quick-navigator-prototype.json","history":[{"actor":"owner","change":"Selected A · direct results","date":"2026-09-08","reference":"Quoted conversation; canonical agenda records the selected behavior.","why":"A is good."},{"actor":"architect","change":"Specified a living prototype suite","date":"2026-09-08","reference":"../2026-09-04-quick-navigator-agenda.md#quick-navigator-build","why":"Preserve an offline interaction reference with synthetic fixtures, stable cases and explicit implementation evidence."}],"id":"quick-navigator","implementation":null,"plan":"../2026-09-04-quick-navigator-agenda.md#quick-navigator-build","scenarios":[{"expected":{"browse_ids":["radar-1","radar-2","sample/inbox#401","sample/inbox#402","sample/game#210","sample/game#211","sample/game#212","sample/game#213","exampleorg/engine#214","exampleorg/engine#215","exampleorg/engine#216","exampleorg/engine#217","anotherorg/docs#218","anotherorg/docs#219","anotherorg/docs#220","anotherorg/docs#221","anotherorg/docs#222"],"count":"1 of 25","destination":"https://github.com/search?q=keeper","local_ids":["sample/game#101"],"matched_ids":["sample/game#101"],"open_url":"https://github.com/sample/game/pull/101","selected_id":"sample/game#101","walk":["sample/game#101","jump:github"]},"freshness":"fresh","id":"quiet","label":"Quiet match · keeper","preferences":{"foldedOwners":[],"groupByOwner":false,"ownerOrder":[],"showDrafts":false,"showHeldBack":false,"showStale":false},"query":"keeper","row_set":"populated","session":"keyboard"},{"expected":{"browse_ids":["radar-1","radar-2","sample/inbox#401","sample/inbox#402","sample/game#210","sample/game#211","sample/game#212","sample/game#213","exampleorg/engine#214","exampleorg/engine#215","exampleorg/engine#216","exampleorg/engine#217","anotherorg/docs#218","anotherorg/docs#219","anotherorg/docs#220","anotherorg/docs#221","anotherorg/docs#222"],"count":"1 of 25","destination":"https://github.com/search?q=draft-camera","local_ids":["sample/game#102"],"matched_ids":["sample/game#102"],"open_url":"https://github.com/sample/game/pull/102","selected_id":"sample/game#102","walk":["sample/game#102","jump:github"]},"freshness":"fresh","id":"draft","label":"Hidden draft","preferences":{"foldedOwners":[],"groupByOwner":false,"ownerOrder":[],"showDrafts":false,"showHeldBack":false,"showStale":false},"query":"draft-camera","row_set":"populated","session":"keyboard"},{"expected":{"browse_ids":["radar-1","radar-2","sample/inbox#401","sample/inbox#402","sample/game#210","sample/game#211","sample/game#212","sample/game#213","exampleorg/engine#214","exampleorg/engine#215","exampleorg/engine#216","exampleorg/engine#217","anotherorg/docs#218","anotherorg/docs#219","anotherorg/docs#220","anotherorg/docs#221","anotherorg/docs#222"],"count":"1 of 25","destination":"https://github.com/search?q=robot","local_ids":["sample/inbox#403"],"matched_ids":["sample/inbox#403"],"open_url":"https://github.com/sample/inbox/pull/403","selected_id":"sample/inbox#403","walk":["sample/inbox#403","jump:github"]},"freshness":"fresh","id":"held","label":"Held-back inbound","preferences":{"foldedOwners":[],"groupByOwner":false,"ownerOrder":[],"showDrafts":false,"showHeldBack":false,"showStale":false},"query":"robot","row_set":"populated","session":"keyboard"},{"expected":{"browse_ids":["radar-1","radar-2","sample/inbox#401","sample/inbox#402","sample/game#210","sample/game#211","sample/game#212","sample/game#213","anotherorg/docs#218","anotherorg/docs#219","anotherorg/docs#220","anotherorg/docs#221","anotherorg/docs#222"],"count":"6 of 25","destination":"https://github.com/exampleorg/engine","local_ids":["exampleorg/engine#214","exampleorg/engine#215","exampleorg/engine#216","exampleorg/engine#217","exampleorg/engine#120","exampleorg/engine#122"],"matched_ids":["exampleorg/engine#214","exampleorg/engine#215","exampleorg/engine#216","exampleorg/engine#217","exampleorg/engine#120","exampleorg/engine#122"],"open_url":"https://github.com/exampleorg/engine/pull/214","selected_id":"exampleorg/engine#214","walk":["exampleorg/engine#214","exampleorg/engine#215","exampleorg/engine#216","exampleorg/engine#217","exampleorg/engine#120","exampleorg/engine#122","jump:github"]},"freshness":"fresh","id":"fold","label":"Folded owner","preferences":{"foldedOwners":["exampleorg"],"groupByOwner":false,"ownerOrder":[],"showDrafts":false,"showHeldBack":false,"showStale":false},"query":"engine","row_set":"populated","session":"keyboard"},{"expected":{"browse_ids":["radar-1","radar-2","sample/inbox#401","sample/inbox#402","sample/game#210","sample/game#211","sample/game#212","sample/game#213","exampleorg/engine#214","exampleorg/engine#215","exampleorg/engine#216","exampleorg/engine#217","anotherorg/docs#218","anotherorg/docs#219","anotherorg/docs#220","anotherorg/docs#221","anotherorg/docs#222"],"count":"25 of 25","destination":"https://github.com/search?q=update","local_ids":["radar-1","radar-2","sample/inbox#401","sample/inbox#402","sample/inbox#403","sample/inbox#404","sample/game#210","sample/game#211","sample/game#212","sample/game#213","exampleorg/engine#214","exampleorg/engine#215","exampleorg/engine#216","exampleorg/engine#217","anotherorg/docs#218","anotherorg/docs#219","anotherorg/docs#220","anotherorg/docs#221","anotherorg/docs#222","sample/game#101","exampleorg/engine#120","anotherorg/docs#121","sample/game#102","exampleorg/engine#122","anotherorg/docs#123"],"matched_ids":["radar-1","radar-2","sample/inbox#401","sample/inbox#402","sample/inbox#403","sample/inbox#404","sample/game#210","sample/game#211","sample/game#212","sample/game#213","exampleorg/engine#214","exampleorg/engine#215","exampleorg/engine#216","exampleorg/engine#217","anotherorg/docs#218","anotherorg/docs#219","anotherorg/docs#220","anotherorg/docs#221","anotherorg/docs#222","sample/game#101","exampleorg/engine#120","anotherorg/docs#121","sample/game#102","exampleorg/engine#122","anotherorg/docs#123"],"open_url":"https://github.com/sample/game/pull/300","selected_id":"radar-1","walk":["radar-1","radar-2","sample/inbox#401","sample/inbox#402","sample/inbox#403","sample/inbox#404","sample/game#210","sample/game#211","sample/game#212","sample/game#213","exampleorg/engine#214","exampleorg/engine#215","exampleorg/engine#216","exampleorg/engine#217","anotherorg/docs#218","anotherorg/docs#219","anotherorg/docs#220","anotherorg/docs#221","anotherorg/docs#222","sample/game#101","exampleorg/engine#120","anotherorg/docs#121","sample/game#102","exampleorg/engine#122","anotherorg/docs#123","jump:github"]},"freshness":"fresh","id":"mixed","label":"Many matches / long titles","preferences":{"foldedOwners":[],"groupByOwner":false,"ownerOrder":[],"showDrafts":false,"showHeldBack":false,"showStale":false},"query":"update","row_set":"populated","session":"keyboard"},{"expected":{"browse_ids":["radar-1","radar-2","sample/inbox#401","sample/inbox#402","sample/game#210","sample/game#211","sample/game#212","sample/game#213","exampleorg/engine#214","exampleorg/engine#215","exampleorg/engine#216","exampleorg/engine#217","anotherorg/docs#218","anotherorg/docs#219","anotherorg/docs#220","anotherorg/docs#221","anotherorg/docs#222"],"count":null,"destination":"https://github.com/search?q=not-a-real-result","local_ids":[],"matched_ids":[],"open_url":"https://github.com/search?q=not-a-real-result","selected_id":"jump:github","walk":["jump:github"]},"freshness":"fresh","id":"none","label":"Nothing matches","preferences":{"foldedOwners":[],"groupByOwner":false,"ownerOrder":[],"showDrafts":false,"showHeldBack":false,"showStale":false},"query":"not-a-real-result","row_set":"populated","session":"keyboard"},{"expected":{"browse_ids":[],"count":null,"destination":"https://github.com/search?q=keeper","local_ids":[],"matched_ids":[],"open_url":"https://github.com/search?q=keeper","selected_id":"jump:github","walk":["jump:github"]},"freshness":"fresh","id":"empty","label":"Empty snapshot","preferences":{"foldedOwners":[],"groupByOwner":false,"ownerOrder":[],"showDrafts":false,"showHeldBack":false,"showStale":false},"query":"keeper","row_set":"empty","session":"keyboard"},{"expected":{"browse_ids":[],"count":null,"destination":"https://github.com/search?q=keeper","local_ids":[],"matched_ids":[],"open_url":"https://github.com/search?q=keeper","selected_id":"jump:github","walk":["jump:github"]},"freshness":"loading","id":"loading","label":"Loading · no snapshot","preferences":{"foldedOwners":[],"groupByOwner":false,"ownerOrder":[],"showDrafts":false,"showHeldBack":false,"showStale":false},"query":"keeper","row_set":"empty","session":"keyboard"},{"expected":{"browse_ids":["radar-1","radar-2","sample/inbox#401","sample/inbox#402","sample/game#210","sample/game#211","sample/game#212","sample/game#213","exampleorg/engine#214","exampleorg/engine#215","exampleorg/engine#216","exampleorg/engine#217","anotherorg/docs#218","anotherorg/docs#219","anotherorg/docs#220","anotherorg/docs#221","anotherorg/docs#222"],"count":"1 of 25","destination":"https://github.com/search?q=keeper","local_ids":["sample/game#101"],"matched_ids":["sample/game#101"],"open_url":"https://github.com/sample/game/pull/101","selected_id":"sample/game#101","walk":["sample/game#101","jump:github"]},"freshness":"offline","id":"offline","label":"Offline · cached match","preferences":{"foldedOwners":[],"groupByOwner":false,"ownerOrder":[],"showDrafts":false,"showHeldBack":false,"showStale":false},"query":"keeper","row_set":"populated","session":"keyboard"},{"expected":{"browse_ids":["radar-1","radar-2","sample/inbox#401","sample/inbox#402","sample/game#210","sample/game#211","sample/game#212","sample/game#213","exampleorg/engine#214","exampleorg/engine#215","exampleorg/engine#216","exampleorg/engine#217","anotherorg/docs#218","anotherorg/docs#219","anotherorg/docs#220","anotherorg/docs#221","anotherorg/docs#222"],"count":null,"destination":null,"local_ids":["radar-1","radar-2","sample/inbox#401","sample/inbox#402","sample/game#210","sample/game#211","sample/game#212","sample/game#213","exampleorg/engine#214","exampleorg/engine#215","exampleorg/engine#216","exampleorg/engine#217","anotherorg/docs#218","anotherorg/docs#219","anotherorg/docs#220","anotherorg/docs#221","anotherorg/docs#222"],"matched_ids":["radar-1","radar-2","sample/inbox#401","sample/inbox#402","sample/inbox#403","sample/inbox#404","sample/game#210","sample/game#211","sample/game#212","sample/game#213","exampleorg/engine#214","exampleorg/engine#215","exampleorg/engine#216","exampleorg/engine#217","anotherorg/docs#218","anotherorg/docs#219","anotherorg/docs#220","anotherorg/docs#221","anotherorg/docs#222","sample/game#101","exampleorg/engine#120","anotherorg/docs#121","sample/game#102","exampleorg/engine#122","anotherorg/docs#123"],"open_url":"https://github.com/sample/game/pull/300","selected_id":"radar-1","walk":["radar-1","radar-2","sample/inbox#401","sample/inbox#402","sample/game#210","sample/game#211","sample/game#212","sample/game#213","exampleorg/engine#214","exampleorg/engine#215","exampleorg/engine#216","exampleorg/engine#217","anotherorg/docs#218","anotherorg/docs#219","anotherorg/docs#220","anotherorg/docs#221","anotherorg/docs#222"]},"freshness":"fresh","id":"browse","label":"Empty query / browse","preferences":{"foldedOwners":[],"groupByOwner":false,"ownerOrder":[],"showDrafts":false,"showHeldBack":false,"showStale":false},"query":"","row_set":"populated","session":"keyboard"},{"expected":{"browse_ids":["radar-1","radar-2","sample/inbox#401","sample/inbox#402","sample/game#210","sample/game#211","sample/game#212","sample/game#213","exampleorg/engine#214","exampleorg/engine#215","exampleorg/engine#216","exampleorg/engine#217","anotherorg/docs#218","anotherorg/docs#219","anotherorg/docs#220","anotherorg/docs#221","anotherorg/docs#222"],"count":null,"destination":null,"local_ids":["radar-1","radar-2","sample/inbox#401","sample/inbox#402","sample/game#210","sample/game#211","sample/game#212","sample/game#213","exampleorg/engine#214","exampleorg/engine#215","exampleorg/engine#216","exampleorg/engine#217","anotherorg/docs#218","anotherorg/docs#219","anotherorg/docs#220","anotherorg/docs#221","anotherorg/docs#222"],"matched_ids":["radar-1","radar-2","sample/inbox#401","sample/inbox#402","sample/inbox#403","sample/inbox#404","sample/game#210","sample/game#211","sample/game#212","sample/game#213","exampleorg/engine#214","exampleorg/engine#215","exampleorg/engine#216","exampleorg/engine#217","anotherorg/docs#218","anotherorg/docs#219","anotherorg/docs#220","anotherorg/docs#221","anotherorg/docs#222","sample/game#101","exampleorg/engine#120","anotherorg/docs#121","sample/game#102","exampleorg/engine#122","anotherorg/docs#123"],"open_url":null,"selected_id":null,"walk":[]},"freshness":"fresh","id":"mouse","label":"Mouse summon","preferences":{"foldedOwners":[],"groupByOwner":false,"ownerOrder":[],"showDrafts":false,"showHeldBack":false,"showStale":false},"query":"","row_set":"populated","session":"mouse"},{"expected":{"browse_ids":["radar-1","radar-2","sample/inbox#401","sample/inbox#402","sample/game#210","sample/game#211","sample/game#212","sample/game#213","exampleorg/engine#214","exampleorg/engine#215","exampleorg/engine#216","exampleorg/engine#217","anotherorg/docs#218","anotherorg/docs#219","anotherorg/docs#220","anotherorg/docs#221","anotherorg/docs#222"],"count":"1 of 25","destination":"https://github.com/search?q=101+is:pr+author:@me","local_ids":["sample/game#101"],"matched_ids":["sample/game#101"],"open_url":"https://github.com/sample/game/pull/101","selected_id":"sample/game#101","walk":["sample/game#101","jump:github"]},"freshness":"fresh","id":"number","label":"PR number","preferences":{"foldedOwners":[],"groupByOwner":false,"ownerOrder":[],"showDrafts":false,"showHeldBack":false,"showStale":false},"query":"101","row_set":"populated","session":"keyboard"},{"expected":{"browse_ids":["radar-1","radar-2","sample/inbox#401","sample/inbox#402","sample/game#210","sample/game#211","sample/game#212","sample/game#213","exampleorg/engine#214","exampleorg/engine#215","exampleorg/engine#216","exampleorg/engine#217","anotherorg/docs#218","anotherorg/docs#219","anotherorg/docs#220","anotherorg/docs#221","anotherorg/docs#222"],"count":"1 of 25","destination":"https://github.com/search?q=is:pr+head:feat/keeper-rig","local_ids":["sample/game#101"],"matched_ids":["sample/game#101"],"open_url":"https://github.com/sample/game/pull/101","selected_id":"sample/game#101","walk":["sample/game#101","jump:github"]},"freshness":"fresh","id":"branch","label":"Head branch","preferences":{"foldedOwners":[],"groupByOwner":false,"ownerOrder":[],"showDrafts":false,"showHeldBack":false,"showStale":false},"query":"feat/keeper-rig","row_set":"populated","session":"keyboard"},{"expected":{"browse_ids":["radar-1","radar-2","sample/inbox#401","sample/inbox#402","sample/game#210","sample/game#211","sample/game#212","sample/game#213","exampleorg/engine#214","exampleorg/engine#215","exampleorg/engine#216","exampleorg/engine#217","anotherorg/docs#218","anotherorg/docs#219","anotherorg/docs#220","anotherorg/docs#221","anotherorg/docs#222"],"count":"1 of 25","destination":"https://github.com/sample/game/pull/101","local_ids":["sample/game#101"],"matched_ids":["sample/game#101"],"open_url":"https://github.com/sample/game/pull/101","selected_id":"sample/game#101","walk":["sample/game#101","jump:github"]},"freshness":"fresh","id":"repo-number","label":"Repository and number","preferences":{"foldedOwners":[],"groupByOwner":false,"ownerOrder":[],"showDrafts":false,"showHeldBack":false,"showStale":false},"query":"game#101","row_set":"populated","session":"keyboard"},{"expected":{"browse_ids":["radar-1","radar-2","sample/inbox#401","sample/inbox#402","sample/game#210","sample/game#211","sample/game#212","sample/game#213","exampleorg/engine#214","exampleorg/engine#215","exampleorg/engine#216","exampleorg/engine#217","anotherorg/docs#218","anotherorg/docs#219","anotherorg/docs#220","anotherorg/docs#221","anotherorg/docs#222"],"count":"1 of 25","destination":"https://github.com/sample/game/pull/101","local_ids":["sample/game#101"],"matched_ids":["sample/game#101"],"open_url":"https://github.com/sample/game/pull/101","selected_id":"sample/game#101","walk":["sample/game#101","jump:github"]},"freshness":"fresh","id":"github-link","label":"GitHub link","preferences":{"foldedOwners":[],"groupByOwner":false,"ownerOrder":[],"showDrafts":false,"showHeldBack":false,"showStale":false},"query":"https://github.com/sample/game/pull/101","row_set":"populated","session":"keyboard"},{"expected":{"browse_ids":["radar-1","radar-2","sample/inbox#401","sample/inbox#402","sample/game#210","sample/game#211","sample/game#212","sample/game#213","exampleorg/engine#214","exampleorg/engine#215","exampleorg/engine#216","exampleorg/engine#217","anotherorg/docs#218","anotherorg/docs#219","anotherorg/docs#220","anotherorg/docs#221","anotherorg/docs#222"],"count":"1 of 25","destination":"https://github.com/search?q=is:pr+head:feat/keeper-rig","local_ids":["sample/game#101"],"matched_ids":["sample/game#101"],"open_url":"https://github.com/sample/game/pull/101","selected_id":"sample/game#101","walk":["sample/game#101","jump:github"]},"freshness":"fresh","id":"prefix-return","label":"No-match prefix → local result","preferences":{"foldedOwners":[],"groupByOwner":false,"ownerOrder":[],"showDrafts":false,"showHeldBack":false,"showStale":false},"query":"feat/keeper-rig","row_set":"populated","session":"keyboard"},{"expected":{"browse_ids":["radar-1","radar-2","sample/inbox#401","sample/inbox#402","sample/game#210","sample/game#211","sample/game#212","sample/game#213","anotherorg/docs#218","anotherorg/docs#219","anotherorg/docs#220","anotherorg/docs#221","anotherorg/docs#222"],"count":"1 of 25","destination":"https://github.com/search?q=keeper","local_ids":["sample/game#101"],"matched_ids":["sample/game#101"],"open_url":"https://github.com/sample/game/pull/101","selected_id":"sample/game#101","walk":["sample/game#101","jump:github"]},"freshness":"fresh","id":"clear-restore","label":"Clear restores browse preferences","preferences":{"foldedOwners":["exampleorg"],"groupByOwner":false,"ownerOrder":[],"showDrafts":false,"showHeldBack":false,"showStale":false},"query":"keeper","row_set":"populated","session":"keyboard"},{"expected":{"browse_ids":["radar-1","radar-2","sample/inbox#401","sample/inbox#402","sample/game#210","sample/game#211","sample/game#212","sample/game#213","exampleorg/engine#214","exampleorg/engine#215","exampleorg/engine#216","exampleorg/engine#217","anotherorg/docs#218","anotherorg/docs#219","anotherorg/docs#220","anotherorg/docs#221","anotherorg/docs#222"],"count":null,"destination":null,"local_ids":["radar-1","radar-2","sample/inbox#401","sample/inbox#402","sample/game#210","sample/game#211","sample/game#212","sample/game#213","exampleorg/engine#214","exampleorg/engine#215","exampleorg/engine#216","exampleorg/engine#217","anotherorg/docs#218","anotherorg/docs#219","anotherorg/docs#220","anotherorg/docs#221","anotherorg/docs#222"],"matched_ids":["radar-1","radar-2","sample/inbox#401","sample/inbox#402","sample/inbox#403","sample/inbox#404","sample/game#210","sample/game#211","sample/game#212","sample/game#213","exampleorg/engine#214","exampleorg/engine#215","exampleorg/engine#216","exampleorg/engine#217","anotherorg/docs#218","anotherorg/docs#219","anotherorg/docs#220","anotherorg/docs#221","anotherorg/docs#222","sample/game#101","exampleorg/engine#120","anotherorg/docs#121","sample/game#102","exampleorg/engine#122","anotherorg/docs#123"],"open_url":"https://github.com/sample/game/pull/300","selected_id":"radar-1","walk":["radar-1","radar-2","sample/inbox#401","sample/inbox#402","sample/game#210","sample/game#211","sample/game#212","sample/game#213","exampleorg/engine#214","exampleorg/engine#215","exampleorg/engine#216","exampleorg/engine#217","anotherorg/docs#218","anotherorg/docs#219","anotherorg/docs#220","anotherorg/docs#221","anotherorg/docs#222"]},"freshness":"fresh","id":"whitespace","label":"Whitespace query","preferences":{"foldedOwners":[],"groupByOwner":false,"ownerOrder":[],"showDrafts":false,"showHeldBack":false,"showStale":false},"query":"   ","row_set":"populated","session":"keyboard"},{"expected":{"browse_ids":["radar-1","radar-2","sample/inbox#401","sample/inbox#402","exampleorg/engine#214","exampleorg/engine#215","exampleorg/engine#216","exampleorg/engine#217","anotherorg/docs#218","anotherorg/docs#219","anotherorg/docs#220","anotherorg/docs#221","anotherorg/docs#222"],"count":null,"destination":null,"local_ids":["radar-1","radar-2","sample/inbox#401","sample/inbox#402","exampleorg/engine#214","exampleorg/engine#215","exampleorg/engine#216","exampleorg/engine#217","anotherorg/docs#218","anotherorg/docs#219","anotherorg/docs#220","anotherorg/docs#221","anotherorg/docs#222"],"matched_ids":["radar-1","radar-2","sample/inbox#401","sample/inbox#402","sample/inbox#403","sample/inbox#404","sample/game#210","sample/game#211","sample/game#212","sample/game#213","exampleorg/engine#214","exampleorg/engine#215","exampleorg/engine#216","exampleorg/engine#217","anotherorg/docs#218","anotherorg/docs#219","anotherorg/docs#220","anotherorg/docs#221","anotherorg/docs#222","sample/game#101","exampleorg/engine#120","anotherorg/docs#121","sample/game#102","exampleorg/engine#122","anotherorg/docs#123"],"open_url":"https://github.com/sample/game/pull/300","selected_id":"radar-1","walk":["radar-1","radar-2","sample/inbox#401","sample/inbox#402","exampleorg/engine#214","exampleorg/engine#215","exampleorg/engine#216","exampleorg/engine#217","anotherorg/docs#218","anotherorg/docs#219","anotherorg/docs#220","anotherorg/docs#221","anotherorg/docs#222"]},"freshness":"fresh","id":"shared-owner-fold","label":"Fold owner shared by all lanes","preferences":{"foldedOwners":["sample"],"groupByOwner":false,"ownerOrder":[],"showDrafts":false,"showHeldBack":false,"showStale":false},"query":"","row_set":"populated","session":"keyboard"},{"expected":{"browse_ids":["radar-1","radar-2","sample/inbox#401","sample/inbox#402","sample/inbox#403","sample/inbox#404","anotherorg/docs#218","anotherorg/docs#219","anotherorg/docs#220","anotherorg/docs#221","anotherorg/docs#222","anotherorg/docs#123","anotherorg/docs#121","sample/game#210","sample/game#211","sample/game#212","sample/game#213","sample/game#102","sample/game#101","exampleorg/engine#214","exampleorg/engine#215","exampleorg/engine#216","exampleorg/engine#217","exampleorg/engine#122","exampleorg/engine#120"],"count":"1 of 25","destination":"https://github.com/search?q=keeper","local_ids":["sample/game#101"],"matched_ids":["sample/game#101"],"open_url":"https://github.com/sample/game/pull/101","selected_id":"sample/game#101","walk":["sample/game#101","jump:github"]},"freshness":"fresh","id":"grouped-restore","label":"Clear restores owner groups and tails","preferences":{"foldedOwners":[],"groupByOwner":true,"ownerOrder":["anotherorg","sample","exampleorg"],"showDrafts":true,"showHeldBack":true,"showStale":true},"query":"keeper","row_set":"populated","session":"keyboard"}],"schema_version":1,"selected_variant":"A","status":"selected","superseded_by":null,"title":"Quick navigator"},"provenance":{"design_fingerprint":"967d078de42d8f5a916fae1185b2e705ee9989feed8ffaa5b4b1afa34f2cfbf7","fixture_sha256":"c0694facc414d3ec49937f11164368ed924032b4b0b58ddcf7b6d52da9f4af9e","metadata_sha256":"87700dbc42136d7cea7652947547632e443e030d1959550cee11d2c2f5e82b25"}}</script>
+<script>
+(() => {
+  "use strict";
+
+  const dataBlock = document.getElementById("prototype-data");
+  const title = document.getElementById("title");
+  const metadataBox = document.getElementById("metadata");
+  const historyBox = document.getElementById("history");
+  const errorBox = document.getElementById("error");
+  const scenarioSelect = document.getElementById("scenario");
+  const stage = document.getElementById("stage");
+  const island = document.getElementById("island");
+  const receipt = document.getElementById("receipt");
+  const summonButton = document.getElementById("summon");
+  const resetButton = document.getElementById("reset");
+
+  let metadata = null;
+  let fixture = null;
+  let provenance = null;
+  let currentScenario = null;
+  let query = "";
+  let selectedIndex = 0;
+  let expanded = true;
+  let keyboardSession = false;
+  let openedURL = null;
+  let currentHeight = "normal";
+  let shellReady = false;
+
+  function setText(node, value) { node.textContent = value == null ? "" : String(value); }
+
+  function safeHref(value) {
+    if (typeof value !== "string" || !value || /^(?:[a-z][a-z0-9+.-]*:|\/|\\)/i.test(value)) return null;
+    return value;
+  }
+
+  function showError(message) {
+    setText(errorBox, message);
+    errorBox.hidden = false;
+    setText(receipt, message);
+  }
+
+  function clearError() { errorBox.hidden = true; setText(errorBox, ""); }
+
+  function isObject(value) { return value !== null && typeof value === "object" && !Array.isArray(value); }
+
+  function validatePayload(payload) {
+    if (!isObject(payload) || !isObject(payload.metadata) || !isObject(payload.fixture)) {
+      return "Prototype data is not synced. The inert JSON block must contain metadata and fixture.";
+    }
+    if (payload.metadata.schema_version !== 1 || payload.fixture.schema_version !== 1) {
+      return "Unsupported prototype schema. Expected metadata and fixture schema version 1.";
+    }
+    if (!["exploring", "selected", "implemented", "superseded"].includes(payload.metadata.status)) {
+      return "Unknown prototype status.";
+    }
+    if (payload.metadata.status === "implemented" && !isObject(payload.metadata.implementation)) {
+      return "Implemented status requires implementation evidence.";
+    }
+    if (!Array.isArray(payload.metadata.scenarios) || payload.metadata.scenarios.length === 0) {
+      return "Prototype metadata has no scenarios.";
+    }
+    if (!isObject(payload.fixture.row_sets)) {
+      return "Prototype fixture has no row sets.";
+    }
+    for (const scenario of payload.metadata.scenarios) {
+      if (!isObject(scenario) || typeof scenario.id !== "string" || typeof scenario.label !== "string" ||
+          typeof scenario.row_set !== "string" || typeof scenario.query !== "string") {
+        return "Prototype metadata contains an invalid scenario entry.";
+      }
+      if (!payload.fixture.row_sets[scenario.row_set]) return `Scenario ${scenario.id} names an unknown row set.`;
+      const rows = payload.fixture.row_sets[scenario.row_set];
+      if (!["radar", "inbound", "pulse"].every(lane => Array.isArray(rows[lane]))) return "A row set is missing a lane array.";
+    }
+    return null;
+  }
+
+  function parsePayload() {
+    let payload;
+    try { payload = JSON.parse(dataBlock.textContent || "{}"); }
+    catch (_) { showError("Prototype data is not valid JSON."); return false; }
+    const problem = validatePayload(payload);
+    if (problem) { showError(problem); return false; }
+    metadata = payload.metadata;
+    fixture = payload.fixture;
+    provenance = payload.provenance || {};
+    return true;
+  }
+
+  function renderMetadata() {
+    title.textContent = metadata.title || "Quick navigator";
+    document.title = `githud — ${metadata.title}`;
+    metadataBox.replaceChildren();
+    const status = document.createElement("span");
+    status.className = "status";
+    setText(status, metadata.status || "status unavailable");
+    const variant = document.createElement("span");
+    variant.className = "fidelity";
+    setText(variant, `${metadata.selected_variant ? `Variant ${metadata.selected_variant}` : "No selected variant"} · synthetic fixed-clock fixture`);
+    metadataBox.append(status, variant);
+    if (metadata.implementation) {
+      const verified = document.createElement("span");
+      setText(verified, `Verified at app ${metadata.implementation.commit.slice(0, 12)} · not live sync`);
+      metadataBox.append(verified);
+      const evidence = safeHref(`../../../${metadata.implementation.evidence}`);
+      if (evidence) { const link = document.createElement("a"); link.href = evidence; link.textContent = "Native evidence"; metadataBox.append(link); }
+    }
+    const plan = safeHref(metadata.plan);
+    if (plan) {
+      const link = document.createElement("a");
+      link.href = plan; link.textContent = "Implementation plan";
+      metadataBox.append(link);
+    }
+    const fixtureLink = safeHref(metadata.fixture);
+    if (fixtureLink) {
+      const link = document.createElement("a");
+      link.href = fixtureLink; link.textContent = "Synthetic fixture";
+      metadataBox.append(link);
+    }
+    if (provenance && provenance.metadata_sha256) {
+      const hash = document.createElement("span");
+      setText(hash, `metadata ${String(provenance.metadata_sha256).slice(0, 12)}…`);
+      metadataBox.append(hash);
+    }
+    historyBox.replaceChildren();
+    if (Array.isArray(metadata.history) && metadata.history.length) {
+      const summary = document.createElement("summary"); summary.textContent = "Decision history"; historyBox.append(summary);
+      for (const entry of metadata.history) {
+        const row = document.createElement("div");
+        row.className = "history-row";
+        const date = document.createElement("span"); setText(date, entry.date);
+        const actor = document.createElement("b"); setText(actor, entry.actor);
+        const change = document.createElement("span"); setText(change, `${entry.change || ""}${entry.why ? ` — ${entry.why}` : ""}`);
+        const reference = document.createElement("small"); setText(reference, entry.reference); change.append(reference);
+        row.append(date, actor, change); historyBox.append(row);
+      }
+      historyBox.hidden = false;
+    }
+  }
+
+  function populateScenarios() {
+    scenarioSelect.replaceChildren();
+    for (const scenario of metadata.scenarios) {
+      const option = document.createElement("option");
+      option.value = scenario.id; option.textContent = `${scenario.id} · ${scenario.label}`;
+      scenarioSelect.append(option);
+    }
+  }
+
+  function buildShell() {
+    island.replaceChildren();
+    const banner = document.createElement("div"); banner.id = "banner"; banner.className = "banner"; banner.hidden = true;
+    const jumpHeader = document.createElement("div"); jumpHeader.className = "jump-header"; jumpHeader.id = "jump-header";
+    const input = document.createElement("input"); input.id = "query"; input.type = "text"; input.autocomplete = "off";
+    input.spellcheck = false; input.placeholder = "Type to jump…"; input.setAttribute("aria-label", "Jump query");
+    const count = document.createElement("span"); count.id = "count"; count.className = "count";
+    jumpHeader.append(input, count);
+    appendHeaderControls(jumpHeader);
+    const staticHeader = document.createElement("div"); staticHeader.id = "static-header"; staticHeader.className = "static-header";
+    const staticTitle = document.createElement("span"); staticTitle.id = "static-title"; staticHeader.append(staticTitle);
+    appendHeaderControls(staticHeader);
+    const results = document.createElement("div"); results.id = "results";
+    const footer = document.createElement("div"); footer.id = "footer"; footer.className = "footer";
+    const footerLeft = document.createElement("span"); footerLeft.id = "footer-left";
+    const footerRight = document.createElement("span"); footerRight.id = "footer-right"; footerRight.className = "right";
+    footer.append(footerLeft, footerRight);
+    island.append(banner, jumpHeader, staticHeader, results, footer);
+    jumpHeader.querySelector("input").addEventListener("input", event => {
+      if (!keyboardSession) return;
+      const nextQuery = event.target.value;
+      if (nextQuery === query) return;
+      query = nextQuery;
+      selectedIndex = 0;
+      openedURL = null;
+      render();
+    });
+    jumpHeader.querySelector("input").addEventListener("keydown", onKeyDown);
+    results.addEventListener("click", event => {
+      const row = event.target.closest("button[data-row-id]");
+      if (!row) return;
+      const state = derivedState();
+      const index = state.walk.indexOf(row.dataset.rowId);
+      if (index >= 0) { selectedIndex = index; render(); }
+      const target = state.rowsByID.get(row.dataset.rowId);
+      openedURL = target ? (target.url || null) : (row.dataset.url || null);
+      collapseSession();
+      setReceipt("Click receipt.", openedURL ? `Would open ${openedURL}.` : "This row has no destination.");
+    });
+    shellReady = true;
+  }
+
+  function appendHeaderControls(header) {
+    const settings = document.createElement("button"); settings.type = "button";
+    settings.className = "header-button"; settings.disabled = true;
+    settings.title = "Settings are outside this prototype"; settings.setAttribute("aria-label", "Settings not simulated");
+    settings.innerHTML = '<svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M1 4h5m4 0h7M1 9h9m4 0h3M1 14h3m4 0h9"/><circle cx="8" cy="4" r="2"/><circle cx="12" cy="9" r="2"/><circle cx="6" cy="14" r="2"/></svg>';
+    const collapse = document.createElement("button"); collapse.type = "button";
+    collapse.className = "header-button"; collapse.setAttribute("aria-label", "Collapse island");
+    collapse.innerHTML = '<svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m4 11 5-5 5 5"/></svg>';
+    collapse.addEventListener("click", () => { collapseSession(); setReceipt("Collapsed.", "Click the pill for a mouse summon, or use the keyboard summon button."); });
+    header.append(settings, collapse);
+  }
+
+  function collapseSession() {
+    expanded = false; keyboardSession = false; query = ""; selectedIndex = 0; render();
+  }
+
+  function trim(value) { return String(value == null ? "" : value).trim(); }
+  function queryIsEmpty(value) { return trim(value).length === 0; }
+  function repositoryName(value) { return String(value || "").replace(/\s+#\d+\s*$/, ""); }
+  function contains(needle, haystack) {
+    return String(haystack || "").toLocaleLowerCase().includes(String(needle || "").toLocaleLowerCase());
+  }
+  function containsNumber(number, value) { return new RegExp(`#${number}(?![0-9])`, "i").test(String(value || "")); }
+
+  function knownRepos(rows) {
+    const seen = new Set(); const result = [];
+    for (const row of rows) {
+      const repo = repositoryName(row.repo);
+      const key = repo.toLocaleLowerCase();
+      if (!seen.has(key)) { seen.add(key); result.push(repo); }
+    }
+    return result;
+  }
+
+  function normaliseLink(value) {
+    const raw = String(value || "");
+    const candidate = /^github\.com\//i.test(raw) ? `https://${raw}` :
+      /^http:\/\/github\.com\//i.test(raw) ? raw.replace(/^http:/i, "https:") : raw;
+    try {
+      const url = new URL(candidate);
+      if (url.hostname.toLocaleLowerCase() !== "github.com") return null;
+      return url.href.replace(/\/+$/, "");
+    } catch (_) { return null; }
+  }
+
+  function resolveRepo(input, repos) {
+    const candidate = repositoryName(trim(input));
+    const exact = repos.find(repo => repo.toLocaleLowerCase() === candidate.toLocaleLowerCase());
+    if (exact) return exact;
+    if (candidate.includes("/")) return null;
+    const suffix = repos.filter(repo => repo.toLocaleLowerCase().endsWith(`/${candidate.toLocaleLowerCase()}`));
+    return suffix.length === 1 ? suffix[0] : null;
+  }
+
+  function parseHandle(raw, repos) {
+    const value = trim(raw);
+    if (!value) return { kind: "text", value: "" };
+    const link = normaliseLink(value);
+    if (link) return { kind: "link", value: link };
+    let match = value.match(/^([A-Za-z0-9_.-]+(?:\/[A-Za-z0-9_.-]+)?)(?:\s*#|\s+)(\d+)$/);
+    if (match) return { kind: "repoNumber", repo: match[1], number: Number(match[2]) };
+    const numberText = value.startsWith("#") ? value.slice(1) : value;
+    if (numberText && /^\d+$/.test(numberText)) return { kind: "number", number: Number(numberText) };
+    const repo = resolveRepo(value, repos);
+    if (repo) return { kind: "repo", repo };
+    if (value.includes("/") || /^[a-z]+-\d+/i.test(value)) return { kind: "branch", branch: value };
+    return { kind: "text", value };
+  }
+
+  function rowMatches(row, handle) {
+    const displayed = [row.title, row.repo, row.subtitle].join(" ");
+    switch (handle.kind) {
+      case "number": return containsNumber(handle.number, row.repo) || contains(String(handle.number), displayed);
+      case "repo": return repositoryName(row.repo).toLocaleLowerCase() === handle.repo.toLocaleLowerCase();
+      case "repoNumber": {
+        const actual = repositoryName(row.repo).toLocaleLowerCase();
+        const wantedRepo = handle.repo.toLocaleLowerCase();
+        const repoMatches = actual === wantedRepo || actual.endsWith(`/${wantedRepo}`);
+        return repoMatches && containsNumber(handle.number, row.repo);
+      }
+      case "branch": return (row.headBranch && contains(handle.branch, row.headBranch)) || contains(handle.branch, displayed);
+      case "link": return normaliseLink(row.url) === handle.value;
+      case "text": return contains(handle.value, displayed);
+      default: return false;
+    }
+  }
+
+  function encodeSearch(value) {
+    return Array.from(String(value)).map(char => /[A-Za-z0-9_.~:/@-]/.test(char) ? char : encodeURIComponent(char)).join("").replace(/%20/g, "+");
+  }
+  function searchURL(value) { return `https://github.com/search?q=${encodeSearch(value)}`; }
+  function githubPath(value) {
+    return `https://github.com/${String(value).split("/").filter(Boolean).map(part => encodeURIComponent(part)).join("/")}`;
+  }
+  function destinationFor(raw, repos) {
+    const handle = parseHandle(raw, repos);
+    switch (handle.kind) {
+      case "number": return searchURL(`${handle.number} is:pr${fixture.self_login && trim(fixture.self_login) ? " author:@me" : ""}`);
+      case "repo": return githubPath(handle.repo);
+      case "repoNumber": {
+        const repo = resolveRepo(handle.repo, repos) || (handle.repo.includes("/") ? handle.repo : null);
+        return repo ? githubPath(`${repo}/pull/${handle.number}`) : searchURL(`${handle.number} is:pr repo:${handle.repo}`);
+      }
+      case "branch": return searchURL(`is:pr head:${handle.branch}`);
+      case "link": return handle.value;
+      case "text": return handle.value ? searchURL(handle.value) : "https://github.com";
+      default: return "https://github.com";
+    }
+  }
+
+  function sourceRows() {
+    const set = fixture.row_sets[currentScenario.row_set];
+    return ["radar", "inbound", "pulse"].flatMap(lane => (Array.isArray(set[lane]) ? set[lane] : []).map(row => ({ ...row, lane })));
+  }
+  function owner(row) { return String(row.repo || "").split("/")[0].toLocaleLowerCase(); }
+  function isFolded(row, preferences) { return (preferences.foldedOwners || []).map(value => String(value).toLocaleLowerCase()).includes(owner(row)); }
+  function orderedOwners(rows, preferences) {
+    const discovery = [];
+    const byOwner = new Map();
+    for (const row of rows) {
+      const key = owner(row);
+      if (!byOwner.has(key)) {
+        discovery.push(key);
+        byOwner.set(key, { key, display: String(row.repo || "").split("/")[0], active: [], drafts: [], quiet: [] });
+      }
+      const bucket = byOwner.get(key);
+      if (row.isDraft) bucket.drafts.push(row);
+      else if (row.isStale) bucket.quiet.push(row);
+      else bucket.active.push(row);
+    }
+    const placed = (preferences.ownerOrder || []).map(value => String(value).toLocaleLowerCase());
+    const rank = key => {
+      const position = placed.indexOf(key);
+      return position >= 0 ? [0, position] : [1, discovery.indexOf(key)];
+    };
+    const ordered = [...discovery].sort((a, b) => {
+      const left = rank(a), right = rank(b);
+      return left[0] - right[0] || left[1] - right[1];
+    });
+    return ordered.map(key => byOwner.get(key));
+  }
+
+  function ownerTitle(bucket, selfLogin) {
+    return selfLogin && bucket.display.toLocaleLowerCase() === String(selfLogin).toLocaleLowerCase()
+      ? "yours" : bucket.display;
+  }
+
+  function browseComposition(rows, preferences) {
+    const radar = rows.filter(row => row.lane === "radar");
+    const inbound = rows.filter(row => row.lane === "inbound");
+    const pulse = rows.filter(row => row.lane === "pulse");
+    const visibleInbound = inbound.filter(row => !row.isHeldBack || Boolean(preferences.showHeldBack));
+    const hiddenInbound = inbound.filter(row => row.isHeldBack && !preferences.showHeldBack);
+    const pulseBuckets = orderedOwners(pulse, preferences);
+    const foldedKeys = new Set((preferences.foldedOwners || []).map(value => String(value).toLocaleLowerCase()));
+    const folded = pulseBuckets.filter(bucket => foldedKeys.has(bucket.key));
+    const leading = pulseBuckets.filter(bucket => !folded.includes(bucket));
+    const grouped = Boolean(preferences.groupByOwner) && leading.length >= 2;
+    const visibleDrafts = bucket => preferences.showDrafts ? bucket.drafts : [];
+    const visibleQuiet = bucket => preferences.showStale ? bucket.quiet : [];
+    const hiddenQuiet = bucket => preferences.showStale ? [] : bucket.quiet;
+    const rowsForBucket = bucket => bucket.active.concat(visibleDrafts(bucket), visibleQuiet(bucket));
+    const pulseRows = [];
+    const leadingActive = leading.flatMap(bucket => bucket.active);
+    const groups = [];
+    if (grouped) {
+      for (const bucket of leading) {
+        const groupRows = rowsForBucket(bucket);
+        pulseRows.push(...groupRows);
+        groups.push({
+          title: ownerTitle(bucket, fixture.self_login), active: bucket.active,
+          drafts: visibleDrafts(bucket), quiet: visibleQuiet(bucket), hiddenQuiet: hiddenQuiet(bucket), rows: groupRows,
+        });
+      }
+    } else {
+      // Flat shape keeps each Core section's source order. Owner ordering is a group
+      // concern and must not reorder the rows when no owner headers are shown.
+      const flatLeading = pulse.filter(row => !foldedKeys.has(owner(row)));
+      const active = flatLeading.filter(row => !row.isDraft && !row.isStale);
+      const drafts = flatLeading.filter(row => row.isDraft);
+      const quiet = flatLeading.filter(row => !row.isDraft && row.isStale);
+      pulseRows.push(...active, ...(preferences.showDrafts ? drafts : []), ...(preferences.showStale ? quiet : []));
+    }
+    const ledgers = folded.length > 2
+      ? [{ title: "elsewhere", count: folded.reduce((sum, bucket) => sum + bucket.active.length, 0),
+          draftCount: folded.reduce((sum, bucket) => sum + visibleDrafts(bucket).length, 0),
+          quietCount: folded.reduce((sum, bucket) => sum + bucket.quiet.length, 0), folded: true }]
+      : folded.map(bucket => ({ title: ownerTitle(bucket, fixture.self_login), count: bucket.active.length,
+          draftCount: visibleDrafts(bucket).length, quietCount: bucket.quiet.length, folded: true }));
+    const flatLeading = pulse.filter(row => !foldedKeys.has(owner(row)));
+    const terminalDrafts = grouped ? [] : flatLeading.filter(row => row.isDraft && preferences.showDrafts);
+    const terminalQuiet = grouped ? [] : flatLeading.filter(row => !row.isDraft && row.isStale && preferences.showStale);
+    const hiddenQuietRows = grouped ? [] : flatLeading.filter(row => !row.isDraft && row.isStale && !preferences.showStale);
+    const displayLeadingActive = grouped ? leadingActive : flatLeading.filter(row => !row.isDraft && !row.isStale);
+    return {
+      rows: radar.concat(visibleInbound, pulseRows), radar, inbound: visibleInbound, pulse: pulseRows,
+      leadingActive: displayLeadingActive, hiddenInbound, groups, grouped, ledgers, terminalDrafts, terminalQuiet,
+      hiddenQuiet: hiddenQuietRows, pulseSourceCount: pulse.length,
+    };
+  }
+
+  function activeScenario() { return currentScenario && currentScenario.id; }
+  function derivedState() {
+    if (!currentScenario || !fixture) return { source: [], matched: [], local: [], walk: [], rowsByID: new Map(), count: null, destination: null };
+    const source = sourceRows();
+    const repos = knownRepos(source);
+    const active = !queryIsEmpty(query);
+    const handle = parseHandle(query, repos);
+    const matched = source.filter(row => rowMatches(row, handle));
+    const browse = active ? null : browseComposition(source, currentScenario.preferences || {});
+    const local = active ? matched : browse.rows;
+    const destination = active ? destinationFor(query, repos) : null;
+    const rowsByID = new Map(local.map(row => [row.id, row]));
+    if (active) rowsByID.set("jump:github", { id: "jump:github", title: "GitHub destination", url: destination, lane: "destination" });
+    const localIDs = local.map(row => row.id);
+    const walk = keyboardSession ? (active ? [...localIDs, "jump:github"] : localIDs) : [];
+    const count = active && matched.length ? `${matched.length} of ${source.length}` : null;
+    return { source, matched, local, localIDs, walk, rowsByID, count, destination, active, handle, browse };
+  }
+
+  function formatAge(timestamp) {
+    if (!timestamp || !fixture.now) return "";
+    const seconds = Math.max(0, (Date.parse(fixture.now) - Date.parse(timestamp)) / 1000);
+    if (!Number.isFinite(seconds)) return "";
+    if (seconds < 60) return "now";
+    if (seconds < 3600) return `${Math.floor(seconds / 60)}m`;
+    if (seconds < 86400) return `${Math.floor(seconds / 3600)}h`;
+    if (seconds < 604800) return `${Math.floor(seconds / 86400)}d`;
+    return `${Math.floor(seconds / 604800)}w`;
+  }
+
+  function rowButton(row, selected) {
+    const button = document.createElement("button");
+    button.type = "button"; button.className = `row${row.lane === "destination" ? " destination" : ""}${row.isDraft || row.isStale ? " subdued" : ""}`;
+    button.dataset.rowId = row.id; button.dataset.url = row.url || "";
+    button.setAttribute("aria-selected", selected ? "true" : "false");
+    const icon = document.createElement("span"); icon.className = `row-icon${row.isCritical ? " critical" : ""}`;
+    const svg = paths => `<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5">${paths}</svg>`;
+    if (row.lane === "destination") icon.innerHTML = svg('<circle cx="8" cy="8" r="5.5"/><path d="m12 12 5 5"/>');
+    else if (row.state === "ready") { icon.classList.add("good"); icon.innerHTML = svg('<circle cx="10" cy="10" r="8" fill="currentColor" stroke="none"/><path d="m6 10 3 3 5-6" stroke="#fff"/>'); }
+    else if (row.state === "draft") icon.innerHTML = svg('<circle cx="10" cy="10" r="8"/><path d="m6 14 1-4 6-6 3 3-6 6Z"/>');
+    else if (row.state === "blocked") icon.innerHTML = svg('<path d="m10 2 8 15H2Z"/><path d="M10 7v5m0 1v2"/>');
+    else if (row.isPR === false) icon.innerHTML = svg('<circle cx="10" cy="10" r="7"/><circle cx="10" cy="10" r="2" fill="currentColor"/>');
+    else if (row.symbolName === "at") icon.textContent = "@";
+    else icon.innerHTML = svg('<path d="M7 17V3m0 0L3 7m4-4 4 4m-4 3c7 0 3 5 8 5"/>');
+    const copy = document.createElement("span"); copy.className = "row-copy";
+    const rowTitle = document.createElement("span"); rowTitle.className = "row-title"; setText(rowTitle, row.title);
+    const rowSubtitle = document.createElement("span"); rowSubtitle.className = "row-subtitle";
+    const age = formatAge(row.timestamp);
+    setText(rowSubtitle, [row.repo, row.subtitle, age].filter(Boolean).join(" · "));
+    copy.append(rowTitle, rowSubtitle); button.append(icon, copy); return button;
+  }
+
+  function addLane(results, name, rows, state) {
+    if (!rows.length) return;
+    const heading = document.createElement("div"); heading.className = "lane-title";
+    const label = document.createElement("span"); setText(label, name); heading.append(label);
+    const list = document.createElement("div"); list.className = "rows";
+    for (const row of rows) list.append(rowButton(row, state.walk[selectedIndex] === row.id));
+    if (name !== "Needs you") results.append(heading);
+    results.append(list);
+  }
+
+  function appendCaption(results, text) {
+    const toggle = /\((show|hide)\)/.test(text);
+    const caption = document.createElement(toggle ? "button" : "div"); caption.className = "caption"; setText(caption, text);
+    if (toggle) {
+      caption.type = "button"; caption.style.background = "transparent"; caption.style.border = "0"; caption.style.textAlign = "left";
+      caption.addEventListener("click", () => {
+        const key = text.includes("gone quiet") ? "showStale" : "showHeldBack";
+        currentScenario = { ...currentScenario, preferences: { ...currentScenario.preferences, [key]: !currentScenario.preferences[key] } };
+        keyboardSession = false; query = ""; selectedIndex = 0; render();
+        setReceipt("Browse preference changed in this sketch only.", "Reset returns to the declared scenario.");
+      });
+    }
+    results.append(caption);
+  }
+
+  function appendRows(results, rows, state) {
+    if (results.classList.contains("rows")) {
+      for (const row of rows) results.append(rowButton(row, state.walk[selectedIndex] === row.id));
+      return;
+    }
+    const list = document.createElement("div"); list.className = "rows";
+    for (const row of rows) list.append(rowButton(row, state.walk[selectedIndex] === row.id));
+    results.append(list);
+  }
+
+  function renderBrowse(results, state) {
+    const browse = state.browse;
+    addLane(results, "Needs you", browse.radar, state);
+    if (browse.inbound.length || browse.hiddenInbound.length) {
+      const heading = document.createElement("div"); heading.className = "lane-title"; setText(heading, "Inbound");
+      const pane = document.createElement("div"); pane.className = "rows";
+      appendRows(pane, browse.inbound.filter(row => !row.isHeldBack), state);
+      const held = browse.inbound.filter(row => row.isHeldBack);
+      if (held.length) { appendCaption(pane, "Bots & drafts"); appendRows(pane, held, state); }
+      if (browse.hiddenInbound.length) appendCaption(pane, `${browse.hiddenInbound.length} from bots & drafts (show)`);
+      results.append(heading, pane);
+    }
+    const hasPulse = browse.pulseSourceCount || browse.leadingActive.length || browse.groups.length || browse.ledgers.length || browse.terminalDrafts.length || browse.terminalQuiet.length || browse.hiddenQuiet.length;
+    if (!hasPulse) return;
+    const section = document.createElement("div"); section.className = "lane-title"; setText(section, "Your PRs"); results.append(section);
+    const pulsePane = document.createElement("div"); pulsePane.className = "rows"; results.append(pulsePane);
+    results = pulsePane;
+    if (browse.grouped) {
+      for (const group of browse.groups) {
+        const heading = document.createElement("div"); heading.className = "lane-title"; setText(heading, group.title); results.append(heading);
+        if (group.active.length) appendRows(results, group.active, state);
+        if (group.drafts.length) { appendCaption(results, "Draft PRs"); appendRows(results, group.drafts, state); }
+        if (group.quiet.length) { appendCaption(results, `${group.quiet.length} gone quiet (hide)`); appendRows(results, group.quiet, state); }
+        else if (group.hiddenQuiet.length) appendCaption(results, `${group.hiddenQuiet.length} gone quiet (show)`);
+      }
+      for (const ledger of browse.ledgers) {
+        const parts = [ledger.title + (ledger.count ? ` · ${ledger.count}` : "")];
+        if (ledger.draftCount) parts.push(`${ledger.draftCount} drafts`);
+        if (ledger.quietCount) parts.push(`${ledger.quietCount} gone quiet`);
+        appendCaption(results, parts.join(", "));
+      }
+    } else {
+      if (browse.leadingActive.length) appendRows(results, browse.leadingActive, state);
+      for (const ledger of browse.ledgers) {
+        const parts = [ledger.title + (ledger.count ? ` · ${ledger.count}` : "")];
+        if (ledger.draftCount) parts.push(`${ledger.draftCount} drafts`);
+        if (ledger.quietCount) parts.push(`${ledger.quietCount} gone quiet`);
+        appendCaption(results, parts.join(", "));
+      }
+      if (browse.terminalDrafts.length) { appendCaption(results, "Draft PRs"); appendRows(results, browse.terminalDrafts, state); }
+      if (browse.hiddenQuiet.length) appendCaption(results, `${browse.hiddenQuiet.length} gone quiet (show)`);
+      if (browse.terminalQuiet.length) { appendCaption(results, `${browse.terminalQuiet.length} gone quiet (hide)`); appendRows(results, browse.terminalQuiet, state); }
+    }
+  }
+
+  function renderRows(state) {
+    const results = document.getElementById("results");
+    if (!results) return;
+    results.replaceChildren();
+    const grouped = [
+      ["Needs you", "radar"], ["Inbound", "inbound"], ["Your PRs", "pulse"],
+    ];
+    if (state.active) {
+      for (const [label, lane] of grouped) addLane(results, label, state.local.filter(row => row.lane === lane), state);
+    } else if (state.browse) {
+      renderBrowse(results, state);
+    }
+    if (!state.local.length && state.active) {
+      const empty = document.createElement("div"); empty.className = "empty";
+      setText(empty, "Nothing on the island matches.");
+      results.append(empty);
+    }
+    if (state.active) {
+      const heading = document.createElement("div"); heading.className = "lane-title"; setText(heading, "GitHub"); results.append(heading);
+      const handle = state.handle;
+      const copy = {
+        number: [`Find #${handle.number} on GitHub`, "searches your PRs and repos you own for that number"],
+        repo: [`Open ${handle.repo}`, `github.com/${handle.repo}`],
+        repoNumber: [`Open ${handle.repo}#${handle.number}`, "opens the pull request on github.com"],
+        branch: [`Find the PR for “${handle.branch}”`, "head-branch search across repos you own"],
+        link: ["Open this GitHub link", "github.com"],
+        text: [`Search GitHub for “${handle.value}”`, "issues and pull requests, all repos"],
+      }[handle.kind];
+      results.append(rowButton({ id: "jump:github", lane: "destination", url: state.destination,
+        title: copy[0], subtitle: currentScenario.freshness === "offline" ? "offline · cached rows only" : copy[1] }, state.walk[selectedIndex] === "jump:github"));
+    }
+  }
+
+  function setReceipt(label, detail = "") {
+    receipt.replaceChildren();
+    if (!detail) { setText(receipt, label); return; }
+    const strong = document.createElement("b"); setText(strong, label); receipt.append(strong, document.createTextNode(` ${detail}`));
+  }
+  function renderSelectionOnly() {
+    const state = derivedState();
+    for (const row of island.querySelectorAll("button[data-row-id]")) row.setAttribute("aria-selected", row.dataset.rowId === state.walk[selectedIndex] ? "true" : "false");
+  }
+
+  function render() {
+    if (!shellReady || !currentScenario) return;
+    clearError();
+    const state = derivedState();
+    const banner = document.getElementById("banner");
+    const jumpHeader = document.getElementById("jump-header");
+    const staticHeader = document.getElementById("static-header");
+    const input = document.getElementById("query");
+    const count = document.getElementById("count");
+    const footerLeft = document.getElementById("footer-left");
+    const footerRight = document.getElementById("footer-right");
+    jumpHeader.hidden = !keyboardSession;
+    staticHeader.hidden = keyboardSession;
+    setText(document.getElementById("static-title"), state.source.some(row => row.lane === "radar") ? "Needs you" : "githud");
+    if (input.value !== query) input.value = query;
+    setText(count, state.count);
+    setText(footerLeft, "GitHub inbox ↗");
+    setText(footerRight, keyboardSession ? `↑↓ move · ↵ open · esc ${query.length ? "clear" : "dismiss"}` : "");
+    banner.hidden = !currentScenario.freshness || currentScenario.freshness === "fresh";
+    if (!banner.hidden) setText(banner, currentScenario.freshness === "loading" ? "Reading unavailable · showing the empty snapshot" : `Reading ${currentScenario.freshness} · cached rows only`);
+    renderRows(state);
+    stage.dataset.height = currentHeight;
+    island.hidden = !expanded;
+    document.getElementById("collapsed-pill").hidden = expanded;
+    renderSelectionOnly();
+  }
+
+  function onKeyDown(event) {
+    if (!keyboardSession || event.isComposing || event.metaKey || event.ctrlKey || event.shiftKey || (event.altKey && event.key !== "Enter")) return;
+    const state = derivedState();
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      event.preventDefault(); selectedIndex = Math.max(0, Math.min(selectedIndex + (event.key === "ArrowDown" ? 1 : -1), state.walk.length - 1));
+      renderSelectionOnly(); island.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: "nearest" }); return;
+    }
+    if (event.key === "Enter") {
+      event.preventDefault(); const id = state.walk[selectedIndex]; const target = id && state.rowsByID.get(id);
+      if (event.altKey) {
+        openedURL = null;
+        if (target && id !== "jump:github") island.querySelector('[aria-selected="true"]')?.classList.toggle("peeked");
+        setReceipt("Peek.", target && id !== "jump:github" ? target.title : "This result has no peek.");
+      }
+      else { openedURL = target?.url || null; collapseSession(); setReceipt("Return receipt.", openedURL ? `Would open ${openedURL}.` : "Nothing is selected."); }
+      return;
+    }
+    if (event.key === "Escape") {
+      event.preventDefault();
+      if (query.length) { query = ""; selectedIndex = 0; openedURL = null; render(); setReceipt("Escape.", "Raw query cleared; the browse view is restored."); }
+      else { collapseSession(); setReceipt("Escape.", "Keyboard session dismissed."); }
+    }
+  }
+
+  function readHash() {
+    const params = new URLSearchParams(location.hash.replace(/^#/, ""));
+    return { scenario: params.get("scenario") || metadata.default_scenario, height: params.get("height") || "normal" };
+  }
+  function writeHash() { history.replaceState(null, "", `#scenario=${encodeURIComponent(currentScenario.id)}&height=${currentHeight}`); }
+  function selectScenario(id, updateURL) {
+    const found = metadata.scenarios.find(scenario => scenario.id === id);
+    if (!found) { showError(`Unknown prototype scenario: ${id}`); currentScenario = null; return; }
+    currentScenario = found; query = found.query; selectedIndex = 0; openedURL = null; keyboardSession = found.session === "keyboard"; expanded = true;
+    scenarioSelect.value = found.id;
+    if (updateURL) writeHash();
+    setReceipt(`${found.id}.`, found.label); render();
+    if (keyboardSession) document.getElementById("query").focus();
+  }
+
+  scenarioSelect.addEventListener("change", () => selectScenario(scenarioSelect.value, true));
+  function setHeight(value, updateURL) {
+    currentHeight = value;
+    for (const other of document.querySelectorAll("[data-height-choice]")) {
+      other.setAttribute("aria-pressed", other.dataset.heightChoice === value ? "true" : "false");
+    }
+    if (updateURL && currentScenario) writeHash();
+    render();
+  }
+  for (const button of document.querySelectorAll("[data-height-choice]")) button.addEventListener("click", () => {
+    setHeight(button.dataset.heightChoice, true);
+  });
+  summonButton.addEventListener("click", () => { keyboardSession = true; expanded = true; selectedIndex = 0; openedURL = null; render(); document.getElementById("query").focus(); setReceipt("Summon.", "Keyboard session is scoped to the prototype field above."); });
+  document.getElementById("collapsed-pill").addEventListener("click", () => { keyboardSession = false; expanded = true; query = ""; render(); setReceipt("Mouse summon.", "The query editor stays absent."); });
+  resetButton.addEventListener("click", () => { if (!currentScenario) return; selectScenario(currentScenario.id, true); setReceipt("Reset.", `Returned to ${currentScenario.id}.`); });
+
+  window.prototypeState = () => {
+    const state = derivedState();
+    return {
+      scenario: activeScenario(), query, session: keyboardSession,
+      expanded, matchedIDs: state.matched.map(row => row.id), localIDs: state.localIDs || state.local.map(row => row.id),
+      walk: state.walk, selectedID: state.walk[selectedIndex] || null, count: state.count, destination: state.destination,
+      openedURL, preferences: currentScenario ? JSON.parse(JSON.stringify(currentScenario.preferences || {})) : null,
+    };
+  };
+
+  function applyHash() {
+    const initial = readHash();
+    if (initial.height !== "normal" && initial.height !== "short") {
+      currentScenario = null;
+      showError(`Unknown prototype height: ${initial.height}`);
+      return;
+    }
+    setHeight(initial.height, false);
+    selectScenario(initial.scenario, false);
+  }
+  window.addEventListener("hashchange", () => {
+    if (metadata && shellReady) applyHash();
+  });
+  if (parsePayload()) {
+    renderMetadata(); populateScenarios(); buildShell(); applyHash();
+  }
+})();
+</script>
+</body>
+</html>

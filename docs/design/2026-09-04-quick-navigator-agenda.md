@@ -723,6 +723,341 @@ The source inspection and isolated probe justify this architecture, not a claim
 that the integrated feature already works. Global input, actual IME candidates,
 VoiceOver speech and foreground-app hand-back remain distinct evidence obligations.
 
+### A path and living prototype suite
+
+<a id="quick-navigator-build"></a>
+
+**Objective:** when a query matches a captured row, the user can see it, select it, and open it without first changing browse preferences; keep that interaction available as a reusable, traceable design prototype.
+**Origin:** conversation — the owner showed “keeper”, “1 of 24”, a “gone quiet (show)” caption, and only the GitHub fallback, then asked to redesign the topology.
+**Status:** A is selected by the owner (“A is good.”, 2026-09-08). The combined implementation plan is proposed; this architecture turn does not start a build.
+**Origin extension:** the owner requested a living, interactive prototype suite and metadata for tracking its evolution, then asked to architect both together.
+**Depth:** Deep for the prototype authoring boundary, metadata lifecycle, shared fixtures and browser/native verification. App changes remain reversible presentation/selection changes; production persistence and native input ownership do not change.
+**Inspected base:** `55f789b` on `main`.
+
+**Precedence after build approval:** this is the build entry point for U12 → U9 → U10 → U11. U12 is newly assigned, not a renumbering. It replaces the older rule that query matches still pass through browse gates/folds, and replaces stable-ID selection retention on actual query text edits. U1–U6 are landed; former U7/U8 remain retired. Native editing, snapshot freezing, keyboard commands, and admission rules remain as previously approved. The current TOPOLOGY document is not rewritten until its behavior and assertions change together.
+
+#### Architecture decision
+
+The island has two presentation contracts, selected by the existing query value:
+
+- **Browse:** empty or whitespace-only query. Apply current draft visibility, quiet and held-back captions, owner grouping/folds, and receipt presentation.
+- **Search:** nonempty query. Draw all matching captured rows directly, in the existing lanes. No browse caption, owner fold, merged ledger, draft gate, group header, or visibility control may hide a search result.
+
+Search is not browse with every preference temporarily switched on. It bypasses that composition. Stored preferences never change. Clearing the query returns to browse over the same summon-time snapshot; ending the session applies deferred live updates.
+
+**Trade-off:** search temporarily includes drafts and held-back items that the user normally hides. Search also gives up owner grouping and manual owner ordering. These are browsing preferences, not restrictions on what an explicit lookup can find. Row facts, badges, complete repository names, and ages remain truthful; “quiet” does not become “active”.
+
+**Rejected alternative:** force `showDrafts`, `showStale`, and `showHeldBackInbound` true and unfold owners during search. That still runs browse topology, retains controls whose actions conflict with search, and risks separately overriding flags in rendering and keyboard traversal. Existing row-view factories already allow direct results with less policy duplication.
+
+**Closed A choice:** include browse-hidden drafts/quiet/held-back/folded-owner rows in search; use flat results within each lane; select the first local result after every actual text edit. Do not offer B again. No new app surface, shortcut, fetch, or persisted setting.
+
+**Suite decision:** keep one evolving standalone HTML per prototype, with a canonical JSON companion and synthetic fixture file. A small local script embeds those inputs for offline use, checks drift and runs browser scenarios. Git is the version history; meaningful decisions live in the companion JSON and are rendered into the prototype. No framework, hosting service, generic plugin system, or separate revision-number scheme.
+
+**Approval of this combined plan means:** add the named prototype, test-tooling and documentation paths; keep browser/design evidence distinct from native proof. The suite design is new scope; A itself is already settled.
+
+#### Requirements
+
+- **R9 — reachable matches:** each matching source row is drawn once and keyboard-reachable in search, including browse-hidden rows.
+- **R10 — count agreement:** positive `N of M` means N local result rows from M captured searchable rows. N excludes the GitHub destination. Zero uses the no-match message and no count.
+- **R11 — useful default:** every actual text edit selects the first local result, or GitHub when no local result exists. Explicit arrow selection survives until the next text edit.
+- **R12 — reversible presentation:** clearing restores browse preferences, grouping and folds without writing them; dismissal restores live data through existing teardown.
+- **R13 — unchanged boundaries:** no suppressed notifications, cleared receipts, new GitHub data, ranking algorithm, or cross-lane deduplication enters search.
+- **R14 — native continuity:** retain header/editor identity, caret, selection, composition, undo, and truthful AX focus across browse/search transitions.
+- **R15 — tested laws:** live documentation changes with the behavior and its assertions; regression evidence includes the reported quiet-only case.
+- **R16 — reusable prototype:** promote A to a stable repo path, openable offline with interactive scenarios; no personal cached data or discarded B/Current implementations in the living file.
+- **R17 — evolution record:** one current metadata record plus meaningful decision history, rendered from the same source; Git supplies exact historical revisions.
+- **R18 — honest implementation link:** distinguish selected design from verified implementation; unknown/stale metadata cannot quietly claim “implemented”.
+- **R19 — repeatable suite:** stable scenario IDs, deterministic synthetic fixtures and independent expected outcomes connect browser checks to corresponding native tests.
+- **R20 — maintenance:** a small index and documented commands make future updates discoverable and keep generated payloads in sync.
+
+#### Verified background
+
+`JumpSnapshot` captures the complete radar/inbound/pulse arrays before browse preferences. `JumpQuery.narrow` counts matches in those arrays. The controller then passes browse preferences to both the view and `KeySession.actionableIDs`. The walk correctly excludes hidden rows, but its set is smaller than the count's set.
+
+Relevant boundaries at the inspected base:
+
+- `Sources/GithudCore/JumpQuery.swift:73`: preserves input order while narrowing; `JumpSnapshot.narrow` forwards the captured arrays.
+- `Sources/GithudApp/HUDPanelController.swift:669`: snapshot acquisition; `:720`: text-edit update; `:1256`: general render path.
+- `Sources/GithudApp/IslandContentView.swift:430`: shared body builder; held-back composition at `:464`, draft/owner/quiet composition at `:484`.
+- `Sources/GithudCore/KeySession.swift:31`: browse walk; `:127`: rebuild preserves an existing selected ID, including `jump:github`.
+
+There is a second failure: an intermediate prefix with no matches selects GitHub, then a later prefix with local matches keeps GitHub selected. Revealing quiet rows alone does not fix Return's default.
+
+The selected temporary sketch is an interaction reference only: it embeds 25 personal cached rows, hard-codes one owner, uses Date.now(), and approximates Swift matching in JavaScript. It passed 33 browser scenario combinations, but that neither makes its data safe to commit nor proves native parity. Replace all account-derived data and labels before promotion. Historical dated mocks remain design records; do not bulk-migrate or overwrite them.
+
+Existing tools: scripts/test.sh runs the zero-dependency Swift Core executable; the native runner compiles production app views with its test main. Node v24.14.0 and agent-browser 0.31.1 were found on this machine; neither is a production app dependency. No repo package.json or prototype runner exists. No external research is needed: existing HTML sketches, fixture runners and native proof records provide the local patterns.
+
+#### Naming and ownership
+
+| Meaning | Existing name | Decision / owner | Status | Consumers / reason |
+|---|---|---|---|---|
+| Captured searchable rows and saved browse context | `JumpSnapshot` | Keep in Core; controller owns session lifetime | reuse | Narrowing and browse restoration |
+| Query interpretation and emptiness | `JumpQuery` | Keep; `isEmpty` is the only browse/search discriminator | reuse | Controller and body builder; no second mode flag |
+| Matching row arrays and totals | `JumpQuery.Narrowed` | Keep; this result supplies both search rows and their walk | reuse | IslandContentView and controller/KeySession |
+| Selected result | `KeySelection` | Keep; distinguish text-edit reset from ordinary rebuild | reuse | Result actions, highlight, accessible selection |
+
+No new production module, stored app enum, or presentation framework. Any small derived ID helper belongs with existing Core result/walk code, not in a new utility. Existing `admitted` denotes the source-array total before browse gates. Counts measure row occurrences, not distinct GitHub URLs; preserve existing IDs and reject duplicate IDs in authored fixtures rather than introducing an unrequested production identity migration.
+
+| Suite concept | Chosen name / owner | Status | Consumers and boundary reason | Sibling disposition |
+|---|---|---|---|---|
+| Metadata, scenario catalog and decision history | `quick-navigator.json` in docs/design/prototypes | new | Generator/checker and embedded browser display; one authoring source | Dated mock files remain historical, not renamed |
+| Interactive visual design | `quick-navigator.html` in docs/design/prototypes | new, promoted from selected sketch | Human review and browser checks; current dated mock is not overwritten | One living file, Git keeps prior revisions |
+| Deterministic row facts and fixed clock | `quick-navigator-prototype.json` in Tests/Fixtures | new | Browser payload and native fixture adapter | Existing endpoint fixtures retain their wire-format meaning |
+| Typed test-only fixture/scenario adapter | `PrototypeFixture` in Tests/GithudAppSnapshots | new | Existing native runner; cannot put prototype metadata into production Core | Separate from FixtureLoader's three GitHub formats |
+| Local embedding and verification commands | `scripts/prototypes.mjs` | new | Designers and prototype checks; file:// cannot reliably fetch JSON companions | No generic tools/helpers module |
+
+The losing alternatives are explicit: do not promote the cached HTML unchanged; do not mutate the dated historical mock; do not add a framework to read two JSON files; do not teach production FixtureLoader a non-GitHub format. Native JSON decoding and Node standard libraries are sufficient for the tooling. Necessary Swift/JavaScript fixture mirrors are checked against declared expected cases, not asserted equivalent by prose.
+
+#### Proposed law changes
+
+These are proposed wording and scope, not claims about current behavior.
+
+- **L1 — conservation:** within a declared surface scope, each row is represented exactly once. Browse may account for hidden rows through its existing captions and ledger lines. Search must represent every match as a result row; a count cannot substitute for a match.
+- **L2 — agreement:** surfaces agree when they claim the same set, measurement, and snapshot. The search count, result rows, and local keyboard walk describe the same matching set. The browse pill/gauge do not claim to be search-result counts.
+- **L3 — traversal:** search traversal is the displayed local result order followed by the GitHub destination. No hidden match or disclosure control belongs in that walk. Browse traversal remains unchanged.
+- **L4 — no zero:** retain. No-match text replaces a zero result count.
+- **L5 — fail closed:** retain. An empty search is not an all-clear claim.
+- **E1 — drafts:** scope its input gating explicitly to browse/lens presentation. Hidden drafts remain available to explicit search because they already exist in the captured source arrays.
+- **Operators:** scope collapse, fold, tail, sink and merge to browse composition. A query filters the captured source set; it does not feed matches back through those hiding operators.
+- **G3 — departure receipts:** remains a browse-only known gap. Receipts are not current search rows and never enter the search count.
+
+This replaces the single “fold, not filter” gloss with two precise promises: browse accounts for hidden work; search exposes its matches. No new exemption for quiet rows is added.
+
+#### Data flow and ordering
+
+Directional guidance, not implementation code:
+
+```text
+Source admission → captured JumpSnapshot                     unchanged
+                         ├─ empty query → browse composition  unchanged
+                         └─ query → JumpQuery.Narrowed        existing matching
+                                      ├─ direct result rows  changed
+                                      ├─ local result walk   changed
+                                      └─ N of M              same source set
+```
+
+Search lane order is Needs you → Inbound → Your PRs, omitting empty lanes, then GitHub. Within each lane, preserve the matching array's snapshot order. Do not apply owner ordering, regroup by quiet/draft/held-back, or add relevance sorting. Full repo labels remain on search rows because owner group headers are absent. The current pulse array is active → quiet → drafts (PulsePresenter.rows), unlike browse's active → drafts → quiet composition; search deliberately preserves the array order.
+
+Reuse `radarRowView`, `inboundRowView`, `pulseRowView`, scroll panes, the existing destination row, and row-only `updateJump`. Browse keeps the existing presenter/owner-lens path. Both initial construction and row-only updates use the same body-builder decision.
+
+#### Living prototype authoring contract
+
+Proposed files (only one prototype is built now; the directory convention supports later ones):
+
+```text
+docs/design/prototypes/
+  README.md                  index, commands, maintenance contract
+  quick-navigator.html       authored layout/styles/interactions; one generated data block
+  quick-navigator.json       authoritative metadata, scenarios, decision history
+Tests/Fixtures/
+  quick-navigator-prototype.json   synthetic row sets and a fixed reference time
+Tests/GithudAppSnapshots/
+  PrototypeFixture.swift     test-only typed decoding and scenario access
+scripts/
+  prototypes.mjs             sync / check / verify; Node standard library only
+```
+
+The suite README links prototypes but does not duplicate their status or decision summaries. HTML may be copied as a single offline file because its data is embedded. Authors edit layout/CSS/interaction code in HTML, and metadata/scenarios in JSON. Only the inert `prototype-data` script block is generated; a separate template tree is unnecessary.
+
+**Metadata fields, schema version 1:**
+
+| Field | Meaning / rule |
+|---|---|
+| schema_version | Exactly the supported schema version; unknown versions fail validation |
+| id, title | Stable prototype ID and readable title; ID matches its basename |
+| status | exploring, selected, implemented, or superseded; describes this design revision, not overall app quality |
+| selected_variant | A initially; required for selected/implemented; never changed by a browser toggle |
+| plan | Relative link to this agenda's quick-navigator-build anchor |
+| fixture | Repo-contained relative path to the synthetic fixture JSON |
+| default_scenario, scenarios | One canonical catalog; selector, deep links and test enumeration derive from it |
+| history | Entries with date, actor, change, why, and a plan/commit/quoted-conversation reference |
+| implementation | null until verified; otherwise an existing app commit, design fingerprint and repo-relative native evidence path |
+| superseded_by | Required prototype ID/link only when superseded |
+
+Do not add updated_at, manual version numbers, duplicate decision-date fields, or copies named final-v2. The last meaningful history entry provides the date; Git supplies exact changes and actors. Initial history records the actual owner choice “A is good.” Separately label architectural rationale as the architect's explanation, not an invented owner quote.
+
+**History is not a second status machine.** It is an ordered list of human-readable design decisions, not executable events. Current status is authoritative in metadata; badges and the history table are derived in HTML. Only meaningful changes need history entries—new interaction contract, accepted variant, changed scope, implementation verification, or supersession—not every spacing adjustment.
+
+**Status transitions:**
+
+| Event | Metadata / visible observation | Persistent effects and repeats | Required check |
+|---|---|---|---|
+| Promote selected A | selected, variant A, implementation null | New safe files; selection quote recorded once | selected-is-not-implemented |
+| Edit layout, fixtures or scenarios | Remain selected within A, or exploring if reopening a design choice; clear current implementation linkage | Git preserves the prior record; history entry for meaningful changes | changed-design-invalidates-verification |
+| Verify implementation | implemented plus existing app commit, matching design fingerprint, evidence path | Later metadata/proof commit refers to earlier code commit; never its own future SHA | implemented-requires-evidence |
+| Add a history explanation only | Design and implementation reference remain valid | No fixture/layout mutation or automatic status change | history-does-not-change-design-fingerprint |
+| Replace with another prototype | superseded plus valid successor; earlier file remains openable | No auto-deletion or redirect hiding the old design | superseded-has-successor |
+| Bad JSON, unknown status, duplicate IDs or missing files | Explicit validation error, never a green empty suite or a fallback to quiet | sync refuses to write; check exits nonzero | invalid-input-refused |
+
+An `implemented` record is a claim about the named app commit and covered scenarios, not a claim that every later app revision still matches it. When changing related app behavior, update the prototype/metadata and native cases in the same change set. Browser checks cannot upgrade status.
+
+**Non-circular fingerprint:** hash the authored HTML with its generated block replaced by a fixed marker, canonical fixture bytes, and canonical metadata excluding status, history, implementation and superseded_by. Canonical JSON sorts object keys and preserves array order. Store the resulting design fingerprint inside implementation metadata only after proof. Generated payloads carry source JSON/fixture hashes. Never embed an HTML file's own full hash inside itself, and never demand the commit currently being created. `check` rejects implemented metadata whose design fingerprint no longer matches.
+
+**Local commands:**
+
+- `node scripts/prototypes.mjs sync quick-navigator`: validate all inputs, update only the embedded data block, preserve authored HTML outside it. Missing/duplicate block, path escaping the repo, invalid JSON/schema or a changed source during write refuses the update.
+- `node scripts/prototypes.mjs check`: read-only validation of registered JSON companions, fixture references, embedded parity, IDs, status/reference rules and offline containment. Empty/missing expected catalog is not a passing suite.
+- `node scripts/prototypes.mjs verify quick-navigator`: check first, then use an isolated agent-browser session to exercise A's scenarios and capture representative wide/short views. Exit nonzero on scenario/assertion/driver failure; save reports under build or a fresh temp directory, never call a missing browser check passed. Close only the owned session.
+
+Node/browser checks remain separate from scripts/test.sh and the production app build. No new npm package, browser install, hosted gallery, CI workflow, daemon or general scenario language is part of this plan. The suite README makes prototype check/verify mandatory for changes to its files; browser installation, if missing, is an explicit prerequisite rather than an automatic download.
+
+#### Shared scenarios and evidence authority
+
+The fixture file contains synthetic, explicitly named row sets and a fixed reference time. The HTML uses that time for ages; Core classification tests receive it where supported. Production row views currently format ages with Date(), so native captures record their time and do not promise pixel-identical ages. Do not refactor production clocks merely to support the prototype. Use the existing Codable Core row shapes for radar/inbound/pulse; retain their real flags rather than duplicating a competing kind string. The test adapter narrows JSON into those exact Core types. It does not feed this display-row format into FixtureLoader's notification/GraphQL/search decoders.
+
+A scenario record names an ID, label, fixture row set, initial query/session state, browse preferences, freshness state, and independently authored expected local row IDs/count, walk and selected result. Required fields cannot silently default to “keeper”. Expected outcomes are not calculated by the JavaScript code being tested. Shared matching/destination cases are checked with production JumpQuery; full visibility/selection expectations become native-controller assertions in their owning U9/U10 units.
+
+Keep these existing scenario IDs: quiet, draft, held, fold, mixed, none, empty, loading, offline, browse, mouse. Add stable number, branch, repo-number, GitHub-link, prefix-return and clear-restore cases as needed; never rename an ID just because its label changes. Use at least 25 synthetic rows across the populated fixture so overflow is real. A synthetic keeper title is sufficient; no actual repository/title/author/URL from the temporary artifact is needed.
+
+The selector and checker enumerate the same catalog. Safe deep links carry only declared scenario ID and normal/short viewport; arbitrary typed query contents are not persisted into the URL or storage. Invalid deep-link IDs show an explicit choice/error, not a silently substituted scenario. Free typing stays interactive over synthetic data; only declared cases claim parity, and the page says so.
+
+| Meaning | Authority | Other representation / guard |
+|---|---|---|
+| Selected design and its history | Companion JSON | HTML renders embedded copy; sync/check detects divergence |
+| Fixture row facts and clock | Synthetic fixture JSON | Browser copy and native typed adapter; source hash and decode checks |
+| Expected scenario outcomes | Declared scenario records plus approved plan | Browser and native assertions both compare independently; neither grades its own computed output |
+| Production matching/destination | Swift JumpQuery / PlainWords | JavaScript is a bounded prototype mirror; declared case parity is required |
+| Native editing, geometry, focus, open effects | AppKit implementation and native/live tests | Browser simulation explicitly cannot certify these |
+| Historical revisions | Git | History entries explain why; no redundant version counter |
+
+The HTML uses no external requests or native/global input. Result Return/click creates a “would open” receipt, never a real URL open or clipboard write. Embed data as inert JSON, escape it safely, render row/query strings as text, and disallow external connections/forms. Actual browser-native editing is still not evidence of AppKit IME, focus acquisition or field-editor lifetime.
+
+#### Program obligations
+
+- **O11:** one narrowed result supplies search arrays, local IDs and totals; local ID concatenation uses the same lane and array order as rendering.
+- **O12:** search never consults browse visibility/grouping preferences to remove or reorder matches, and never writes those preferences.
+- **O13:** the search discriminator is the existing whitespace-aware query emptiness; raw editor text still owns first-Escape clearing.
+- **O14:** an actual text change resets result selection; a caret/selection move, result arrow, peek, resize, or unchanged-text callback does not.
+- **O15:** no query update replaces the native header/editor or uses a saved text copy to overwrite native selection/composition.
+- **O16:** assertions compare actual rendered actionable rows with the full walk in order; subset checks against raw arrays are insufficient.
+- **O17:** companion JSON is the sole metadata/scenario/history authority; rendered copies and selectors derive from it.
+- **O18:** schema version, lifecycle states, IDs and referenced paths are validated; unknown or malformed inputs fail explicitly before generation/verification.
+- **O19:** fixture rows are synthetic and time-frozen; no live account import path survives promotion. Browser/native cases use the same declared inputs and independent expectations.
+- **O20:** generated payload parity and implementation freshness are checked without self-referential hashes or future commit IDs.
+- **O21:** browser reports distinguish scenario verification from native proof; no browser success automatically changes design approval or implementation status.
+- **O22:** the prototype is standalone offline, has no real navigation/clipboard/global-key effects, and leaves no unrelated process/session cleanup.
+
+#### State and action contract
+
+All query/presentation changes below are synchronous on the existing UI thread. Poll data still waits in the live model until session exit.
+
+| Action / state | User-visible result | Stored state / effects | Ordering and repeat behavior | Locking test |
+|---|---|---|---|---|
+| Summon with empty query | Existing browse layout and native editor | Capture snapshot; no preference writes | Existing acquisition/refusal rules | browse-at-summon |
+| Type text matching a hidden row | Direct local row, positive count, then GitHub | No preference writes or network request | First local result selected after each actual edit | hidden-match-reachable |
+| Prefix has zero matches, later has matches | GitHub-only becomes local results plus GitHub | Selection resets, not retained on GitHub | One reset per changed text value | fallback-to-local |
+| Arrow to GitHub without editing | GitHub selected and Return may open it | No query or preference change | Resize/peek preserve selected ID | explicit-fallback-stays |
+| First Escape on text, including whitespace | Empty query and original browse layout | Native edit clears raw text; preferences unchanged | No session exit; native undo remains session-scoped | clear-restores-browse |
+| Undo clear or edit | Presentation follows restored native text | No model preference mutation | Same field/editor; text-change selection rule applies | undo-restores-results |
+| Poll/theme during search | Captured results remain | Existing owed-update flags only | Coalesced, no new timer/render owner | search-snapshot-stays |
+| Second Escape / Return / key loss | Existing release/collapse/open behavior | Teardown then existing final transition applies live state | Late callbacks cannot restart search | search-exit-unchanged |
+
+Empty source arrays, whitespace-only input, and zero matches are distinct covered cases. Real IME candidate behavior is not redesigned: keep the approved native composition priority and existing tests.
+
+#### U12. Establish the living selected-A prototype suite
+
+- **Goal:** make selected A durable, interactive, safe to commit, and traceable before app implementation.
+- **Requirements:** R16–R20; preserves R9–R14 as the selected design contract.
+- **Dependencies:** none; A selection is already supplied by the owner.
+- **Files:** create the six suite files listed above, plus modify `Tests/GithudAppSnapshots/run.sh` and its `main.swift` to compile/read the test-only adapter; link the suite from README and this agenda. No production app files.
+- **Approach:** promote A's authored HTML with wholly synthetic data; remove Current/B code and personal labels. Establish canonical JSON, typed fixtures, sync/check/verify commands and history UI in the same usable slice. Keep dated mocks untouched.
+- **Patterns:** existing standalone mocks, existing native runner, Node standard libraries and installed agent-browser. Do not import a web framework or make Core tests require a browser.
+- **Tests:** *happy:* A opens offline with selected status and synthetic scenarios, Core matching agrees with declared query cases. *edge:* fixed-clock repeatability, empty/loading/no-match distinct, unknown hash/scenario IDs rejected, null implementation valid while selected. *error:* malformed/unsupported JSON, duplicate IDs, escaped paths, duplicate generated blocks, stale payload and false implemented records fail without rewriting HTML. *integration:* selector/checker catalog equality, scripts remain usable from a clean checkout with documented dev tools, sync is idempotent, expected outcomes survive a deliberately broken matcher test.
+- **Verification:** no account-derived strings/data remain; all declared browser cases pass; metadata and fixture mirrors agree; native adapter decodes and checks existing Core matching. Future AppKit search visibility is not claimed before U9/U10.
+- **Runtime evidence:** new tooling/adapter unexecuted; temporary sketch's 33 combinations only prove its earlier browser interactions.
+- **Checkpoint:** auto — schema/negative tests, offline browser verification, Core and app-build scripts, and native decode checks. Missing browser prerequisite holds this unit's verification, not safe app research; never auto-install it.
+- **Rollback:** remove only newly authored suite files via an explicit revert; no app persistence or account data is migrated.
+
+#### U9. Draw all query matches directly
+
+- **Goal:** make every counted match visible and reachable without changing browse preferences.
+- **Requirements:** R9, R10, R12, R13, R14, R15.
+- **Dependencies:** U12 and landed U6/U5.
+- **Files:** modify `Sources/GithudCore/JumpQuery.swift`, `Sources/GithudCore/KeySession.swift`, `Sources/GithudApp/HUDPanelController.swift`, `Sources/GithudApp/IslandContentView.swift`, `docs/TOPOLOGY.md`, `README.md`; test both existing main.swift runners.
+- **Approach:** direct search rows and walk derive from the narrowed arrays; preserve the browse branch untouched. Update L1/L2/L3, operator scope and E1 with their assertions in this commit. Search emits no collapse/fold controls or lens eye.
+- **Patterns:** existing row-view factories and shared makeBody/updateJump; existing JumpSnapshot capture and teardown; U12's shared synthetic cases and test-only adapter.
+- **Tests:** quiet-only, draft-only, held-back-only, folded-owner-only, merged-fold and mixed-lane matches appear once with ordered walk equality; zero matches shows only fallback/no-match; clear and whitespace restore saved browse shape; unavailable/nil-url behavior remains the existing row behavior, with no invented resolver.
+- **Verification:** positive local count equals rendered local rows and local walk length; clearing restores preferences byte-for-byte; both scripts and native runner pass. U10's selection default is not claimed yet.
+- **Runtime evidence:** proposed integration unexecuted; use production controller/native fixtures to compare real row views, IDs, count and editor identity.
+- **Checkpoint:** auto — native hidden-match fixtures plus Core and app-build checks; no red commit.
+
+#### U10. Reset selection only when query text changes
+
+- **Goal:** Return opens the first local result after typing, including after a zero-match prefix.
+- **Requirements:** R11, R14, R15.
+- **Dependencies:** U9.
+- **Files:** modify `Sources/GithudApp/HUDPanelController.swift`, `Sources/GithudCore/KeySession.swift` only if an existing primitive needs extension, `README.md`; test the two existing runners.
+- **Approach:** on actual changed text, initialize selection from the current result walk. Retain ordinary stable-ID rebuild for layout-only updates; guard unchanged-text callbacks. Native editor selection is not result selection.
+- **Patterns:** KeySelection initializer for first result; existing rebuild for non-text changes.
+- **Tests:** no-match prefix → local match selects local; explicit Down to GitHub stays until text changes; a disappearing selected local row chooses first remaining local; same-text/caret/resize do not reset; clear and undo preserve editor/undo identity.
+- **Verification:** result default and explicit arrow choice both hold through the real controller; Core, native runner and app build pass.
+- **Runtime evidence:** proposed selection policy unexecuted; fixture sequence through native editor callbacks and captured opener settles it.
+- **Checkpoint:** auto — prefix/selection regressions and build checks; no red commit.
+
+#### U11. Record topology regression evidence
+
+- **Goal:** demonstrate A on the actual island, then link the living prototype to that verified implementation.
+- **Requirements:** R9–R20.
+- **Dependencies:** U12, U9, U10.
+- **Files:** extend `Tests/GithudAppSnapshots/main.swift` if required; update this amendments section, README and the prototype JSON/embedded payload; create only `loop/evidence/wp6k-search-results.md` and `loop/evidence/wp6k-search-results.manifest.json` for current proof. Do not rewrite earlier evidence.
+- **Approach:** use U12's shared cases to capture search, selected local open, and clear-to-browse. Pin source/binary/artifacts and record browser/native differences. Only after native proof passes, set implementation metadata to an existing tested app commit, the design fingerprint and this new evidence path; add one implementation history entry and re-sync. If proof exposes app defects, land and verify their corrective code commit before the final metadata/proof commit; no self-referencing commit field.
+- **Patterns:** `Tests/GithudAppSnapshots/run.sh`; `loop/evidence/wp6k-native-input.manifest.json` and its documented contained live driver.
+- **Tests:** both themes; mixed lane walk; long query and short screen; editor selection/undo across browse/search; unchanged saved preferences; synthetic global summon/typing/Return/Escape/mouse boundaries.
+- **Verification:** actual quiet match instead of a caption; selected local URL opens; clearing restores browse; all shared browser/native cases and both scripts pass; implemented metadata resolves to matching design evidence. State unavailable human-only observations rather than treating them as parity.
+- **Runtime evidence:** unverified — implementation and new fixture captures are required; older recording does not prove this redesign.
+- **Checkpoint:** auto under the existing scoped native-capture grant — verify permissions, fixture process and disposable foreground document first. Current recording plus automated checks → commit/push evidence and metadata. Missing permissions/identity holds only live exercise/final proof and implemented status; finish independent local work. Never send input into an unidentified app.
+
+#### System-wide impact
+
+No new production data source, persistence migration, dependency, timer, editor, hotkey or root-view refactor. Admission/classifier and browse presenters remain authoritative for their existing scopes. Source errors/freshness retain current presentation; zero search matches never imply no outstanding work. Direct result rows retain their existing pointer, peek, open and AX behavior.
+
+The suite adds a repo authoring format, not app state. File → validator → embedded payload → browser is new; fixture JSON → typed test adapter → real Core/AppKit checks is the test bridge. Browser tooling remains opt-in and separate from app packaging. Bad authoring inputs produce tool errors, never app defaults; generation refuses unsafe targets and keeps authored bytes outside the data block. Historical mocks are not schema consumers and do not acquire compatibility obligations.
+
+#### Risks, dependencies and disconfirming evidence
+
+| Disconfirming case | Required assertion / response |
+|---|---|
+| Query counts a draft but draws nothing | Actual view local rows equal all matching arrays; fail U9 |
+| Folded owner or held-back filter still hides a match | Mixed nondefault-preference fixture; fail U9 |
+| Clearing leaves an owner unfolded or drafts enabled | Preference equality and native browse round-trip; fail U9 |
+| Typing a branch leaves GitHub selected after local rows return | Prefix transition and captured opener; fail U10 |
+| Result refresh resets caret/undo or focus | Native identity/range/history assertions; fail the owning unit |
+| Direct array order differs between walk and drawing | Ordered equality over real actionable views, not a set/subset assertion |
+| Broad matching yields many results | Existing capped scroll panes and screen fitting; no new result cap that hides counted rows |
+| Cached private data survives promotion | Replace whole data source and account labels, inspect all promoted bytes; generator reads only committed synthetic fixture paths |
+| HTML changes while metadata still says implemented | Design fingerprint mismatch fails check; clear linkage/reverify, never silently update proof |
+| JS matcher and native behavior agree only with themselves | Both compare declared expectations; shared cases run real Swift matching and controller output |
+| Same schema drifts across Node/Swift/browser | Typed decoding and catalog/fixture parity checks; unknown schema/IDs fail |
+| Browser is unavailable or network is attempted | Nonzero verification result; selected design remains selected, not implemented |
+| Screenshot ages change every week | Freeze HTML fixture ages and Core test time; native screenshots record capture time and do not claim age-pixel equality |
+| A maintenance-only history edit invalidates itself | Exclude status/history/implementation from design fingerprint; no full-HTML self-hash |
+
+#### Bug-trace and confidence cross-check
+
+| User problem / requirement | Contract that addresses it | Expected result |
+|---|---|---|
+| 1 of 24 but only gone quiet caption | R9/R10; U9 direct-result branch | Local match is a real row and walk entry |
+| Fallback survives a later local match | R11; U10 text-edit reset | First local result selected |
+| Search changes my browse settings | R12; no preference writes | Clear restores original browse shape |
+| Temporary artifact cannot be reused or found | R16/R20; stable HTML plus index | Offline prototype at one repo path |
+| Design evolution loses rationale | R17; JSON history plus Git | Read what/why/who beside exact revisions |
+| Prototype falsely claims current implementation | R18/R19; fingerprint and native evidence | Selected until independently verified |
+
+Source inspections establish the current boundaries, not the viability of new tooling. New browser/Swift adapters and lifecycle guards remain unverified until their owning units run. No unrelated source finding is promoted into this build.
+
+#### Build execution contract
+
+- **Closed decisions:** A is selected; direct search rows, all captured current-row categories, unchanged browse, first-local selection after text edits, no receipts/suppressed data/new fetch, unchanged native input/snapshot lifecycle. The living page presents A, not reopened A/B choices.
+- **Builder-owned:** helper placement within named owners, synthetic fixture values, test names, minimal layout constraints and focused validators. Record decisions the spec does not cover. No prototype framework, alternate metadata authority, action DSL, importer or automatic approval.
+- **Verify at contact:** ensure both controller construction paths use the search contract; row factories register actionable IDs and preserve full repo context; snapshot arrays contain browse-hidden categories; unchanged-text callbacks can be distinguished. If a fact differs, use the existing typed boundary and add a regression before changing consumers. If required rows are not captured, do not fetch or widen admission silently—return the concrete scope conflict.
+- **Authority after Build approval:** use this checkout on main; preserve pre-existing untracked files; no branch/PR or real secret values. In addition to earlier Sources/Tests/README/TOPOLOGY/agenda authority, this combined plan names docs/design/prototypes and scripts/prototypes.mjs plus the existing native runner as its new suite scope. Only U11's two named proof files may be added under loop. Commit serially and push after green units; laws and assertions change with behavior. No CI or global skill/config edits.
+- **Expected gates:** U12 passes prototype sync/check/verify, Core/app-build and native fixture decoding/matching checks; it does not claim future AppKit search behavior. U9/U10 additionally check their actual native visibility/selection contracts and keep prototype checks green. U11 needs complete current browser/native/live evidence before implemented metadata. No red unit commits and no missing tool reported as a pass.
+- **Human inventory:** A selection is resolved by the owner's quote; do not ask again. Approval to build this combined plan is pending. Existing native-capture consent applies only with verified permissions and fixture/disposable-document identities. Synthetic fixtures replace human/private content; real IME/VoiceOver sensory assessment remains separate. A browser-tool prerequisite may need installation by the owner; continue local checks but hold browser certification if unavailable. No new taste gate is invented for the already selected A.
+- **Stop conditions:** observed schema/fixture mismatch without a safe typed adapter, inability to preserve native editor/snapshot boundaries, or missing authority/permissions for a required external effect. A missing temp sketch is not a blocker: the selected contract and new synthetic fixtures are sufficient. Record reversible implementation choices and continue.
+
+#### Scope boundaries and deferred work
+
+Out of scope: redesigning browse, walking disclosure controls, G3 receipt traversal, ranking/deduplication, live query polling, changed composition shortcuts, new preferences, generalized prototype platform, automatic app-to-HTML generation, whole-repo prototype migration, hosting, CI changes, or migrating historical mock files. No requested portion is deferred; unrelated historical limitations remain in their existing records.
 ## Plan
 
 **Objective:** a PR you own, or any row the island already holds, reachable in three keystrokes

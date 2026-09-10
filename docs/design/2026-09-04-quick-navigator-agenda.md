@@ -729,7 +729,7 @@ VoiceOver speech and foreground-app hand-back remain distinct evidence obligatio
 
 **Objective:** when a query matches a captured row, the user can see it, select it, and open it without first changing browse preferences; keep that interaction available as a reusable, traceable design prototype.
 **Origin:** conversation — the owner showed “keeper”, “1 of 24”, a “gone quiet (show)” caption, and only the GitHub fallback, then asked to redesign the topology.
-**Status:** A is selected by the owner (“A is good.”, 2026-09-08). The combined implementation plan is proposed; this architecture turn does not start a build.
+**Status:** Completed 2026-09-09 within the verification coverage recorded below. A remains selected by the owner (“A is good.”, 2026-09-08).
 **Origin extension:** the owner requested a living, interactive prototype suite and metadata for tracking its evolution, then asked to architect both together.
 **Depth:** Deep for the prototype authoring boundary, metadata lifecycle, shared fixtures and browser/native verification. App changes remain reversible presentation/selection changes; production persistence and native input ownership do not change.
 **Inspected base:** `55f789b` on `main`.
@@ -1058,6 +1058,24 @@ Source inspections establish the current boundaries, not the viability of new to
 #### Scope boundaries and deferred work
 
 Out of scope: redesigning browse, walking disclosure controls, G3 receipt traversal, ranking/deduplication, live query polling, changed composition shortcuts, new preferences, generalized prototype platform, automatic app-to-HTML generation, whole-repo prototype migration, hosting, CI changes, or migrating historical mock files. No requested portion is deferred; unrelated historical limitations remain in their existing records.
+
+
+#### Build completion and accepted decision — 2026-09-09
+
+U12 landed as `b271ab7`, U9 as `7d74c1a`, and U10 as `2dbd480`, each green and pushed directly to main. U11 adds current screenshots, a contained 25-second native recording, and the [proof record](../../loop/evidence/wp6k-search-results.md). Production code is pinned to the existing U10 commit; the later metadata/evidence commit does not refer to its own future SHA.
+
+The accepted architecture decision above remains the durable record: search bypasses browse hiding/grouping; actual text edits choose the first result; the prototype has one metadata source and a non-circular implementation link. This follows the repo's agenda/TOPOLOGY convention rather than adding a second ADR directory. Revisit if explicit search must exclude a captured category, if selection becomes ranked, or if the browser/native scenario contract can no longer be maintained from the shared fixture.
+
+Fresh evidence: 1,841 Core checks, app build, 455 native checks, 44 prototype tooling checks and 20 browser scenarios passed. Native tests check actual drawn IDs/walk/count, editor/undo identity and captured local URL. The live driver checks the isolated app and disposable foreground document before input; its query typing leaves that document unchanged, while post-dismissal and mouse-summoned typing reaches it. Both themes and a 400-point short island are captured.
+
+Build-owned choices and limits:
+
+- Search walking is an overload on `KeySession`; direct rows use the existing shared body builder. No new production module or preference exists.
+- Native undo tests separate setup typing and Escape into event-loop turns. Treating them as one event caused an oracle failure; no production undo change was needed.
+- The live fixture is a three-Pulse-row synthetic subset converted to GitHub wire JSON with whole-second timestamps. Full 25-row/mixed-lane and nondefault-preference cases use the native adapter. The live CLI has no fixture login, so its fallback scope is not claimed identical to the shared known-login case.
+- TextEdit's AX window list was unavailable. The contained driver used its exact document path/name/front-window title and foreground process instead; the HUD's real AX focus and selection remained observable.
+- An extreme 300-point three-lane island can reduce panes to zero under the existing allocator. The verified short size is 400 points, retaining a row in every pane. Arbitrary-height support is not claimed. Real IME candidate UI and human VoiceOver assessment remain unperformed; browser captures do not certify native editing or vibrancy.
+- Failed converter/capture attempts are identified in the proof record, not counted as passes. The normal app was restored and the disposable document closed. No real secret or clipboard values were handled, and pre-existing untracked files were preserved.
 ## Plan
 
 **Objective:** a PR you own, or any row the island already holds, reachable in three keystrokes

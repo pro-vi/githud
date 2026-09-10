@@ -4,13 +4,16 @@ import os from 'node:os';
 import path from 'node:path';
 import { ROOT, assertData, canonical, embed, designFingerprint, dataBlock, assertOffline, contained, syncPrototype, checkPrototype, verifyPrototype } from '../../scripts/prototypes.mjs';
 
-const metadata=JSON.parse(await fs.readFile(path.join(ROOT,'docs/design/prototypes/quick-navigator.json'),'utf8'));
+const canonicalMetadata=JSON.parse(await fs.readFile(path.join(ROOT,'docs/design/prototypes/quick-navigator.json'),'utf8'));
+// Isolated authoring fixtures have no implementation commit/evidence of their own.
+// Their negative cases must not depend on the living page's current lifecycle state.
+const metadata={...structuredClone(canonicalMetadata),status:'selected',implementation:null};
 const fixture=JSON.parse(await fs.readFile(path.join(ROOT,'Tests/Fixtures/quick-navigator-prototype.json'),'utf8'));
 const html='<!doctype html><meta http-equiv="Content-Security-Policy" content="default-src \'none\'; connect-src \'none\'; script-src \'unsafe-inline\'"><h1>Prototype</h1><script id="prototype-data" type="application/json">{}</script><footer>Authored</footer>';
 let passed=0;
 function test(name,run){run();passed++;console.log(`PASS ${name}`);}
 function invalid(name,mutate){test(name,()=>{const m=structuredClone(metadata),f=structuredClone(fixture);mutate(m,f);assert.throws(()=>assertData(m,f));});}
-test('valid canonical inputs',()=>assertData(metadata,fixture));
+test('valid canonical inputs',()=>{assertData(canonicalMetadata,fixture);assertData(metadata,fixture);});
 test('canonical key order and array order',()=>{assert.equal(canonical({b:2,a:1}),canonical({a:1,b:2}));assert.notEqual(canonical([1,2]),canonical([2,1]));});
 invalid('unknown schema',m=>m.schema_version=2);
 invalid('unknown status',m=>m.status='green');

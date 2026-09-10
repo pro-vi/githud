@@ -59,9 +59,9 @@ func prototypeFreshness(_ reading: PrototypeFixture.Scenario.Reading) -> Freshne
 }
 
 func prototypeView(for scenario: PrototypeFixture.Scenario, theme: ThemeID,
-                   fixture: PrototypeFixture) -> IslandContentView {
+                   fixture: PrototypeFixture, queryText: String? = nil) -> IslandContentView {
     let rows = fixture.rowSets[scenario.rowSet]!
-    let query = JumpQuery(scenario.query)
+    let query = JumpQuery(queryText ?? scenario.query)
     let narrowed = query.narrow(radar: rows.radar, inbound: rows.inbound, pulse: rows.pulse)
     let active = !query.isEmpty
     let knownRepos = JumpQuery.knownRepos(radar: rows.radar, inbound: rows.inbound, pulse: rows.pulse)
@@ -82,9 +82,39 @@ func prototypeView(for scenario: PrototypeFixture.Scenario, theme: ThemeID,
         lensPreferences: scenario.preferences.lens, selfLogin: fixture.selfLogin)
 }
 
+func capturePrototypeView(_ view: IslandContentView, output: String,
+                          maxHeight: CGFloat? = nil) throws {
+    let height = maxHeight.map { view.fittingHeight(maxHeight: $0) } ?? view.fittingHeight()
+    let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 520, height: height),
+                          styleMask: .borderless, backing: .buffered, defer: false)
+    window.appearance = NSAppearance(named: .darkAqua)
+    let host = NSView(frame: NSRect(x: 0, y: 0, width: 520, height: height))
+    host.wantsLayer = true
+    host.layer?.backgroundColor = NSColor(calibratedWhite: 0.105, alpha: 1).cgColor
+    window.contentView = host
+    view.translatesAutoresizingMaskIntoConstraints = false
+    host.addSubview(view)
+    NSLayoutConstraint.activate([
+        view.leadingAnchor.constraint(equalTo: host.leadingAnchor),
+        view.trailingAnchor.constraint(equalTo: host.trailingAnchor),
+        view.topAnchor.constraint(equalTo: host.topAnchor),
+        view.bottomAnchor.constraint(equalTo: host.bottomAnchor),
+    ])
+    window.setContentSize(NSSize(width: 520, height: height))
+    host.layoutSubtreeIfNeeded()
+    guard let bitmap = host.bitmapImageRepForCachingDisplay(in: host.bounds) else {
+        fatalError("prototype capture bitmap")
+    }
+    host.cacheDisplay(in: host.bounds, to: bitmap)
+    try bitmap.representation(using: .png, properties: [:])!.write(to: URL(fileURLWithPath: output))
+    window.contentView = nil
+    window.close()
+}
+
 // U9 view construction: compare the IDs AppKit actually registered in its rendered body,
 // in order, against the shared case contract. The old browse-gated body intentionally fails
 // the hidden draft/quiet/held-back/folded search cases until the production branch is changed.
+let u11CaptureIDs: Set<String> = ["quiet", "mixed", "none", "clear-restore"]
 for themeID in [ThemeID.color, .github] {
     for scenario in prototype.metadata.scenarios {
         let view = prototypeView(for: scenario, theme: themeID, fixture: prototype.fixture)
@@ -98,8 +128,51 @@ for themeID in [ThemeID.color, .github] {
             + (!query.isEmpty && scenario.session == .keyboard ? [KeySession.destinationID] : [])
         check(view.renderedActionableIDsForTesting() == expected,
               "U9 \(themeID.rawValue)/\(scenario.id): rendered actionable rows equal the direct-search contract")
+        if u11CaptureIDs.contains(scenario.id) {
+            view.setKeySessionHint(true, hasQuery: !query.isEmpty)
+            view.setKeyFocus(id: scenario.expected.selectedID)
+            let path = URL(fileURLWithPath: output)
+                .appendingPathComponent("u11-\(themeID.rawValue)-\(scenario.id).png").path
+            window.contentView = nil
+            window.close()
+            try capturePrototypeView(view, output: path)
+            continue
+        }
         window.contentView = nil
         window.close()
+    }
+}
+
+if let mixed = prototype.metadata.scenarios.first(where: { $0.id == "mixed" }),
+   let clearRestore = prototype.metadata.scenarios.first(where: { $0.id == "clear-restore" }) {
+    for themeID in [ThemeID.color, .github] {
+        let browse = prototypeView(for: clearRestore, theme: themeID,
+                                   fixture: prototype.fixture, queryText: "")
+        browse.setKeySessionHint(true, hasQuery: false)
+        browse.setKeyFocus(id: clearRestore.expected.browseIDs.first)
+        try capturePrototypeView(
+            browse,
+            output: URL(fileURLWithPath: output)
+                .appendingPathComponent("u11-\(themeID.rawValue)-clear-restore-browse.png").path)
+        let short = prototypeView(for: mixed, theme: themeID, fixture: prototype.fixture)
+        short.setKeySessionHint(true, hasQuery: true)
+        short.setKeyFocus(id: mixed.expected.selectedID)
+        try capturePrototypeView(
+            short,
+            output: URL(fileURLWithPath: output)
+                .appendingPathComponent("u11-\(themeID.rawValue)-mixed-short.png").path,
+            maxHeight: 400)
+        let paneHeights = short.paneHeightsForTesting()
+        check(paneHeights.count == 3 && paneHeights.allSatisfy { $0 >= 31 },
+              "U11 \(themeID.rawValue)/mixed-short: all three lanes retain a row at 400pt")
+        let long = prototypeView(for: mixed, theme: themeID, fixture: prototype.fixture,
+                                 queryText: String(repeating: "update-", count: 12))
+        long.setKeySessionHint(true, hasQuery: true)
+        long.setKeyFocus(id: KeySession.destinationID)
+        try capturePrototypeView(
+            long,
+            output: URL(fileURLWithPath: output)
+                .appendingPathComponent("u11-\(themeID.rawValue)-long-query.png").path)
     }
 }
 

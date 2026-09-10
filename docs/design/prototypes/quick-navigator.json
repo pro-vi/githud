@@ -2,12 +2,16 @@
   "schema_version": 1,
   "id": "quick-navigator",
   "title": "Quick navigator",
-  "status": "selected",
+  "status": "implemented",
   "selected_variant": "A",
   "plan": "../2026-09-04-quick-navigator-agenda.md#quick-navigator-build",
   "fixture": "../../../Tests/Fixtures/quick-navigator-prototype.json",
   "default_scenario": "quiet",
-  "implementation": null,
+  "implementation": {
+    "commit": "2dbd480441090f9e23dc8681ead42eaa4cac0501",
+    "design_fingerprint": "967d078de42d8f5a916fae1185b2e705ee9989feed8ffaa5b4b1afa34f2cfbf7",
+    "evidence": "loop/evidence/wp6k-search-results.manifest.json"
+  },
   "superseded_by": null,
   "history": [
     {
@@ -23,6 +27,13 @@
       "change": "Specified a living prototype suite",
       "why": "Preserve an offline interaction reference with synthetic fixtures, stable cases and explicit implementation evidence.",
       "reference": "../2026-09-04-quick-navigator-agenda.md#quick-navigator-build"
+    },
+    {
+      "date": "2026-09-09",
+      "actor": "builder",
+      "change": "Verified direct search and first-result selection in the native app",
+      "why": "Shared browser and native cases pass; contained global input records quiet-row lookup, clear, undo, open and mouse boundaries. Evidence states the 300-point height limitation and unperformed human IME/VoiceOver checks.",
+      "reference": "../../../loop/evidence/wp6k-search-results.md"
     }
   ],
   "scenarios": [

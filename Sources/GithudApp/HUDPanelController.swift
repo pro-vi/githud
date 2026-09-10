@@ -719,6 +719,7 @@ final class HUDPanelController {
     private func handleJumpTextChange(_ text: String) {
         guard jumpSessionLive, let snapshot = jumpSnapshot,
               let island = contentView as? IslandContentView else { return }
+        guard text != jumpQuery?.text else { return }
         let query = JumpQuery(text)
         jumpQuery = query
         let narrowed = snapshot.narrow(query)
@@ -728,15 +729,16 @@ final class HUDPanelController {
         let destination = active
             ? query.destination(selfLogin: snapshot.selfLogin, knownRepos: knownRepos)
             : nil
-        if var selection = keySelection {
-            selection.rebuild(ids: active ? KeySession.actionableIDs(search: narrowed) : KeySession.actionableIDs(
+        if keySelection != nil {
+            // Editing the query starts at its first result. Layout-only rebuilds
+            // retain the selected ID; native caret and undo remain editor-owned.
+            keySelection = KeySelection(ids: active ? KeySession.actionableIDs(search: narrowed) : KeySession.actionableIDs(
                 radar: narrowed.radar, pulse: narrowed.pulse,
                 showDrafts: snapshot.pulsePreferences.showDrafts,
                 showStale: snapshot.pulsePreferences.showStale,
                 inbound: narrowed.inbound,
                 showHeldBackInbound: snapshot.inboundPreferences.showHeldBack,
                 lens: snapshot.lensPreferences))
-            keySelection = selection
         }
         let height = island.updateJump(
             rows: narrowed.radar, pulse: narrowed.pulse, inbound: narrowed.inbound,

@@ -196,7 +196,8 @@ Avoid `-w 'ghp_…'` with the token inline. That leaks it into shell history and
 
 Search shows matching quiet rows, drafts, held-back inbound and folded-owner rows directly,
 even when browse hides them. It does not change your saved preferences. Clearing the query
-restores the browse layout from the same summon-time snapshot.
+restores the browse layout from the same summon-time snapshot. Each text edit selects the
+first local result, or GitHub if nothing matches. Arrow keys keep your choice until you edit again.
 
 The global hotkey uses no Accessibility permission, so macOS never asks you to approve
 anything.

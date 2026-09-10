@@ -259,6 +259,153 @@ for scenario in prototype.metadata.scenarios where scenario.rowSet == "populated
     controller.hide()
 }
 
+func makeU10Controller(_ scenarioID: String) -> (HUDPanelController, JumpLineView, JumpFieldEditor)? {
+    guard let scenario = prototype.metadata.scenarios.first(where: { $0.id == scenarioID }) else {
+        check(false, "U10 controller \(scenarioID): scenario exists")
+        return nil
+    }
+    guard let rows = prototype.fixture.rowSets[scenario.rowSet] else {
+        check(false, "U10 controller \(scenarioID): fixture row set exists")
+        return nil
+    }
+    let model = AppModel(surfacePreferences: .auto,
+                         pulsePreferences: scenario.preferences.pulse,
+                         themeID: .github,
+                         inboundPreferences: scenario.preferences.inbound,
+                         lensPreferences: scenario.preferences.lens)
+    model.setRadar(rows.radar, confirmed: true)
+    model.setInbound(rows.inbound)
+    model.setPulse(rows.pulse)
+    model.setSelfLogin(prototype.fixture.selfLogin)
+    let controller = HUDPanelController(model: model)
+    controller.show()
+    controller.setExpanded(true)
+    controller.beginKeySummonSession()
+    guard controller.jumpSessionIsLiveForTesting(),
+          let line = controller.jumpLineForTesting(),
+          let editor = line.field.currentEditor() as? JumpFieldEditor else {
+        check(false, "U10 controller \(scenarioID): native editor is acquired")
+        controller.hide()
+        return nil
+    }
+    return (controller, line, editor)
+}
+
+func replaceU10Text(_ editor: JumpFieldEditor, with text: String) {
+    editor.insertText(text, replacementRange:
+        NSRange(location: 0, length: editor.string.utf16.count))
+}
+
+// U10 selection defaults: a no-match prefix must not leave the fallback selected when
+// a later changed value reveals a local row.
+if let (prefixController, _, prefixEditor) = makeU10Controller("quiet"),
+   let quiet = prototype.metadata.scenarios.first(where: { $0.id == "quiet" }) {
+    replaceU10Text(prefixEditor, with: "feat")
+    check(prefixController.selectedIDForTesting() == KeySession.destinationID,
+          "U10 no-match prefix selects the GitHub destination")
+    replaceU10Text(prefixEditor, with: "feat/keeper-rig")
+    check(prefixController.selectedIDForTesting() == quiet.expected.localIDs.first,
+          "U10 later local match resets selection to its first local row")
+    prefixController.hide()
+}
+
+// U10 preserves an explicit destination choice through an unchanged-text callback,
+// a caret move, and the production screen-change notification. A later edit resets it.
+if let (stableController, stableLine, stableEditor) = makeU10Controller("quiet"),
+   let quiet = prototype.metadata.scenarios.first(where: { $0.id == "quiet" }) {
+    replaceU10Text(stableEditor, with: quiet.query)
+    check(stableLine.control(stableLine.field, textView: stableEditor,
+                             doCommandBy: Selector(("moveDown:"))),
+          "U10 explicit destination arrow command is handled")
+    let destination = stableController.selectedIDForTesting()
+    check(destination == KeySession.destinationID,
+          "U10 arrow moves to the GitHub destination")
+    stableLine.controlTextDidChange(
+        Notification(name: NSControl.textDidChangeNotification, object: stableLine.field))
+    check(stableController.selectedIDForTesting() == destination,
+          "U10 unchanged text callback preserves the explicit destination")
+    stableEditor.setSelectedRange(NSRange(location: stableEditor.string.utf16.count, length: 0))
+    check(stableController.selectedIDForTesting() == destination,
+          "U10 caret movement preserves the explicit destination")
+    NotificationCenter.default.post(name: NSApplication.didChangeScreenParametersNotification, object: nil)
+    check(stableController.selectedIDForTesting() == destination,
+          "U10 screen resize preserves the explicit destination")
+    replaceU10Text(stableEditor, with: "draft-camera")
+    check(stableController.selectedIDForTesting()
+          == prototype.metadata.scenarios.first(where: { $0.id == "draft" })?.expected.localIDs.first,
+          "U10 changed text resets to the first newly matching local row")
+    stableController.hide()
+}
+
+// U10 disappearing-row rule: a selected local row leaving the result set selects the
+// first remaining local row instead of clamping to the GitHub destination.
+if let (disappearController, disappearLine, disappearEditor) = makeU10Controller("mixed"),
+   let mixed = prototype.metadata.scenarios.first(where: { $0.id == "mixed" }),
+   let quiet = prototype.metadata.scenarios.first(where: { $0.id == "quiet" }) {
+    replaceU10Text(disappearEditor, with: mixed.query)
+    check(disappearLine.control(disappearLine.field, textView: disappearEditor,
+                                doCommandBy: Selector(("moveDown:"))),
+          "U10 selects a second local row before it disappears")
+    check(disappearController.selectedIDForTesting() == "radar-2",
+          "U10 disappearing-row setup selects the second local row")
+    replaceU10Text(disappearEditor, with: quiet.query)
+    check(disappearController.selectedIDForTesting() == quiet.expected.localIDs.first,
+          "U10 disappearing local row selects the first remaining local row")
+    disappearController.hide()
+}
+
+// U10 native continuity: clear and undo travel through the field editor and panel
+// command route while preserving the editor and its session-local undo manager.
+if let (undoController, undoLine, undoEditor) = makeU10Controller("quiet"),
+   let quiet = prototype.metadata.scenarios.first(where: { $0.id == "quiet" }),
+   let panel = undoLine.field.window as? HUDPanel {
+    replaceU10Text(undoEditor, with: quiet.query)
+    // Separate user actions occur on separate event-loop turns. Without this,
+    // setup insertion and Escape deletion share one undo group in this runner.
+    RunLoop.current.run(until: Date().addingTimeInterval(0.01))
+    let originalUndoManager = undoEditor.undoManager
+    check(undoLine.control(undoLine.field, textView: undoEditor,
+                           doCommandBy: Selector(("cancelOperation:"))),
+          "U10 native clear command is handled")
+    check(undoEditor.string.isEmpty, "U10 clear empties the native query")
+    check(undoController.jumpLineForTesting() === undoLine
+          && undoLine.field.currentEditor() === undoEditor
+          && undoEditor.undoManager === originalUndoManager,
+          "U10 clear preserves header, editor, and undo manager")
+    let undoEvent = NSEvent.keyEvent(with: .keyDown, location: .zero,
+                                     modifierFlags: .command, timestamp: 0,
+                                     windowNumber: panel.windowNumber, context: nil,
+                                     characters: "z", charactersIgnoringModifiers: "z",
+                                     isARepeat: false, keyCode: 6)!
+    check(panel.performKeyEquivalent(with: undoEvent), "U10 native undo chord is handled")
+    check(undoEditor.string == quiet.query, "U10 native undo restores the query")
+    check(undoController.keyWalkForTesting() == quiet.expected.walk
+          && undoController.selectedIDForTesting() == quiet.expected.localIDs.first,
+          "U10 undo restores search results and selects the first local match")
+    check(undoController.jumpLineForTesting() === undoLine
+          && undoLine.field.currentEditor() === undoEditor
+          && undoEditor.undoManager === originalUndoManager,
+          "U10 undo preserves header, editor, and undo manager")
+    undoController.hide()
+}
+
+// U10 Return captures the existing local URL through the controller seam, without opening
+// a browser or routing an external event.
+if let (openController, openLine, openEditor) = makeU10Controller("quiet"),
+   let quiet = prototype.metadata.scenarios.first(where: { $0.id == "quiet" }) {
+    var openedURL: URL?
+    openController.openURLForTesting = { openedURL = $0 }
+    replaceU10Text(openEditor, with: quiet.query)
+    check(openLine.control(openLine.field, textView: openEditor,
+                           doCommandBy: Selector(("insertNewline:"))),
+          "U10 local Return command is handled")
+    check(openedURL == quiet.expected.openURL.flatMap(URL.init(string:)),
+          "U10 local Return captures the selected row URL")
+    check(!openController.jumpSessionIsLiveForTesting(),
+          "U10 local Return retires the native session")
+    openController.hide()
+}
+
 let nativePanel = HUDPanel(contentRect: NSRect(x: 0, y: 0, width: 520, height: 100),
                            styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
 nativePanel.keySessionActive = true

@@ -23,6 +23,14 @@ import Foundation
 public enum KeySession {
     public static let destinationID = "jump:github"
 
+    /// A nonempty query has a different contract from browse: every matching
+    /// captured row is a stop, without gates, folds or regrouping. The caller
+    /// passes the same Narrowed arrays to the direct-result renderer.
+    public static func actionableIDs(search results: JumpQuery.Narrowed) -> [String] {
+        results.radar.map(\.id) + results.inbound.map(\.id)
+            + results.pulse.map(\.id) + [destinationID]
+    }
+
     /// The flattened actionable row ids, in on-screen order: radar (already
     /// urgency-sorted upstream), then pulse `active`, then `stale`/`drafts` only when
     /// rendered. A collapsed stale group's caption line ("N gone quiet (show)") — and its
@@ -84,7 +92,7 @@ public enum KeySession {
         case moveDown      // 125 — selection +1, clamped at last
         case open          // 36  — open the selected row (Open-on-GitHub ceiling), end + collapse
         case dismiss       // 53  — end session + collapse
-        case peek          // 49  — toggle the focused row's chevron peek (no-op without one)
+        case peek          // Option–Return — toggle selected-row peek (no-op without one)
         case passthrough   // everything else
     }
 }

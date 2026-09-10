@@ -4514,21 +4514,16 @@ suite("Quick navigator — narrowed draw set and keyboard walk stay in agreement
     let other = row(215, branch: "fix/unrelated")
     let query = JumpQuery("feat/quick-navigator")
     let narrowed = query.narrow(radar: [], inbound: [], pulse: [old, other])
-    let walk = KeySession.actionableIDs(
-        radar: narrowed.radar, pulse: narrowed.pulse,
-        showDrafts: false, showStale: false, inbound: narrowed.inbound,
-        includeDestination: true)
-    let drawnIDs = Set(narrowed.radar.map(\.id) + narrowed.inbound.map(\.id) +
-                       narrowed.pulse.map(\.id) + [KeySession.destinationID])
-    expect(Set(walk).isSubset(of: drawnIDs), "every walked id belongs to a drawn narrowed row")
+    let walk = KeySession.actionableIDs(search: narrowed)
+    let drawnIDs = narrowed.radar.map(\.id) + narrowed.inbound.map(\.id) +
+        narrowed.pulse.map(\.id) + [KeySession.destinationID]
+    expectEqual(walk, drawnIDs, "search walk equals the entire narrowed row order")
     expectEqual(walk, [old.id, KeySession.destinationID],
                 "matching row is followed by the GitHub destination")
     expectEqual(walk.last, KeySession.destinationID, "GitHub destination is always last")
 
     let none = JumpQuery("xq-zeta").narrow(radar: [], inbound: [], pulse: [old, other])
-    expectEqual(KeySession.actionableIDs(
-        radar: none.radar, pulse: none.pulse, showDrafts: false, showStale: false,
-        inbound: none.inbound, includeDestination: true),
+    expectEqual(KeySession.actionableIDs(search: none),
         [KeySession.destinationID], "nothing matched leaves only the GitHub destination")
     expectEqual(KeySession.actionableIDs(
         radar: [], pulse: [old], showDrafts: false, showStale: false,
@@ -4537,17 +4532,13 @@ suite("Quick navigator — narrowed draw set and keyboard walk stay in agreement
     var selection = KeySelection(ids: walk)
     let added = row(213, branch: "feat/quick-navigator-prep")
     let afterPoll = query.narrow(radar: [], inbound: [], pulse: [added, old, other])
-    selection.rebuild(ids: KeySession.actionableIDs(
-        radar: afterPoll.radar, pulse: afterPoll.pulse,
-        showDrafts: false, showStale: false, includeDestination: true))
+    selection.rebuild(ids: KeySession.actionableIDs(search: afterPoll))
     expectEqual(selection.selectedID, old.id,
-                "a poll-added match does not move selection off its stable row id")
+                "a non-text rebuild follows its stable row id (session polls remain frozen)")
 
     let narrowedAway = JumpQuery("xq-zeta").narrow(radar: [], inbound: [], pulse: [old])
     selection = KeySelection(ids: [old.id, KeySession.destinationID])
-    selection.rebuild(ids: KeySession.actionableIDs(
-        radar: narrowedAway.radar, pulse: narrowedAway.pulse,
-        showDrafts: false, showStale: false, includeDestination: true))
+    selection.rebuild(ids: KeySession.actionableIDs(search: narrowedAway))
     expectEqual(selection.selectedID, KeySession.destinationID,
                 "a removed selection clamps to the remaining drawn destination")
 }
@@ -4579,13 +4570,11 @@ suite("Topology laws — narrowing discloses the admitted set and walks only dra
     [{"id":"o/r#1","repo":"o/r #1","title":"Match","subtitle":"ready","timestamp":"2026-06-16T08:00:00Z","state":"ready","symbolName":"checkmark.circle.fill","url":"https://github.com/o/r/pull/1","isDraft":false,"isStale":false,"isFresh":true,"merge":"mergeable","headBranch":"feat/match","changeSignature":"1"},{"id":"o/r#2","repo":"o/r #2","title":"Other","subtitle":"ready","timestamp":"2026-06-16T08:00:00Z","state":"ready","symbolName":"checkmark.circle.fill","url":"https://github.com/o/r/pull/2","isDraft":false,"isStale":false,"isFresh":true,"merge":"mergeable","headBranch":"feat/other","changeSignature":"2"}]
     """.utf8))
     let narrowed = JumpQuery("match").narrow(radar: [], inbound: [], pulse: rows)
-    let walk = KeySession.actionableIDs(radar: narrowed.radar, pulse: narrowed.pulse,
-                                        showDrafts: false, showStale: false,
-                                        includeDestination: true)
-    let drawn = Set(narrowed.pulse.map(\.id) + [KeySession.destinationID])
+    let walk = KeySession.actionableIDs(search: narrowed)
+    let drawn = narrowed.pulse.map(\.id) + [KeySession.destinationID]
     expectEqual(narrowed.admitted, 2, "L1 narrowing retains the admitted total")
     expectEqual(narrowed.matched, 1, "one matching row is disclosed")
-    expect(Set(walk).isSubset(of: drawn), "L3 walk is a subset of drawn rows")
+    expectEqual(walk, drawn, "L3 search walk equals every local match, then GitHub")
     expectEqual(PlainWords.jumpCount(matched: narrowed.matched, admitted: narrowed.admitted),
                 "1 of 2", "L2 header discloses narrowed versus admitted")
     let admittedPill = PillMorph.resolve(style: .standingCounted, rows: [], pulse: rows,
@@ -4597,14 +4586,35 @@ suite("Topology laws — narrowing discloses the admitted set and walks only dra
     } else {
         expect(false, "collapsed gauge keeps an admitted pulse count")
     }
-    expect(narrowed.matched > 0, "L4 caller emits a count only for a nonzero match")
+    expectEqual(walk.count - 1, narrowed.matched, "L2 destination does not contribute to the local count")
     let none = JumpQuery("no-such-row").narrow(radar: [], inbound: [], pulse: rows)
     expectEqual(none.matched, 0, "no-match narrowing has zero matches in data")
     expect(none.pulse.isEmpty, "no-match rows are removed from the drawn lane")
-    expectEqual(KeySession.actionableIDs(radar: none.radar, pulse: none.pulse,
-                                         showDrafts: false, showStale: false,
-                                         includeDestination: true),
+    expectEqual(KeySession.actionableIDs(search: none),
                 [KeySession.destinationID], "no-match walk keeps only the destination row")
+}
+
+suite("Search topology — browse-hidden rows remain direct ordered results") {
+    let now = ISO8601DateFormatter().date(from: "2026-06-16T10:00:00Z")!
+    func row(_ number: Int, draft: Bool = false, quiet: Bool = false) -> PulseRow {
+        PulsePresenter.row(for: PullRequestPulse(
+            repo: "sample/game", number: number, title: "Lookup target",
+            url: "https://github.com/sample/game/pull/\(number)", isDraft: draft,
+            createdAt: "2026-05-01T10:00:00Z",
+            updatedAt: quiet ? "2026-05-01T10:00:00Z" : "2026-06-16T09:00:00Z",
+            ci: .passing, review: .approved, merge: .mergeable), now: now)
+    }
+    let quiet = row(1, quiet: true), draft = row(2, draft: true), active = row(3)
+    expect(quiet.isStale && draft.isDraft, "fixture actually includes hidden categories")
+    let input = [quiet, draft, active]
+    let search = JumpQuery("lookup").narrow(radar: [], inbound: [], pulse: input)
+    expectEqual(KeySession.actionableIDs(search: search),
+                [quiet.id, draft.id, active.id, KeySession.destinationID],
+                "search includes all categories in captured order, not browse region order")
+    expectEqual(search.matched, 3, "every matched row is a local stop")
+    expectEqual(KeySession.actionableIDs(radar: [], pulse: input, showDrafts: false,
+                showStale: false, lens: LensPreferences(groupByOwner: true, foldedOwners: ["sample"])),
+                [], "browse still honors owner folds and visibility preferences")
 }
 
 // MARK: - KeySession (WP-6k — the ⌃⌥G scoped key session's pure brain)

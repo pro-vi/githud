@@ -729,13 +729,13 @@ final class HUDPanelController {
             ? query.destination(selfLogin: snapshot.selfLogin, knownRepos: knownRepos)
             : nil
         if var selection = keySelection {
-            selection.rebuild(ids: KeySession.actionableIDs(
+            selection.rebuild(ids: active ? KeySession.actionableIDs(search: narrowed) : KeySession.actionableIDs(
                 radar: narrowed.radar, pulse: narrowed.pulse,
                 showDrafts: snapshot.pulsePreferences.showDrafts,
                 showStale: snapshot.pulsePreferences.showStale,
                 inbound: narrowed.inbound,
                 showHeldBackInbound: snapshot.inboundPreferences.showHeldBack,
-                lens: snapshot.lensPreferences, includeDestination: active))
+                lens: snapshot.lensPreferences))
             keySelection = selection
         }
         let height = island.updateJump(
@@ -1004,6 +1004,8 @@ final class HUDPanelController {
     func islandForTesting() -> IslandContentView? { contentView as? IslandContentView }
     func surfaceForTesting() -> NSView? { surface }
     func panelForTesting() -> HUDPanel { panel }
+    func keyWalkForTesting() -> [String] { keySelection?.ids ?? [] }
+    func selectedIDForTesting() -> String? { keySelection?.selectedID }
     func jumpSessionIsLiveForTesting() -> Bool { jumpSessionLive }
     func deferredStateForTesting() -> (render: Bool, surface: Bool) {
         (deferredRenderOwed, deferredSurfaceRebuildOwed)
@@ -1275,14 +1277,13 @@ final class HUDPanelController {
             // (the ink bar's PeekStash-analog) — a rebuild that drops the selected row
             // clamps to the nearest index (pure rule, tested in Core).
             if var selection = keySelection {
-                selection.rebuild(ids: KeySession.actionableIDs(
+                selection.rebuild(ids: queryActive ? KeySession.actionableIDs(search: narrowed) : KeySession.actionableIDs(
                     radar: narrowed.radar, pulse: narrowed.pulse,
                     showDrafts: pulsePreferences.showDrafts,
                     showStale: pulsePreferences.showStale,
                     inbound: narrowed.inbound,
                     showHeldBackInbound: inboundPreferences.showHeldBack,
-                    lens: lensPreferences,
-                    includeDestination: queryActive))   // folded rows are off-screen → out of the walk
+                    lens: lensPreferences))
                 keySelection = selection
             }
             let view = IslandContentView(rows: narrowed.radar, pulse: narrowed.pulse,

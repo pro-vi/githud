@@ -49,6 +49,60 @@ for scenario in prototype.metadata.scenarios {
         lens: scenario.preferences.lens) == scenario.expected.browseIDs,
           "prototype \(scenario.id): declared browse restoration agrees with Core")
 }
+
+func prototypeFreshness(_ reading: PrototypeFixture.Scenario.Reading) -> Freshness {
+    switch reading {
+    case .fresh: return .fresh
+    case .loading: return .fresh
+    case .offline: return .failing(consecutive: 3, ageSeconds: 480)
+    }
+}
+
+func prototypeView(for scenario: PrototypeFixture.Scenario, theme: ThemeID,
+                   fixture: PrototypeFixture) -> IslandContentView {
+    let rows = fixture.rowSets[scenario.rowSet]!
+    let query = JumpQuery(scenario.query)
+    let narrowed = query.narrow(radar: rows.radar, inbound: rows.inbound, pulse: rows.pulse)
+    let active = !query.isEmpty
+    let knownRepos = JumpQuery.knownRepos(radar: rows.radar, inbound: rows.inbound, pulse: rows.pulse)
+    return IslandContentView(
+        rows: narrowed.radar, pulse: narrowed.pulse, inbound: narrowed.inbound,
+        jump: scenario.session == .keyboard ? query : nil,
+        jumpCount: active && narrowed.matched > 0
+            ? PlainWords.jumpCount(matched: narrowed.matched, admitted: narrowed.admitted) : nil,
+        jumpHandle: active ? query.handle(knownRepos: knownRepos) : nil,
+        jumpDestination: active
+            ? query.destination(selfLogin: fixture.selfLogin, knownRepos: knownRepos) : nil,
+        showDrafts: scenario.preferences.showDrafts,
+        showStale: scenario.preferences.showStale,
+        showHeldBackInbound: scenario.preferences.showHeldBack,
+        freshness: prototypeFreshness(scenario.freshness),
+        radarConfirmed: true, inboundConfirmed: true, reviewsConfirmed: true,
+        theme: Theme.named(theme), onGearTap: { _ in }, onCollapse: {},
+        lensPreferences: scenario.preferences.lens, selfLogin: fixture.selfLogin)
+}
+
+// U9 view construction: compare the IDs AppKit actually registered in its rendered body,
+// in order, against the shared case contract. The old browse-gated body intentionally fails
+// the hidden draft/quiet/held-back/folded search cases until the production branch is changed.
+for themeID in [ThemeID.color, .github] {
+    for scenario in prototype.metadata.scenarios {
+        let view = prototypeView(for: scenario, theme: themeID, fixture: prototype.fixture)
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 520, height: 900),
+                              styleMask: .borderless, backing: .buffered, defer: false)
+        window.contentView = view
+        view.frame = NSRect(x: 0, y: 0, width: 520, height: view.fittingHeight())
+        view.layoutSubtreeIfNeeded()
+        let query = JumpQuery(scenario.query)
+        let expected = scenario.expected.localIDs
+            + (!query.isEmpty && scenario.session == .keyboard ? [KeySession.destinationID] : [])
+        check(view.renderedActionableIDsForTesting() == expected,
+              "U9 \(themeID.rawValue)/\(scenario.id): rendered actionable rows equal the direct-search contract")
+        window.contentView = nil
+        window.close()
+    }
+}
+
 let now = Date()
 let stamp = ISO8601DateFormatter().string(from: now)
 let pulses = [182, 214, 215].map { number in
@@ -142,6 +196,69 @@ for themeID in [ThemeID.github, .color] {
 // the actual field-editor and control-delegate path without global events or a clipboard.
 app.setActivationPolicy(.accessory)
 app.finishLaunching()
+
+// U9 controller path: use the real HUDPanelController, native editor delegate, and snapshot
+// update. Selection's first-row policy belongs to U10; this unit checks only the rendered body,
+// walk order, and preservation of the live header/editor across edit and clear.
+for scenario in prototype.metadata.scenarios where scenario.rowSet == "populated" && scenario.session == .keyboard {
+    let rows = prototype.fixture.rowSets[scenario.rowSet]!
+    let model = AppModel(surfacePreferences: .auto,
+                         pulsePreferences: scenario.preferences.pulse,
+                         themeID: .github,
+                         inboundPreferences: scenario.preferences.inbound,
+                         lensPreferences: scenario.preferences.lens)
+    model.setRadar(rows.radar, confirmed: true)
+    model.setInbound(rows.inbound)
+    model.setPulse(rows.pulse)
+    model.setSelfLogin(prototype.fixture.selfLogin)
+    let controller = HUDPanelController(model: model)
+    controller.show()
+    controller.setExpanded(true)
+    controller.beginKeySummonSession()
+    check(controller.jumpSessionIsLiveForTesting(),
+          "U9 controller \(scenario.id): native session begins")
+    guard controller.jumpSessionIsLiveForTesting(),
+          let line = controller.jumpLineForTesting(),
+          let editor = line.field.currentEditor() as? JumpFieldEditor else {
+        check(false, "U9 controller \(scenario.id): native editor is acquired")
+        controller.hide()
+        continue
+    }
+    let originalLine = line
+    let beforePreferences = (model.pulsePreferences, model.inboundPreferences, model.lensPreferences)
+    let replacement = NSRange(location: 0, length: editor.string.utf16.count)
+    editor.insertText(scenario.query, replacementRange: replacement)
+    let query = JumpQuery(scenario.query)
+    let expectedDrawn = scenario.expected.localIDs
+        + (!query.isEmpty ? [KeySession.destinationID] : [])
+    check(controller.islandForTesting()?.renderedActionableIDsForTesting() == expectedDrawn,
+          "U9 controller \(scenario.id): edit renders the ordered local rows and destination")
+    check(controller.keyWalkForTesting() == scenario.expected.walk,
+          "U9 controller \(scenario.id): edit walk equals the declared ordered walk")
+    let visibleCounts = descendants(line).compactMap { $0 as? NSTextField }
+        .filter { $0 !== line.field && !$0.isHiddenOrHasHiddenAncestor }.map(\.stringValue)
+    check(visibleCounts == scenario.expected.count.map { [$0] } ?? [],
+          "U9 controller \(scenario.id): actual header count agrees with the local results")
+    check(controller.jumpLineForTesting() === originalLine
+          && line.field.currentEditor() === editor,
+          "U9 controller \(scenario.id): edit retains header and native editor identity")
+    if !scenario.query.isEmpty {
+        check(line.control(line.field, textView: editor,
+                           doCommandBy: Selector(("cancelOperation:"))),
+              "U9 controller \(scenario.id): native clear command is handled")
+        check(controller.islandForTesting()?.renderedActionableIDsForTesting() == scenario.expected.browseIDs,
+              "U9 controller \(scenario.id): clear restores the browse rows")
+        check(model.pulsePreferences == beforePreferences.0
+              && model.inboundPreferences == beforePreferences.1
+              && model.lensPreferences == beforePreferences.2,
+              "U9 controller \(scenario.id): clear does not mutate browse preferences")
+        check(controller.jumpLineForTesting() === originalLine
+              && line.field.currentEditor() === editor,
+              "U9 controller \(scenario.id): clear retains header and native editor identity")
+    }
+    controller.hide()
+}
+
 let nativePanel = HUDPanel(contentRect: NSRect(x: 0, y: 0, width: 520, height: 100),
                            styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
 nativePanel.keySessionActive = true

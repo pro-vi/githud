@@ -25,7 +25,8 @@ here, in the same pull request. Nothing else in this document is load-bearing ag
 | **lane** | A question the island answers. Three today: **Needs you**, **Inbound**, **Your PRs**. |
 | **region** | A classification of a lane's rows by fact, not by preference. Disjoint and total: every row is in exactly one. |
 | **surface** | Somewhere rows or counts are rendered: the lane, a ledger line, a card, the menu-bar glyph, the collapsed pill. |
-| **count** | The residue an operator leaves behind when it hides rows. Counts are the honesty mechanism; see **L1**. |
+| **count** | A quantity with a stated scope: hidden browse rows, or local search results out of captured searchable rows. A search count never substitutes for a result row; see **L1**. |
+| **browse / search** | Empty or whitespace-only query uses browse composition. A non-empty query uses search: every matching captured row is shown directly. |
 
 ---
 
@@ -33,12 +34,12 @@ here, in the same pull request. Nothing else in this document is load-bearing ag
 
 Numbering is stable. Reordering preserves numbers in place; a retired law leaves a gap.
 
-**L1 — conservation.** Every row **admitted to a lane** lands exactly once: as a visible row,
-inside a subordinate run, in a terminal region, or inside a count. Hiding is never dropping.
+**L1 — conservation.** Within a declared surface scope, every row is represented exactly once.
+Browse may represent a row directly, in a subordinate run, in a terminal region, or inside a
+count. Search represents every matching captured row as a result row; a count cannot replace it.
 
-> *Fold, not filter.* This is the oldest rule in the project and the one every other law
-> serves. A surface that hides work without counting it is a **miss**, and a miss is the only
-> thing that kills a tool like this.
+> Browse accounts for hidden work. Search exposes every match. Browse hiding operators do not
+> apply to search results.
 
 **L1's domain is rows, and three boundaries sit above it.** Stating them is not a weakening — a
 law whose edges are unwritten gets read as either false or unbounded, and both are worse.
@@ -49,21 +50,21 @@ law whose edges are unwritten gets read as either false or unbounded, and both a
   GitHub inbox, and `probe --show-suppressed`. Conservation cannot govern this boundary, because
   the whole point is that the firehose is not conserved. What governs it instead is the miss
   doctrine: suppression must always be *auditable*, never silent.
-- **Input gating.** One preference removes a region from a lane's input rather than from its
-  rendering (see **E1**). Rows gated out that way are not in the lane, so they are not in L1's
-  domain either.
-- **Narrowing.** A jump query temporarily narrows the admitted rows shown in the lanes. It is
-  user-directed and reversible with `esc`. For a non-empty query (ignoring whitespace), the header
-  count discloses the narrowed subset against the summon-time admitted set. At zero matches, the
-  no-match line replaces that count. An empty query shows neither. When the session ends, the
-  live lanes and collapsed pill/gauge render the current admitted set again, so narrowing never
-  silently drops a row.
+- **Input gating.** In browse, one preference removes drafts from the lane's input rather than
+  its rendering (see **E1**). That exemption is browse-only: captured drafts remain searchable.
+- **Narrowing.** A non-empty jump query (ignoring whitespace) narrows the summon-time captured
+  radar, inbound and pulse arrays. Search shows every match, including browse-hidden drafts,
+  quiet rows, held-back inbound and folded owners. Suppressed notifications and departure
+  receipts are outside this search set. Clearing restores browse over the same snapshot and
+  saved preferences without writing them; ending the session applies the current live data.
 
-**L2 — agreement.** Surfaces showing the same underlying set agree on that set — except where **E2**
-applies — and on its order **within each partition**. For a non-empty jump query (ignoring
-whitespace), the header count discloses the narrowed subset against the summon-time admitted set;
-when there are no matches, the no-match line replaces the count. An empty query shows neither.
-The pill/gauge and lanes agree again on the live admitted set after the session ends.
+**L2 — agreement.** Surfaces claiming the same set, measurement and snapshot agree — except where
+**E2** applies — and agree on order **within each partition**. In search, `N of M` means N local
+result rows out of M captured searchable rows, counted before browse gates and folds. N equals
+the number of displayed local rows and local keyboard stops; it excludes the GitHub destination.
+Counts measure row occurrences, not distinct GitHub URLs. No matches shows the no-match line
+instead of a count; an empty query shows neither. The browse pill/gauge do not claim to count
+search results, and resume the live admitted set when the session ends.
 
 > The partition qualifier is load-bearing, not a hedge. The lane sinks folded owners below
 > every leading one, so a folded owner the user dragged to the top renders near the bottom of
@@ -74,12 +75,13 @@ The pill/gauge and lanes agree again on the live admitted set after the session 
 **L3 — linearization.** For every row the key session governs, keyboard traversal order equals
 render order, exactly, and a selection can never land on a row the lane does not draw.
 
-> A row that is hidden — input-gated, collapsed, or folded away — is not "unreachable"; it is not
-> drawn at all, and **L1** guarantees its caption or ledger count stands in its place. After existing
-> input gates and folds, matching rows that remain drawn are walked from the same narrowed set.
-> The only rows drawn but not walked remain departure receipts, which is **G3**.
-> The trailing GitHub destination row is walked, so it is
-> not a G3 case.
+> In browse, collapsed or folded rows are represented by counts, with the browse-only draft
+> exemption **E1**. Departure receipts remain drawn but not walked (**G3**).
+> In search, every matching row is walked in displayed order: Needs you → Inbound → Your PRs,
+> preserving each matching array's captured order, then the GitHub destination. Empty lanes
+> are omitted. No caption, owner ledger, group header or visibility control hides a match or
+> enters the search walk. Pulse search preserves active → quiet → drafts array order rather
+> than browse's active → drafts → quiet composition.
 
 **L4 — no zero.** A surviving count never renders as zero. An operator that would leave `0`
 behind renders nothing instead — a zero count is noise wearing the costume of honesty.
@@ -92,7 +94,8 @@ degraded vocabulary is used rather than the confident one.
 
 ## Operators
 
-Each operator transforms rows into a smaller rendering while satisfying **L1**. `scope` names
+These operators apply only to **browse composition**, never to search results. Each transforms
+rows into a smaller rendering while satisfying **L1**. `scope` names
 where it applies today — several have not generalized across lanes yet, and saying so is more
 useful than implying a symmetry that isn't built.
 
@@ -125,10 +128,11 @@ which you are designing decides whether a count belongs:
 | audit receipt | just cleared | a **trail** — nothing is owed; the count proves githud did not lose something silently |
 | your own WIP | drafts | **nothing** — only you can act on it, and only when you choose to |
 
-> **⚠ EXEMPTION — drafts (E1).** Hidden drafts leave **no** caption; they are fully invisible.
+> **⚠ EXEMPTION — drafts (E1).** In browse, hidden drafts leave **no** caption; they are fully invisible.
 > The mechanism is the real distinction: drafts gate at the lane's **input**, every other
 > collapsible set gates at its **rendering**. The rationale is the table above — a draft is the
-> only kind whose count would promise nothing, so it is the only set that may vanish outright.
+> only kind whose count would promise nothing, so it is the only set that may vanish outright
+> from browse. Captured drafts remain available to explicit search.
 
 ### `fold(owner) → ledger line`
 *scope: Your PRs.* An owner the user has folded renders as one counted line instead of its
@@ -154,7 +158,9 @@ unfolding, since one owner cannot be inferred from a merged line.
 
 ## Lane: Your PRs
 
-The only lane specified at this layer today. The other two are named below, honestly unfinished.
+The browse composition below applies only when the query is empty or whitespace-only.
+Search draws matching rows directly, without these owner and region operators.
+The other two lanes are named below, honestly unfinished at this layer.
 
 ```
 axes         region = live | draft | quiet      classification by fact; disjoint, total
@@ -198,7 +204,7 @@ trust filtering, urgency-ranked, with a `just cleared` receipt band for departur
 **Inbound** answers *"what's at my door?"* — open issues and PRs others opened on repos you
 own, waiting-longest first, with bot and draft arrivals held back to a count.
 
-Both use `collapse`. Neither uses `fold`, `tail`, `sink` or `merge` — the owner lens has not
+In browse, both use `collapse`. Neither uses `fold`, `tail`, `sink` or `merge` — the owner lens has not
 generalized past Your PRs. Whether these lanes should share those operators or merely rhyme
 with them is **an open question, not a settled one.** They are not specified here because
 they have not been designed at this layer; an empty section is more honest than an invented one.
@@ -213,7 +219,7 @@ are wrong and should be re-cut — it does not mean the register should grow.
 
 | # | Operator | Exemption | Reason |
 |---|---|---|---|
-| E1 | `collapse` | drafts gate at **input**, not rendering — hidden means absent, no caption | A count is a debt; a draft is your own WIP, and only you can act on it |
+| E1 | `collapse` | browse-only: drafts gate at **input**, not rendering — hidden means absent, no caption; captured drafts remain searchable | A count is a debt; a draft is your own WIP, and only you can act on it |
 | E2 | `fold` / **L2** | a folded owner with nothing left in the lane stays listed on the card, so the card's owner set can legitimately exceed the lane's | A fold must stay **releasable**. An owner folded and then emptied — by hiding drafts, or by its work landing — would otherwise be folded forever with no way to reach it. The card shows configuration; the lane shows what is on screen |
 
 ### Known gaps

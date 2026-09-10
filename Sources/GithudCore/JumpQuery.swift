@@ -14,10 +14,13 @@ public struct JumpQuery: Equatable, Sendable {
     }
 
     public struct Narrowed: Equatable, Sendable {
+        /// Search renders these arrays directly; browse visibility preferences
+        /// never remove a match. Each array keeps its captured source order.
         public let radar: [RadarRow]
         public let inbound: [InboundRow]
         public let pulse: [PulseRow]
         public let matched: Int
+        /// Captured source rows before browse gates, not a pill/gauge count.
         public let admitted: Int
     }
 

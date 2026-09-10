@@ -274,6 +274,18 @@ final class IslandContentView: NSView {
         [radarScroll, inboundScroll, pulseScroll].compactMap { $0?.frame.height }
     }
 
+    /// Inspect actual constructed views, not the input arrays or dictionary order.
+    /// Scroll-clipped rows still count; explicitly hidden views do not.
+    func renderedActionableIDsForTesting() -> [String] {
+        func walk(_ view: NSView) -> [String] {
+            guard !view.isHidden else { return [] }
+            if let id = keyRows.first(where: { $0.value === view })?.key { return [id] }
+            let children = (view as? NSStackView)?.arrangedSubviews ?? view.subviews
+            return children.flatMap(walk)
+        }
+        return bodyStack.map(walk) ?? []
+    }
+
     /// Restore captured offsets into the REBUILT panes (call after the island is framed + laid
     /// out). Each is clamped to the new content height — a shorter rebuilt lane can't scroll past
     /// its end, and the pane frame itself is already whole-row-snapped by `fittingHeight()`, so
@@ -461,19 +473,24 @@ final class IslandContentView: NSView {
             radarScroll = scroll; radarHeightC = height; radarPane = scroll
         }
 
-        let inboundSections = InboundPresenter.sections(for: inbound)
-        var inboundViews: [NSView] = inboundSections.active.map { inboundRowView($0) }
-        if showHeldBackInbound {
-            if !inboundSections.heldBack.isEmpty {
-                inboundViews.append(revealedHeader(PlainWords.heldBackHeader,
-                                                   onHide: onToggleHeldBackInbound))
+        var inboundViews: [NSView]
+        if queryActive {
+            inboundViews = inbound.map { inboundRowView($0) }
+        } else {
+            let inboundSections = InboundPresenter.sections(for: inbound)
+            inboundViews = inboundSections.active.map { inboundRowView($0) }
+            if showHeldBackInbound {
+                if !inboundSections.heldBack.isEmpty {
+                    inboundViews.append(revealedHeader(PlainWords.heldBackHeader,
+                                                       onHide: onToggleHeldBackInbound))
+                }
+                inboundViews += inboundSections.heldBack.map { inboundRowView($0) }
+            } else if !inboundSections.heldBack.isEmpty {
+                inboundViews.append(captionButton(
+                    text: PlainWords.heldBackCaption(inboundSections.heldBack.count),
+                    spoken: PlainWords.heldBackCaptionSpoken(inboundSections.heldBack.count),
+                    onClick: onToggleHeldBackInbound))
             }
-            inboundViews += inboundSections.heldBack.map { inboundRowView($0) }
-        } else if !inboundSections.heldBack.isEmpty {
-            inboundViews.append(captionButton(
-                text: PlainWords.heldBackCaption(inboundSections.heldBack.count),
-                spoken: PlainWords.heldBackCaptionSpoken(inboundSections.heldBack.count),
-                onClick: onToggleHeldBackInbound))
         }
         var inboundPane: NSView?
         if !inboundViews.isEmpty {
@@ -481,69 +498,77 @@ final class IslandContentView: NSView {
             inboundScroll = scroll; inboundHeightC = height; inboundPane = scroll
         }
 
-        let sections = PulsePresenter.sections(for: pulse)
-        let lensDrafts = sections.lensRegions(showDrafts: showDrafts).drafts
-        let lensLayout = PulsePresenter.lensLayout(live: sections.active, drafts: lensDrafts,
-                                                   quiet: sections.stale, prefs: lensPreferences,
-                                                   selfLogin: selfLogin, lastOpened: lensLastOpened)
         var pulseViews: [NSView] = []
-        for entry in lensLayout.entries {
-            switch entry {
-            case .rows(let lensRows):
-                pulseViews += lensRows.map { row in
-                    let owner = PulsePresenter.owner(of: row)
-                    guard let selfLogin else { return pulseRowView(row) }
-                    return owner.lowercased() == selfLogin.lowercased()
-                        ? pulseRowView(row, elideOwner: true)
-                        : pulseRowView(row, emphasizeOwner: owner)
+        let pulseLabel: NSView?
+        if queryActive {
+            // Search exposes matches directly; browse preferences must not hide or
+            // reorder them. Full repo labels replace the absent owner headers.
+            pulseViews = pulse.map { pulseRowView($0) }
+            pulseLabel = pulse.isEmpty ? nil : sectionHeader("Your PRs")
+        } else {
+            let sections = PulsePresenter.sections(for: pulse)
+            let lensDrafts = sections.lensRegions(showDrafts: showDrafts).drafts
+            let lensLayout = PulsePresenter.lensLayout(live: sections.active, drafts: lensDrafts,
+                                                       quiet: sections.stale, prefs: lensPreferences,
+                                                       selfLogin: selfLogin, lastOpened: lensLastOpened)
+            for entry in lensLayout.entries {
+                switch entry {
+                case .rows(let lensRows):
+                    pulseViews += lensRows.map { row in
+                        let owner = PulsePresenter.owner(of: row)
+                        guard let selfLogin else { return pulseRowView(row) }
+                        return owner.lowercased() == selfLogin.lowercased()
+                            ? pulseRowView(row, elideOwner: true)
+                            : pulseRowView(row, emphasizeOwner: owner)
+                    }
+                case .group(_, let title, let groupRows, let drafts, let quiet):
+                    pulseViews.append(ownerSubHeader(title))
+                    pulseViews += groupRows.map { pulseRowView($0, elideOwner: true) }
+                    if !drafts.isEmpty {
+                        pulseViews.append(tailLabel(PlainWords.draftTailLabel(drafts.count)))
+                        pulseViews += drafts.map { pulseRowView($0, elideOwner: true) }
+                    }
+                    if !quiet.isEmpty {
+                        pulseViews.append(captionButton(
+                            text: showStale ? PlainWords.staleRevealedCaption(quiet.count)
+                                            : PlainWords.staleCaption(quiet.count),
+                            spoken: showStale ? PlainWords.staleRevealedCaptionSpoken(quiet.count)
+                                              : PlainWords.staleCaptionSpoken(quiet.count),
+                            verb: showStale ? PlainWords.hideControl : PlainWords.showVerb,
+                            indent: Self.tailIndent, onClick: onToggleStale))
+                        if showStale { pulseViews += quiet.map { pulseRowView($0, elideOwner: true) } }
+                    }
+                case .ledger(let owner, let title, let count, let draftCount, let quietCount, let fresh):
+                    pulseViews.append(lensLedgerLine(owner: owner, title: title, count: count,
+                                                     draftCount: draftCount, quietCount: quietCount, fresh: fresh))
                 }
-            case .group(_, let title, let groupRows, let drafts, let quiet):
-                pulseViews.append(ownerSubHeader(title))
-                pulseViews += groupRows.map { pulseRowView($0, elideOwner: true) }
-                if !drafts.isEmpty {
-                    pulseViews.append(tailLabel(PlainWords.draftTailLabel(drafts.count)))
-                    pulseViews += drafts.map { pulseRowView($0, elideOwner: true) }
-                }
-                if !quiet.isEmpty {
-                    pulseViews.append(captionButton(
-                        text: showStale ? PlainWords.staleRevealedCaption(quiet.count)
-                                        : PlainWords.staleCaption(quiet.count),
-                        spoken: showStale ? PlainWords.staleRevealedCaptionSpoken(quiet.count)
-                                          : PlainWords.staleCaptionSpoken(quiet.count),
-                        verb: showStale ? PlainWords.hideControl : PlainWords.showVerb,
-                        indent: Self.tailIndent, onClick: onToggleStale))
-                    if showStale { pulseViews += quiet.map { pulseRowView($0, elideOwner: true) } }
-                }
-            case .ledger(let owner, let title, let count, let draftCount, let quietCount, let fresh):
-                pulseViews.append(lensLedgerLine(owner: owner, title: title, count: count,
-                                                 draftCount: draftCount, quietCount: quietCount, fresh: fresh))
             }
-        }
-        if showDrafts, !lensLayout.terminalDrafts.isEmpty {
-            pulseViews.append(revealedHeader(PlainWords.draftsHeader, onHide: onToggleDrafts))
-            pulseViews += lensLayout.terminalDrafts.map { pulseRowView($0) }
-        }
-        if showStale, !lensLayout.terminalQuiet.isEmpty {
-            pulseViews.append(revealedHeader(PlainWords.staleHeader, onHide: onToggleStale))
-            pulseViews += lensLayout.terminalQuiet.map { pulseRowView($0) }
-        } else if !lensLayout.terminalQuiet.isEmpty {
-            pulseViews.append(captionButton(
-                text: PlainWords.staleCaption(lensLayout.terminalQuiet.count),
-                spoken: PlainWords.staleCaptionSpoken(lensLayout.terminalQuiet.count),
-                onClick: onToggleStale))
-        }
+            if showDrafts, !lensLayout.terminalDrafts.isEmpty {
+                pulseViews.append(revealedHeader(PlainWords.draftsHeader, onHide: onToggleDrafts))
+                pulseViews += lensLayout.terminalDrafts.map { pulseRowView($0) }
+            }
+            if showStale, !lensLayout.terminalQuiet.isEmpty {
+                pulseViews.append(revealedHeader(PlainWords.staleHeader, onHide: onToggleStale))
+                pulseViews += lensLayout.terminalQuiet.map { pulseRowView($0) }
+            } else if !lensLayout.terminalQuiet.isEmpty {
+                pulseViews.append(captionButton(
+                    text: PlainWords.staleCaption(lensLayout.terminalQuiet.count),
+                    spoken: PlainWords.staleCaptionSpoken(lensLayout.terminalQuiet.count),
+                    onClick: onToggleStale))
+            }
 
-        let owners = Set(PulsePresenter.ownerBuckets(live: sections.active, drafts: lensDrafts,
-                                                     quiet: sections.stale).map(\.key))
-        let folded = owners.filter { lensPreferences.isFolded($0) }.count
-        let wantsEye = owners.count >= 2 || folded > 0
-        let pulseLabel: NSView? = pulse.isEmpty ? nil : wantsEye
-            ? LensEyeHeaderView(title: sectionHeader("Your PRs"), eye: IconButton(
-                symbol: lensLayout.entries.contains { if case .ledger = $0 { return true }; return false }
-                    ? "eye.slash" : "eye",
-                tooltip: PlainWords.lensEyeLabel(foldedCount: folded), tint: theme.inkTertiary,
-                hover: theme.hoverFill) { [weak self] in self?.onOpenLensCard?() })
-            : sectionHeader("Your PRs")
+            let owners = Set(PulsePresenter.ownerBuckets(live: sections.active, drafts: lensDrafts,
+                                                         quiet: sections.stale).map(\.key))
+            let folded = owners.filter { lensPreferences.isFolded($0) }.count
+            let wantsEye = owners.count >= 2 || folded > 0
+            pulseLabel = pulse.isEmpty ? nil : wantsEye
+                ? LensEyeHeaderView(title: sectionHeader("Your PRs"), eye: IconButton(
+                    symbol: lensLayout.entries.contains { if case .ledger = $0 { return true }; return false }
+                        ? "eye.slash" : "eye",
+                    tooltip: PlainWords.lensEyeLabel(foldedCount: folded), tint: theme.inkTertiary,
+                    hover: theme.hoverFill) { [weak self] in self?.onOpenLensCard?() })
+                : sectionHeader("Your PRs")
+        }
         pulseLabel?.setContentHuggingPriority(.required, for: .vertical)
         var pulsePane: NSView?
         if !pulse.isEmpty {

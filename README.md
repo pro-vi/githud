@@ -194,6 +194,10 @@ Avoid `-w 'ghp_…'` with the token inline. That leaks it into shell history and
 | **Clear or put away** | <kbd>esc</kbd> clears typed text; press it again to put the island away, or click anywhere else |
 | **Settings** | right-click the menu-bar item → *Settings…* |
 
+Search shows matching quiet rows, drafts, held-back inbound and folded-owner rows directly,
+even when browse hides them. It does not change your saved preferences. Clearing the query
+restores the browse layout from the same summon-time snapshot.
+
 The global hotkey uses no Accessibility permission, so macOS never asks you to approve
 anything.
 
